@@ -1,0 +1,1021 @@
+classdef thermal_model
+	%THERMAL_MODEL Summary of this class goes here
+	%   Detailed explanation goes here
+	
+	properties		
+		%% System Structure
+		Nc (1,1) {mustBePositive, mustBeInteger} ...
+			= 36;		% Number of Cores
+		Nh (1,1) {mustBePositive, mustBeInteger} ...
+			= 6;		% Number of rows
+		Nv (1,1) {mustBePositive, mustBeInteger} ...
+			= 6;		% Number of cols
+		vd (1,1) {mustBePositive, mustBeInteger} ...
+			= 4;		% Voltage/Power Domains
+		VDom {mustBeNonnegative, mustBeNumericOrLogical, mustBeNonempty, mustBeLessThanOrEqual(VDom,1)} ...
+			= 1;		% Structure of the Voltage Domains Nc x vd
+		
+		%% Matlab/Simulation
+		%thermal_model_ver
+		model_ver (1,1) {mustBeNonnegative, mustBeInteger} ...
+			= 0;				% Version of the Thermal Model
+		%model_variation
+		model_deviations (1,1) {mustBeNonnegative, mustBeNumericOrLogical} ...
+			= 1;				% If the true system should be != from nominal
+		%measure_noise = 1;
+		sensor_noise (1,1) {mustBeNonnegative, mustBeNumericOrLogical} ...
+			= 1;
+		%T_noise_max = 1.0;
+		sensor_noise_amplitude (3,1) {mustBeNonnegative, mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= [1.0; 1.0; 1.0];	% Process, Voltage, Temperature amplitudes.
+		Ts (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
+			= 250e-6;			% Discretization Time
+		
+		Ac_nom {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= [1];
+		Bc_nom {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= [1];
+		Ac_true {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= [1];
+		Bc_true {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= [1];
+		
+		C {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= [1];
+		D {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= [1];
+
+		temp_amb (1,1) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= 25.0 + 273.15;	% External Ambient Temperature
+
+		%ThMoNoise;	
+		param_dev_per {mustBeNonnegative, mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= 1;
+
+		% TODO: set dim checks
+		% fp = FloorPlan
+		RC_fp_len (:,:,4) {mustBeNonnegative, mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= ones(1,1,4);
+		%		(:,:,1) = North
+		%		(:,:,2) = East
+		%		(:,:,3) = South
+		%		(:,:,4) = West
+		CPw_fp_len (:,:,4) {mustBeNonnegative, mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= ones(1,1,4);
+		%		(:,:,1) = North
+		%		(:,:,2) = East
+		%		(:,:,3) = South
+		%		(:,:,4) = West
+		R_fp_material {mustBeNonnegative, mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= 1;
+		%		(:,:,1) = Si
+		%		(:,:,2) = Cu
+		C_fp_material {mustBeNonnegative, mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= 1;
+		%		(:,:,1) = Si
+		%		(:,:,2) = Cu
+
+		% Thickness
+		t_si (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
+			= 5e-4; %3e-4;
+		t_cu (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
+			= 1e-3; %1.1e-3;
+		% TODO: set dim checks
+		t_comp {mustBePositive, mustBeNumeric, mustBeFinite} ...
+			= [1.5e-2, 1e-3, 2e-3, 10e-2];
+		%al, pcb, mb, air (%reverse order of pos)
+
+		% Width
+		% TODO: set dim checks
+		wid_comp {mustBePositive, mustBeNumeric, mustBeFinite} ...
+			= [0.0416, 0.0366, 10e-2, 20e-2];
+		%al, pcb, mb, air (%reverse order of pos)
+
+		% Length
+		% TODO: set dim checks
+		len_comp {mustBePositive, mustBeNumeric, mustBeFinite} ...
+			= [0.0416, 0.0366, 10e-2, 20e-2];
+		%al, pcb, mb, air (%reverse order of pos)
+
+
+		% Additional vertical resistance
+		R_TIM1 (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
+			= 1;%0.25; %6 4.5
+		R_TIM2 (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
+			= 2.5; %6; %4; 0.75;
+		case_fan_dis (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
+			= 0.25; %0.85 %0.1 - 1
+		case_fan_nom_speed (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
+			= 1000; %fan_nom_speed
+		al_fan_dis (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
+			= 10; %heatsink_fan_dis
+		al_fins_coeff (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
+			= 3; %fins_coeff
+
+		air_factor (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
+			= 100;
+		%air_time_factor = 10; %20
+
+		pw2therm_coeff = 1.05; %0.90 %0.41; 0.7;
+end
+
+	properties(Dependent)
+		%% Matlab/Simulation
+		Ns;							% Number of States
+		Ni;							% Number of inputs
+		Nout;						% Number of "Outputs"
+
+		% Matlab Matrices
+		Ad_nom;
+		Bd_nom;
+		Ad_true;
+		Bd_true;
+	end
+	
+	properties(SetAccess=immutable, GetAccess=public)
+
+		%%% Value that, if changed, I need to change the code
+
+		add_states = 4;
+		add_outputs = 1;
+		add_inputs = 1;
+		param_dev_dim2 = 8;
+
+		full_model_layers = 2;
+
+		extt_rows = 1;
+		extb_rows = 1;
+		extl_cols = 1;
+		extr_cols = 1;
+
+		air_pos = 0;
+		mb_pos = 1;
+		pcb_pos = 2;
+		al_pos = 3;	
+
+		%%% PHYSICAL values
+
+		alpha_k_si = -4e-3;
+		alpha_k_cu = -1e-4;
+		k_si = 127; %148;
+		k_cu = 398.5; %400;
+		k_air = 0.025;
+		k_al = 225.94;
+		k_pcb = 3.096;
+		k_mb = 0.167;
+
+		alpha_c_si = 1e-3;
+		alpha_c_cu = 3e-4;
+		c_si = 1.7243e+06; %1.66e6;
+		c_cu = 3.4794e+06; %3.44e6;
+		c_air = 1004*1.29*1.5; %SHC*air density*"air compression factor" % SHC=Specific Heat Capacity
+		c_al = 921*2698; %SHC*density
+		c_pcb = 753*2900; %SHC*density
+		c_mb = 795*1900; %SHC*density
+
+		%{
+		A_dim
+		B_dim
+		C_dim
+		D_dim
+		%}
+	end
+	
+	%% Gerenal Methods
+	methods
+		function obj = thermal_model(inputArg1,inputArg2)
+			%THERMAL_MODEL Construct an instance of this class
+			%   Detailed explanation goes here
+			%obj.Property1 = inputArg1 + inputArg2;
+		end
+		
+		function outputArg = method1(obj,inputArg)
+			%METHOD1 Summary of this method goes here
+			%   Detailed explanation goes here
+			%outputArg = obj.Property1 + inputArg;
+		end
+	end
+
+	%% Models
+	methods(Static)
+		function R = spreading_r_computation(source_area, plate_area, plate_thickness, k_source, R_plate)	
+			src_r = (source_area / pi)^(1/2);
+			plt_r = (plate_area / pi)^(1/2);
+			tau = plate_thickness / plt_r;
+			
+			epsi = src_r/plt_r;
+			h = 1 / (R_plate * plate_area);
+			Biot = h * plt_r / k_source;
+			
+			delta_c = pi + 1/(pi^(1/2)*epsi);
+			phi_c = ( tanh(delta_c*tau) + delta_c/Biot ) / ( 1 + delta_c/Biot*tanh(delta_c*tau) );			
+			
+			psi_avg = (1-epsi)^(3/2)*phi_c / 2;
+			psi_max = (1-epsi)*phi_c/(pi^(1/2));
+			
+			R = psi_avg / k_source / (source_area^(1/2));			
+		end
+	end
+
+	methods
+		function [A, B] = lin_model_create(obj, T, pdev, tm_ver) %, pw, ceff, pw_levels)
+			
+			lNc = obj.Nc;
+			lNh = obj.Nh;
+			lNv = obj.Nv;
+			
+			debug = 0;
+			
+			lAirPos = obj.air_pos;
+			lMbPos = obj.mb_pos;
+			lPcbPos = obj.pcb_pos;
+			lAlPos = obj.al_pos;		
+
+			North = 1;
+			East = 2;
+			South = 3;
+			West = 4;
+			
+			chiplet_width = max( sum( squeeze(obj.RC_fp_len(1+obj.extt_rows:end-obj.extb_rows,1+obj.extl_cols:end-obj.extr_cols, East)), 2 ) + ...
+				sum( squeeze(obj.RC_fp_len(1+obj.extt_rows:end-obj.extb_rows,1+obj.extl_cols:end-obj.extr_cols, West)), 2 ) );
+			chiplet_length = max( sum( squeeze(obj.RC_fp_len(1+obj.extt_rows:end-obj.extb_rows,1+obj.extl_cols:end-obj.extr_cols, North)), 2 ) + ...
+				sum( squeeze(obj.RC_fp_len(1+obj.extt_rows:end-obj.extb_rows,1+obj.extl_cols:end-obj.extr_cols, South)), 2 ) );
+	
+			%%% Components of non-fully modeled Layers
+			A_comp = zeros(obj.add_states, 1);
+			for i=1:obj.add_states
+				A_comp(i) = obj.wid_comp(i) * obj.len_comp(i);
+			end
+			
+			% Capacitances
+			C_al = obj.c_al * A_comp(end-lAlPos) * obj.t_comp(end-lAlPos);
+			C_pcb = obj.c_pcb * A_comp(end-lPcbPos) * obj.t_comp(end-lPcbPos);
+			C_mb = obj.c_mb * A_comp(end-lMbPos) * obj.t_comp(end-lMbPos);
+			C_air = obj.c_air * A_comp(end-lAirPos) * obj.t_comp(end-lAirPos);
+			
+			% Resistances
+			%partial
+			Ri_air_tot_v = obj.t_comp(end-lAirPos) / A_comp(end-lAirPos) / obj.k_air / obj.air_factor;
+			air_al_t = obj.t_comp(end-lAirPos) - (obj.t_comp(end-lAlPos)+obj.t_cu+obj.t_si+obj.t_comp(end-lAirPos));
+			Ri_air_al_t = air_al_t / A_comp(end-lAirPos) / obj.k_air / obj.air_factor;
+			Ri_air_al_len = (obj.len_comp(end-lAirPos)-obj.len_comp(end-lAlPos)) / 2 ...
+							/ (obj.wid_comp(end-lAirPos) * obj.t_comp(end-lAirPos)) ...
+							/ obj.k_air / obj.air_factor;
+			Ri_air_al_wid = (obj.wid_comp(end-lAirPos)-obj.wid_comp(end-lAlPos)) / 2 ...
+							/ (obj.len_comp(end-lAirPos) * obj.t_comp(end-lAirPos)) ...
+							/ obj.k_air / obj.air_factor;
+			%
+			Ri_al_v = obj.t_comp(end-lAlPos) / A_comp(end-lAlPos) / obj.k_al;
+			Ri_al_len = obj.len_comp(end-lAlPos) / (obj.wid_comp(end-lAlPos) * obj.t_comp(end-lAlPos)) / obj.k_al;
+			Ri_al_wid = obj.wid_comp(end-lAlPos) / (obj.len_comp(end-lAlPos) * obj.t_comp(end-lAlPos)) / obj.k_al;
+			%
+			Ri_pcb_v = obj.t_comp(end-lPcbPos) / A_comp(end-lPcbPos) / obj.k_pcb;
+			Ri_mb_v = obj.t_comp(end-lMbPos) / A_comp(end-lMbPos) / obj.k_mb;
+			%
+			RaL = 1.948E+09 * air_al_t^3;
+			h_alair_cond = RaL^(1/4) * 0.54 * obj.k_air / air_al_t;
+			R_alair_cond = 1 / (h_alair_cond * A_comp(end-lAlPos) * obj.al_fins_coeff);
+			
+			RaL = 1.948E+09 * (t_air-t_al-t_cu-t_si-t_pcb + t_al/2)^3;
+			h_alairAL12_cond = k_air/(t_air-t_al-t_cu-t_si-t_pcb + t_al/2) * ...
+				(0.825 + (0.387 * RaL^(1/6))/(1+(0.492/7.039E-01)^(9/16))^(8/27))^2;
+			R_alairAL1_cond = 1 / (h_alairAL12_cond * (al_wi*t_al));
+			R_alairAL2_cond = 1 / (h_alairAL12_cond * (al_li*t_al));
+			
+			RaL = 1.948E+09 * (t_air)^3;
+			h_mbair_cond = RaL^(1/4) * 0.54 * k_air / (t_air);
+			R_mbair_cond = 1 / (h_mbair_cond * (A_mb - A_al));
+			
+			%source_area, plate_area, plate_thickness, k_source, R_plate
+			R_spr_alair = obj.spreading_r_computation(A_al, A_air, t_air, k_al, Ri_air_al_t);
+			R_alair_v = Ri_al_v + R_alair_cond + R_spr_alair;
+			%
+			R_spr_alair1 = obj.spreading_r_computation((al_wi*t_al), (air_wi*t_air), air_li, k_al, Ri_air_al_len);
+			R_alairAL1_v = Ri_al_len + R_alairAL1_cond + R_spr_alair1;
+			
+			R_spr_alair2 = obj.spreading_r_computation((al_li*t_al), (air_li*t_air), air_wi, k_al, Ri_air_al_wid);
+			R_alairAL2_v = Ri_al_wid + R_alairAL2_cond + R_spr_alair2;
+			%
+			R_spr_pcbmb = obj.spreading_r_computation(A_pcb, A_mb, t_mb, k_pcb, Ri_mb_v);
+			R_pcbmb_v = Ri_pcb_v + Ri_mb_v + R_spr_pcbmb;
+			R_spr_mbair = obj.spreading_r_computation(A_mb, A_air, t_air, k_mb, Ri_air_tot_v);
+			R_mbair_v = Ri_mb_v + R_mbair_cond + R_spr_mbair;
+			
+			%TODO NOWWW
+			%R_air_v = R_air_v * obj.ThMoNoise(fix(i/2)+1,7);
+			%C_air = Ci_air * obj.ThMoNoise(fix(i/2)+1,7);
+			si_pcb_fact = 0.1;
+			pcb_mb_fact = 15;
+			mb_air_fact = 10;
+
+			A=zeros(obj.Ns);
+			
+			for i=1:2*lNc
+				if (mod(i,2)>0)				
+					% Core Position
+					ci = fix((i-1)/2)+1;
+					irow = fix((ci-1)/core_cols)+1 + extt_rows;
+					icol = mod((ci-1),core_cols)+1 + extl_cols;
+
+					% Computing Core R
+					li = dRNmat(irow,icol) + dRSmat(irow,icol);
+					wi = dREmat(irow,icol) + dRWmat(irow,icol);
+					Ri_si_hn = li/(wi*t_si)/k1mat(irow,icol);
+					Ri_si_hs = Ri_si_hn;
+					Ri_si_he = wi/(li*t_si)/k1mat(irow,icol);
+					Ri_si_hw = Ri_si_he;
+
+					Ri_si_v = t_si/(wi*li)/k1mat(irow,icol);
+					Ri_cu_v = t_cu/(wi*li)/k2mat(irow,icol);
+					R_spr_cual = obj.spreading_r_computation((wi*li), A_al, t_al, k_cu, Ri_al_v);
+					R_spr_sipcb = obj.spreading_r_computation((wi*li), A_pcb, t_pcb, k_si, Ri_pcb_v);
+
+					Ri_cu_hn = li/(wi*t_cu)/k2mat(irow,icol);
+					Ri_cu_hs = Ri_cu_hn;
+					Ri_cu_he = wi/(li*t_cu)/k2mat(irow,icol);
+					Ri_cu_hw = Ri_cu_he;
+
+					% Computing Core C
+					li = lCNmat(irow,icol) + lCSmat(irow,icol);
+					wi = lCEmat(irow,icol) + lCWmat(irow,icol);
+					Ci_si = c1mat(irow, icol) * li*wi*t_si;
+					Ci_cu = c2mat(irow, icol) * li*wi*t_cu;
+					%
+					
+					% Computing neighbourhood R
+					li = dRNmat(irow-1,icol) + dRSmat(irow-1,icol);
+					wi = dREmat(irow-1,icol) + dRWmat(irow-1,icol);
+					Rn_si_h = li/(wi*t_si)/k1mat(irow-1,icol);
+					Rn_cu_h = li/(wi*t_cu)/k2mat(irow-1,icol);
+					li = dRNmat(irow+1,icol) + dRSmat(irow+1,icol);
+					wi = dREmat(irow+1,icol) + dRWmat(irow+1,icol);
+					Rs_si_h = li/(wi*t_si)/k1mat(irow+1,icol);
+					Rs_cu_h = li/(wi*t_cu)/k2mat(irow+1,icol);
+					li = dRNmat(irow,icol+1) + dRSmat(irow,icol+1);
+					wi = dREmat(irow,icol+1) + dRWmat(irow,icol+1);
+					Re_si_h = wi/(li*t_si)/k1mat(irow,icol+1);
+					Re_cu_h = wi/(li*t_cu)/k2mat(irow,icol+1);
+					li = dRNmat(irow,icol-1) + dRSmat(irow,icol-1);
+					wi = dREmat(irow,icol-1) + dRWmat(irow,icol-1);
+					Rw_si_h = wi/(li*t_si)/k1mat(irow,icol-1);
+					Rw_cu_h = wi/(li*t_cu)/k2mat(irow,icol-1);
+
+					% Series
+					R_si_hn = Ri_si_hn + Rn_si_h;
+					R_si_hs = Ri_si_hs + Rs_si_h;
+					R_si_he = Ri_si_he + Re_si_h;
+					R_si_hw = Ri_si_hw + Rw_si_h;
+
+					R_sicu_v = Ri_si_v + Ri_cu_v + R_TIM1;
+
+					R_cu_hn = Ri_cu_hn + Rn_cu_h;
+					R_cu_hs = Ri_cu_hs + Rs_cu_h;
+					R_cu_he = Ri_cu_he + Re_cu_h;
+					R_cu_hw = Ri_cu_hw + Rw_cu_h;					
+					
+					R_cual_v = Ri_cu_v + R_TIM2 + Ri_al_v + R_spr_cual;
+					R_sipcb_v = Ri_si_v + Ri_pcb_v + R_spr_sipcb;
+					
+					C_si = Ci_si;
+					C_cu = Ci_cu;
+
+					% Noise
+					if d==1
+					R_si_hn = R_si_hn * obj.ThMoNoise(fix(i/2)+1,1);
+					R_si_hs = R_si_hs * obj.ThMoNoise(fix(i/2)+1,1);
+					R_si_he = R_si_he * obj.ThMoNoise(fix(i/2)+1,1);
+					R_si_hw = R_si_hw * obj.ThMoNoise(fix(i/2)+1,1);
+
+					R_sicu_v = R_sicu_v * obj.ThMoNoise(fix(i/2)+1,3);
+					R_cual_v = R_cual_v * obj.ThMoNoise(fix(i/2)+1,4);
+
+					R_cu_hn = R_cu_hn * obj.ThMoNoise(fix(i/2)+1,2);
+					R_cu_hs = R_cu_hs * obj.ThMoNoise(fix(i/2)+1,2);
+					R_cu_he = R_cu_he * obj.ThMoNoise(fix(i/2)+1,2);
+					R_cu_hw = R_cu_hw * obj.ThMoNoise(fix(i/2)+1,2);
+
+					C_si = Ci_si * obj.ThMoNoise(fix(i/2)+1,5);
+					C_cu = Ci_cu * obj.ThMoNoise(fix(i/2)+1,6);
+
+					end
+					
+					switch tm_ver
+						case 10
+							C_si = 1e-3; %C_si / 6 *1.1;
+							C_cu = 1.2e-2; %C_cu / 2;
+
+							R_si_hn = R_si_hn * 1.44;
+							R_si_hs = R_si_hs * 1.44;
+							R_si_he = R_si_he * 2.67;
+							R_si_hw = R_si_hw * 2.67;
+
+							R_sicu_v = 5; %R_si_v * 5;
+
+							R_cu_hn = R_cu_hn * 0.56;
+							R_cu_hs = R_cu_hs * 0.56;
+							%R_cu_he
+							%R_cu_hw
+
+							R_cual_v = 29; %R_cu_v * 5 * 1.3;
+						case 1	
+							ci = fix((i-1)/2)+1;
+							irow = fix((ci-1)/core_cols)+1;
+							icol = mod((ci-1),core_cols)+1;
+							
+							pw2therm_coeff = 0.9;
+							
+							C_si = C_si*1.1;
+							C_cu = C_cu*1.1;
+
+							g1=obj.gaussian_filter(max(obj.Nv, obj.Nh),1.2)*16;
+							g1 = g1 + (1-0.025 - g1(1));
+							g2=obj.gaussian_filter(max(obj.Nv, obj.Nh),2.5)*16;
+							%g2 = g2 + (1-0.025 - g2(1));
+							g2 = 1./g2 * 0.75;						
+							
+							R_si_hn = R_si_hn * g2(irow,icol); % * 2.67;
+							R_si_hs = R_si_hs * g2(irow,icol); % * 2.67;
+							R_si_he = R_si_he * g2(irow,icol); % * 2.67;
+							R_si_hw = R_si_hw * g2(irow,icol); % * 2.67;							
+
+							R_sicu_v = R_sicu_v / 2.2; %1.5;
+
+							R_cu_hn = R_cu_hn * g2(irow,icol) * 2; %* 4;
+							R_cu_hs = R_cu_hs * g2(irow,icol) * 2; % * 4;
+							R_cu_he = R_cu_he * g2(irow,icol) * 2; % * 4;
+							R_cu_hw = R_cu_hw * g2(irow,icol) * 2; % * 4;
+
+							R_cual_v = R_cual_v; %* 1.5;% * 1.3;							
+							R_sipcb_v = R_sipcb_v; % * 1.5;
+							R_pcbmb_v = R_pcbmb_v;
+							
+							%R_alair_v
+							%R_alairAL1_v
+							%R_alairAL2_v							
+							
+						case 2 
+							ci = fix((i-1)/2)+1;
+							irow = fix((ci-1)/core_cols)+1;
+							icol = mod((ci-1),core_cols)+1;							
+							
+							C_si = C_si*1.1;
+							C_cu = C_cu*1.1;
+							
+							%pw2therm_coeff = 0.9;
+
+							g1=obj.gaussian_filter(max(obj.Nv, obj.Nh),1.2)*16;
+							g1 = g1 + (1-0.025 - g1(1));
+							g2=obj.gaussian_filter(max(obj.Nv, obj.Nh),2.5)*16;
+							%g2 = g2 + (1-0.025 - g2(1));
+							g2 = 1./g2 * 0.7;						
+							
+							R_si_hn = R_si_hn * g2(irow,icol); % * 2.67;
+							R_si_hs = R_si_hs * g2(irow,icol); % * 2.67;
+							R_si_he = R_si_he * g2(irow,icol); % * 2.67;
+							R_si_hw = R_si_hw * g2(irow,icol); % * 2.67;							
+
+							R_sicu_v = R_sicu_v / 1.2;
+
+							R_cu_hn = R_cu_hn * g2(irow,icol) * 2; %* 4;
+							R_cu_hs = R_cu_hs * g2(irow,icol) * 2; % * 4;
+							R_cu_he = R_cu_he * g2(irow,icol) * 2; % * 4;
+							R_cu_hw = R_cu_hw * g2(irow,icol) * 2; % * 4;
+
+							R_cual_v = R_cual_v / 1.5;% * 1.3;							
+							R_sipcb_v = R_sipcb_v / 1.5;
+							R_pcbmb_v = R_pcbmb_v / 1.07;
+							
+							%R_alair_v
+							%R_alairAL1_v
+							%R_alairAL2_v
+							
+							air_therm_dev = 0.2; %exp(obj.Ts / (C_al*Ri_al_v) ) - 1; %0.4;
+					end
+					
+					if debug
+						clc;
+						drow = fix((ci-1)/core_cols)+1;
+						dcol = mod((ci-1),core_cols)+1;
+						ci
+						
+						C_si
+						%C_core
+						dC(drow, dcol) = C_si;
+						%dCcore(drow, dcol) = C_core;
+						C_cu
+						
+						R_si_hn
+						R_si_hs
+						R_si_he
+						R_si_hw
+						
+						dRN(drow, dcol) = R_si_hn;
+						dRS(drow, dcol) = R_si_hs;
+						dRE(drow, dcol) = R_si_he;
+						dRW(drow, dcol) = R_si_hw;
+
+						R_sicu_v
+						
+						dRV(drow, dcol) = R_sicu_v;
+
+						R_cu_hn
+						R_cu_hs
+						R_cu_he
+						R_cu_hw
+
+						R_cual_v
+					end
+				end
+				
+				%for j=1:2*lNc
+					
+				% ==============
+				% diagonal terms
+				% ==============
+
+				%Silicon (die temp dyn) 
+				if (mod(i,2)>0)
+					A(i,i) = -1/(R_sicu_v*C_si) -1/C_si * (1/R_si_he+1/R_si_hn+1/R_si_hw+1/R_si_hs) - 1/(C_si*R_sipcb_v) * si_pcb_fact;
+					
+					%PCB:
+					A(i, end-lPcbPos) = 1/(C_si*R_sipcb_v) * si_pcb_fact;
+					A(end-lPcbPos, i) = 1/(C_pcb*R_sipcb_v) * si_pcb_fact;
+				% Heat-Spread (Cooper dyn)
+				else %if (mod(i,2)==0)
+					A(i,i) = -1/(R_sicu_v*C_cu) -1/(R_cual_v*C_cu) -1/C_cu * (1/R_cu_he+1/R_cu_hn+1/R_cu_hw+1/R_cu_hs);
+					
+					%heat sink:
+					A(i, end-lAlPos) = 1/(C_cu*R_cual_v);
+					A(end-lAlPos, i) = 1/(C_al*R_cual_v);
+				end
+
+				% ==============
+				% Vertical coupling terms btween silicon and copper (flow from die to spreader)
+				% ==============
+				if (mod(i,2)>0)
+					A(i,i+1)=1/(R_sicu_v*C_si);
+				else %if (mod(i,2)==0)
+					A(i,i-1)=1/(R_sicu_v*C_cu);
+				end
+
+				% ==============
+				% horizontal coupling of die thermal dyn (silicon)
+				% ==============
+				%if(lNc~=1) %avoid single core case
+				if (mod(i,2)>0)
+					% vertici
+					if(i==1)
+					   A(i,i+2)=1/(R_si_he*C_si); 
+					   A(i,i+2*lNv)=1/(R_si_hs*C_si);
+					elseif(i==2*lNv-1)
+					   A(i,i-2)=1/(R_si_hw*C_si); 
+					   A(i,i+2*lNv)=1/(R_si_hs*C_si);
+					elseif (i==(lNh-1)*2*lNv+1) 
+					   A(i,i+2)=1/(R_si_he*C_si); 
+					   A(i,i-2*lNv)=1/(R_si_hn*C_si);
+					elseif (i==2*lNc-1) 
+					   A(i,i-2)=1/(R_si_hw*C_si); 
+					   A(i,i-2*lNv)=1/(R_si_hn*C_si);
+
+					% bordi verticali (west and east)
+					elseif ((mod(i,2*lNv)==1)&&(i~=(lNh-1)*2*lNv+1)&&(i~=1)) 
+					   A(i,i+2)=1/(R_si_he*C_si); 
+					   A(i,i+2*lNv)=1/(R_si_hs*C_si);
+					   A(i,i-2*lNv)=1/(R_si_hn*C_si);
+					elseif (((mod(i+1,2*lNv)==0) && (i~=2*lNc-1) && (i~=2*lNv-1))) 
+					   A(i,i-2)=1/(R_si_hw*C_si); 
+					   A(i,i+2*lNv)=1/(R_si_hs*C_si);
+					   A(i,i-2*lNv)=1/(R_si_hn*C_si);
+
+					% horizonatal boundaries (upper and lower)
+					elseif ((i~=1)&& (i<2*lNv-2))
+					   A(i,i-2)=1/(R_si_hw*C_si); 
+					   A(i,i+2)=1/(R_si_he*C_si); 
+					   A(i,i+2*lNv)=1/(R_si_hs*C_si);
+					elseif ((i>(lNh-1)*2*lNv+1) && (i<2*lNc-1))
+					   A(i,i-2)=1/(R_si_hw*C_si); 
+					   A(i,i+2)=1/(R_si_he*C_si); 
+					   A(i,i-2*lNv)=1/(R_si_hn*C_si);
+
+					%internal
+					else
+					  A(i,i-2)=1/(R_si_hw*C_si); 
+					  A(i,i+2)=1/(R_si_he*C_si); 
+					  A(i,i-2*lNv)=1/(R_si_hn*C_si);
+					  A(i,i+2*lNv)=1/(R_si_hs*C_si);           
+					end
+				end
+
+				% ==============
+				% horizontal coupling of sperader thermal dyn (copper)
+				% ==============
+				if (mod(i,2)==0)
+					% vertexes
+					if(i==2)
+					   A(i,i+2)=1/(R_cu_he*C_cu); 
+					   A(i,i+2*lNv)=1/(R_cu_hs*C_cu);
+					elseif(i==2*lNv)
+					   A(i,i-2)=1/(R_cu_hw*C_cu); 
+					   A(i,i+2*lNv)=1/(R_cu_hs*C_cu);
+					elseif (i==(lNh-1)*2*lNv+2) 
+					   A(i,i+2)=1/(R_cu_he*C_cu); 
+					   A(i,i-2*lNv)=1/(R_cu_hn*C_cu);
+					elseif (i==2*lNc) 
+					   A(i,i-2)=1/(R_cu_hw*C_cu); 
+					   A(i,i-2*lNv)=1/(R_cu_hn*C_cu);
+
+					% vertical boundaries (west and east)
+					elseif ((mod(i,2*lNv)==2)&&(i~=(lNh-1)*2*lNv+2) &&(i~=2)) 
+					   A(i,i+2)=1/(R_cu_he*C_cu); 
+					   A(i,i+2*lNv)=1/(R_cu_hs*C_cu);
+					   A(i,i-2*lNv)=1/(R_cu_hn*C_cu);
+					elseif (((mod(i,2*lNv)==0) && (i~=2*lNc) && (i~=2*lNv)))
+					   A(i,i-2)=1/(R_cu_hw*C_cu); 
+					   A(i,i+2*lNv)=1/(R_cu_hs*C_cu);
+					   A(i,i-2*lNv)=1/(R_cu_hn*C_cu);
+
+					% horizontal boundaries (upper and lower)
+					elseif((i~=2)&& (i<2*lNv))
+					   A(i,i-2)=1/(R_cu_hw*C_cu); 
+					   A(i,i+2)=1/(R_cu_he*C_cu); 
+					   A(i,i+2*lNv)=1/(R_cu_hs*C_cu);
+					elseif ((i>(lNh-1)*2*lNv+2) && (i<2*lNc))
+					   A(i,i-2)=1/(R_cu_hw*C_cu); 
+					   A(i,i+2)=1/(R_cu_he*C_cu); 
+					   A(i,i-2*lNv)=1/(R_cu_hn*C_cu);
+
+					%internal
+					else
+					  A(i,i-2)=1/(R_cu_hw*C_cu); 
+					  A(i,i+2)=1/(R_cu_he*C_cu); 
+					  A(i,i-2*lNv)=1/(R_cu_hn*C_cu);
+					  A(i,i+2*lNv)=1/(R_cu_hs*C_cu);           
+					end
+				end
+				%end %single core case
+				
+				% Last Columns Poles (airs)
+				% HeatSpreader
+				if mod(i,2)==0
+					% diagonal terms for vertexes
+					if (i==2) 
+						A(i,end-lAirPos)=1/C_cu * (1/R_cu_hn + 1/R_cu_hw);
+						A(end-lAirPos,i)=1/C_air * (1/R_cu_hn + 1/R_cu_hw);
+					elseif (i==2*lNv)
+						A(i,end-lAirPos)=1/C_cu * (1/R_cu_hn + 1/R_cu_he);
+						A(end-lAirPos,i)=1/C_air * (1/R_cu_hn + 1/R_cu_he);
+					elseif (i==(lNh-1)*2*lNv+2) 
+						A(i,end-lAirPos)=1/C_cu * (1/R_cu_hs + 1/R_cu_hw);
+						A(end-lAirPos,i)=1/C_air * (1/R_cu_hs + 1/R_cu_hw);
+					elseif (i==2*lNc)
+						A(i,end-lAirPos)=1/C_cu * (1/R_cu_hs + 1/R_cu_he);
+						A(end-lAirPos,i)=1/C_air * (1/R_cu_hs + 1/R_cu_he);
+						
+					% diagonal terms for vertical (west and east) boundary nodes
+					elseif ((mod(i,2*lNv)==2)&&(i~=(lNh-1)*2*lNv+2)&&(i~=2))
+						A(i,end-lAirPos)=1/(C_cu*R_cu_hw);
+						A(end-lAirPos,i)=1/(C_air*R_cu_hw);
+					elseif ((mod(i,2*lNv)==0) && (i~=2*lNc) && (i~=2*lNv))
+						A(i,end-lAirPos)=1/(C_cu*R_cu_he);
+						A(end-lAirPos,i)=1/(C_air*R_cu_he);
+					% diagonal terms for horizontal (upper and lower) boundary nodes
+					elseif ((i~=2)&& (i<2*lNv))
+						A(i,end-lAirPos)=1/(C_cu*R_cu_hn);
+						A(end-lAirPos,i)=1/(C_air*R_cu_hn);
+					elseif ((i>(lNh-1)*2*lNv+2) && (i<2*lNc))
+						A(i,end-lAirPos)=1/(C_cu*R_cu_hs);
+						A(end-lAirPos,i)=1/(C_air*R_cu_hs);
+						
+					% diagonal terms corresponding to other nodes (internal)
+					%else
+						%A(i,end)=0;
+						%A(end,i)=0;
+					end
+					
+				% Silicium
+				else
+					% diagonal terms for vertexes
+					if (i==1)
+						A(i,end-lAirPos)=1/C_si * (1/R_si_hn + 1/R_si_hw);
+						A(end-lAirPos,i)=1/C_air * (1/R_si_hn + 1/R_si_hw);					
+					elseif (i==2*lNv-1)
+						A(i,end-lAirPos)=1/C_si * (1/R_si_hn + 1/R_si_he);
+						A(end-lAirPos,i)=1/C_air * (1/R_si_hn + 1/R_si_he);	
+					elseif (i==(lNh-1)*2*lNv+1)
+						A(i,end-lAirPos)=1/C_si * (1/R_si_hs + 1/R_si_hw);
+						A(end-lAirPos,i)=1/C_air * (1/R_si_hs + 1/R_si_hw);						
+					elseif (i==2*lNc-1)
+						A(i,end-lAirPos)=1/C_si * (1/R_si_hs + 1/R_si_he);
+						A(end-lAirPos,i)=1/C_air * (1/R_si_hs + 1/R_si_he);	
+
+					% diagonal terms for vertical (west and east) boundary nodes
+					elseif (mod(i,2*lNv)==1)&&(i~=(lNh-1)*2*lNv+1)&&(i~=1)
+						A(i,end-lAirPos)=1/(C_si*R_si_hw);
+						A(end-lAirPos,i)=1/(C_air*R_si_hw);
+					elseif (mod(i+1,2*lNv)==0) && (i~=2*lNc-1) && (i~=2*lNv-1)
+						A(i,end-lAirPos)=1/(C_si*R_si_he);
+						A(end-lAirPos,i)=1/(C_air*R_si_he);
+					% diagonal terms for horizontal (upper and lower) boundary nodes
+					elseif (i~=1)&& (i<2*lNv-2)
+						A(i,end-lAirPos)=1/(C_si*R_si_hn);
+						A(end-lAirPos,i)=1/(C_air*R_si_hn);
+					elseif (i>(lNh-1)*2*lNv+1) && (i<2*lNc-1)
+						A(i,end-lAirPos)=1/(C_si*R_si_hs);
+						A(end-lAirPos,i)=1/(C_air*R_si_hs);
+
+					%  diagonal terms corresponding to other nodes (internal)
+					%else
+						%B(i,end) = 0;
+					end
+				end
+				
+				 %%%%%%%%
+				% CASE 2 %
+				 %%%%%%%%
+				% for performance, add it above
+				% HeatSpreader part 2
+				if mod(i,2)==0
+					if (tm_ver == 2)
+						%for j=1:lNc
+						j=i/2; %remember
+						row = fix((j-1)/core_cols)+1;
+						col = mod((j-1),core_rows)+1;
+
+						%1: Add/change the final input
+							A(2*j,end-lAirPos) = A(2*j,end-lAirPos)-1/(R_cual_v*C_cu) + ...
+								(1/(R_cual_v*C_cu))*(1-air_therm_dev)^(row-1);
+						%2: add previous rows part
+						for k=1:row-1
+							id2 = j - (core_cols*(row-k));
+							A(2*j, 2*id2) = A(2*j, 2*id2) + ...
+								air_therm_dev * (1-air_therm_dev)^(row-1-k) * ...
+								1/(R_cual_v*C_cu);
+						end
+						%end
+						
+						%3: fix self
+						%This is not needed beacuse all coefficients stay
+						%the same!
+						A(2*j, 2*j) = -(sum(A(2*j,:)) - A(2*j, 2*j));
+						
+					end	%(tm_ver == 2)
+				end %mod(i,2)==0
+
+			end % for i
+
+			%HeatSink
+			A(end-lAlPos, end-lAirPos) = 1/C_al * (1/R_alair_v + 2/R_alairAL1_v + 2/R_alairAL2_v) + heatsink_fan_dis/C_al;
+			A(end-lAirPos, end-lAlPos) = 1/C_air * (1/R_alair_v + 2/R_alairAL1_v + 2/R_alairAL2_v) + heatsink_fan_dis/C_al; %here C_al or C_air?
+			A(end-lAlPos, end-lAlPos) = 0;
+			A(end-lAlPos, end-lAlPos) = -sum(A(end-lAlPos,:));
+			
+			%PCB
+			%negligible with air
+			A(end-lPcbPos, end-lMbPos) =1/(C_pcb*R_pcbmb_v) * pcb_mb_fact;
+			A(end-lMbPos, end-lPcbPos) =1/(C_mb*R_pcbmb_v) * pcb_mb_fact;
+			A(end-lPcbPos, end-lPcbPos) = 0;
+			A(end-lPcbPos, end-lPcbPos) = -sum(A(end-lPcbPos,:));
+			
+			%Motherboard
+			A(end-lMbPos, end-lAirPos) = 1/(C_mb * R_mbair_v) * mb_air_fact;
+			A(end-lAirPos, end-lMbPos) = 1/(C_air * R_mbair_v) * mb_air_fact;
+			A(end-lMbPos, end-lMbPos) = 0;
+			A(end-lMbPos, end-lMbPos) = -sum(A(end-lMbPos,:));
+			
+			%Air
+			%A(end, end) = -(lNc+(lNh-2)*2+(lNv-2)*2+4*2)/(R_cu_v*C_cu) -100*lNc/4; % -0.149075;
+			A(end-lAirPos, end-lAirPos)=0;
+			A(end-lAirPos, end-lAirPos) = -sum(A(end-lAirPos,:)) - case_fan_dis; % -0.149075;
+
+			% ==============
+			% Make it symmetrical
+			% ==============
+			% CANNOT DO THIS ANYMORE:
+			%	because now C_si is different between cores, making
+			%	different Rs
+			%	NOT doing THIS, means that the Resistance of core i will
+			%	be different (due to noise) seen by different cores.
+% 			for i=1:2*lNc
+% 				for j=1:i-2
+% 					if A(i,j)~=A(j,i)
+% 						if rand(1) >= 0.5
+% 							A(i,i) = A(i,i) + (A(i,j)-A(j,i));
+% 							A(i,j) = A(j,i);
+% 						else
+% 							A(j,j) = A(j,j) + (A(j,i)-A(i,j));
+% 							A(j,i) = A(i,j);
+% 						end					
+% 					end
+% 				end
+% 				for j=i+2:2*lNc
+% 					if A(i,j)~=A(j,i)
+% 						if rand(1) >= 0.5
+% 							A(i,i) = A(i,i) + (A(i,j)-A(j,i));
+% 							A(i,j) = A(j,i);
+% 						else
+% 							A(j,j) = A(j,j) + (A(j,i)-A(i,j));
+% 							A(j,i) = A(i,j);
+% 						end					
+% 					end
+% 				end
+% 			end
+			
+			% ==============
+			% input matrix
+			% ==============
+
+			% inputs: core power (controlled) ambient temperature (disturbance)
+			B=zeros(obj.Ns,obj.Ni);
+			k=0;
+			for i=1:2*lNc
+				if mod(i,2)>0					
+					k=k+1;
+					
+					% Core Position
+					ci = fix((i-1)/2)+1;
+					irow = fix((ci-1)/core_cols)+1 + extt_rows;
+					icol = mod((ci-1),core_cols)+1 + extl_cols;
+					
+					li = lCcoreNmat(irow,icol) + lCcoreSmat(irow,icol);
+					wi = lCcoreEmat(irow,icol) + lCcoreWmat(irow,icol);
+					C_core = c1mat(irow, icol) * li*wi*t_si;					
+					if d==1
+						C_core = C_core * obj.ThMoNoise(fix(i/2)+1,5);
+					end
+					
+					if (tm_ver == 1) %|| (tm_ver == 2)
+						g2=obj.gaussian_filter(max(obj.Nv, obj.Nh),3)*16;
+						g2 = g2 + (1-0.01 - g2(1));
+						C_core = C_core / g2(irow-extt_rows,icol-extl_cols);% / 1.5;
+					end							
+							
+					B(i,k)=1/C_core * pw2therm_coeff;
+				end
+			end
+
+			B(end-lAirPos,:) = [zeros(1, lNc) case_fan_dis/fan_nom_speed];
+
+		end %function
+		function obj = create_thermal_model(obj)
+			
+			tm_ver = obj.model_ver;
+			
+			% ==============
+			% C & D
+			% ==============
+			obj.C = zeros(obj.Nout,obj.Ns);
+			k=-2;
+			for i=1:obj.Nc
+				k=k+2;
+				obj.C(i,k+1)=1;
+			end
+			obj.C(end, end) = 1;
+			obj.D = zeros(obj.Nout, obj.Ni);
+			
+			[obj.Ac_nom, obj.Bc_nom] = obj.lin_model_create(0, tm_ver, 0);
+			[obj.Ac_true, obj.Bc_true] = obj.lin_model_create(1, tm_ver, 0);
+			
+			%obj.x_init = ones(obj.Ns,1)*obj.temp_amb;
+			% TODO: remove this after leakage is fixed:
+			leak_store = obj.exp_leakage;
+			obj.exp_leakage = 0;
+			%obj.min_pw_red = obj.power_compute(ones(obj.Nc,1)*obj.F_min,ones(obj.Nc,1)*obj.V_min,(obj.core_crit_temp)*ones(obj.Nc,1),[zeros(obj.Nc,obj.ipl-1) ones(obj.Nc,1)],ones(obj.Nc,1));
+			obj.min_pw_red = obj.power_compute(ones(obj.Nc,1)*obj.F_min,ones(obj.Nc,1)*obj.V_Max,(obj.core_crit_temp)*ones(obj.Nc,1),[zeros(obj.Nc,obj.ipl-1) ones(obj.Nc,1)],ones(obj.Nc,1));
+			obj.exp_leakage = leak_store;
+			
+			if rank([obj.C(1:obj.Nc,:);obj.C(1:obj.Nc,:)*obj.Ac_nom;obj.C(1:obj.Nc,:)*obj.Ac_nom*obj.Ac_nom]) == obj.Ns
+			%This is not working
+			%(rank(obsv(obj.Ac_nom, obj.C)) == obj.Ns)
+				disp("The system is Observable!")
+				obj.observable = 1;
+			else
+				disp("MAY be NOT Observable!")
+				obj.observable = 0;
+			end
+		end
+		function obj = create_thermal_model_noise(obj)
+			ddiv = 30;
+			dmean = 1.01;
+			obj.ThMoNoise = (randn(obj.Nc, 8) / ddiv + dmean);
+		end
+	end
+
+	%% Dependent Variables
+	methods
+		% State Dimension
+		function value = get.Ns(obj)
+			value = obj.Nc*2+obj.add_states;
+		end
+		% Input Dimension
+		function value = get.Ni(obj)
+			value = obj.Nc+obj.add_inputs;
+		end
+		% Outputs
+		function value = get.Nout(obj)
+			value = obj.Nc+obj.add_outputs;
+		end	
+
+		% Matrices
+		function value = get.Ad_nom(obj)
+			disc = c2d(ss(obj.Ac_nom, obj.Bc_nom, obj.C, obj.D), obj.Ts);
+			value = disc.A;
+		end
+		function value = get.Bd_nom(obj)
+			disc = c2d(ss(obj.Ac_nom, obj.Bc_nom, obj.C, obj.D), obj.Ts);
+			value = disc.B;
+		end
+		function value = get.Ad_true(obj)
+			disc = c2d(ss(obj.Ac_true, obj.Bc_true, obj.C, obj.D), obj.Ts);
+			value = disc.A;
+		end
+		function value = get.Bd_true(obj)
+			disc = c2d(ss(obj.Ac_true, obj.Bc_true, obj.C, obj.D), obj.Ts);
+			value = disc.B;
+		end
+
+		%% SET
+		function obj = set.model_deviations(obj, val)
+			%check modifications
+			if val
+				if val ~= obj.model_deviations 
+					obj = obj.create_thermal_model_noise();
+				end
+			else
+				%reset: 
+				obj.param_dev_per = ones(obj.Nc, 8);					
+			end
+			obj.model_deviations = val;
+		end
+
+		% Matrices
+		function obj = set.Ac_nom(obj, val)
+			cmp = [obj.Ns obj.Ns];
+			if size(val) == cmp
+				obj.Ac_nom = val;
+			else
+				warning("[TM Error]: Ac_nom wrong input size.");
+				disp(strcat("[TM] Ac_nom required size: [", num2str(cmp(1)), ",", num2str(cmp(2)),"]"));
+			end
+		end
+		function obj = set.Ac_true(obj, val)
+			cmp = [obj.Ns obj.Ns];
+			if size(val) == cmp
+				obj.Ac_true = val;
+			else
+				warning("[TM Error]: Ac_true wrong input size.");
+				disp(strcat("[TM] Ac_true required size: [", num2str(cmp(1)), ",", num2str(cmp(2)),"]"));
+			end
+		end
+		function obj = set.Bc_nom(obj, val)
+			cmp = [obj.Ns obj.Ni];
+			if size(val) == cmp
+				obj.Bc_nom = val;
+			else
+				warning("[TM Error]: Bc_nom wrong input size.");
+				disp(strcat("[TM] Bc_nom required size: [", num2str(cmp(1)), ",", num2str(cmp(2)),"]"));
+			end
+		end
+		function obj = set.Bc_true(obj, val)
+			cmp = [obj.Ns obj.Ni];
+			if size(val) == cmp
+				obj.Bc_true = val;
+			else
+				warning("[TM Error]: Bc_true wrong input size.");
+				disp(strcat("[TM] Bc_true required size: [", num2str(cmp(1)), ",", num2str(cmp(2)),"]"));
+			end
+		end
+		function obj = set.C(obj, val)
+			cmp = [obj.Nout obj.Ns];
+			if size(val) == cmp
+				obj.C = val;
+			else
+				warning("[TM Error]: C wrong input size.");
+				disp(strcat("[TM] C required size: [", num2str(cmp(1)), ",", num2str(cmp(2)),"]"));
+			end
+		end
+		function obj = set.D(obj, val)
+			cmp = [obj.Nout obj.Ni];
+			if size(val) == cmp
+				obj.D = val;
+			else
+				warning("[TM Error]: D wrong input size.");
+				disp(strcat("[TM] D required size: [", num2str(cmp(1)), ",", num2str(cmp(2)),"]"));
+			end
+		end
+		
+		function obj = set.param_dev_per(obj, val)
+			cmp = [obj.Nc obj.param_dev_dim2];
+			if size(val) == cmp
+				obj.param_dev_per = val;
+			else
+				warning("[TM Error]: param_dev_per wrong input size.");
+				disp(strcat("[TM] param_dev_per required size: [", num2str(cmp(1)), ",", num2str(cmp(2)),"]"));
+			end
+		end
+		
+
+
+	end
+
+
+end
