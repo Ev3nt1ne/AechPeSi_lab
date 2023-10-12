@@ -10,6 +10,7 @@ classdef thermal_model
 			= 6;		% Number of rows
 		Nv (1,1) {mustBePositive, mustBeInteger} ...
 			= 6;		% Number of cols
+		% TODO: Maybe move vd and VDom out?
 		vd (1,1) {mustBePositive, mustBeInteger} ...
 			= 4;		% Voltage/Power Domains
 		VDom {mustBeNonnegative, mustBeNumericOrLogical, mustBeNonempty, mustBeLessThanOrEqual(VDom,1)} ...
@@ -111,10 +112,7 @@ classdef thermal_model
 
 		pw2therm_coeff = 1.05; %0.90 %0.41; 0.7;
 
-		add_sensor_outputs (1,1) {mustBePositive, mustBeInteger} ...
-			= 0;
-
-		sensor_active {mustBeNonnegative, mustBeNumericOrLogical, mustBeVector} ...
+		sensors_active {mustBeNonnegative, mustBeNumericOrLogical, mustBeVector} ...
 			= [0 0 0 0];
 
 end
@@ -124,6 +122,7 @@ end
 		Ns;							% Number of States
 		Ni;							% Number of inputs
 		Nout;						% Number of "Outputs"
+		add_outputs;
 
 		% Matlab Matrices
 		Ad_nom;
@@ -214,16 +213,16 @@ end
 			% Call superclass constructor before accessing object
 			% You cannot conditionalize this statement
 			%obj = obj@BaseClass1(args{:});
-			obj.sensor_active = zeros(add_states,1);
-			obj = default_floorplan_config();
+			obj.sensors_active = zeros(obj.add_states,1);
+			obj = obj.default_floorplan_config();
 
 			% Post Initialization %%
 			% Any code, including access to object
-			obj = create_thermal_model_noise();
-			obj = create_thermal_model();
+			obj = obj.create_thermal_model_noise();
+			obj = obj.create_thermal_model();
 
 
-			get_size(obj);
+			obj.get_size(obj);
 		end
 	end
 	methods(Static)
@@ -358,7 +357,7 @@ end
 				obj.t_comp(end-lAirPos), obj.k_mb, Ri_air_tot_v);
 			R_mbair_v = Ri_mb_v + R_mbair_cond + R_spr;
 			
-			%TODO NOWWW
+			%TODO
 			%R_air_v = R_air_v * obj.ThMoNoise(fix(i/2)+1,7);
 			%C_air = Ci_air * obj.ThMoNoise(fix(i/2)+1,7);
 
@@ -436,21 +435,21 @@ end
 
 					% Noise
 					if pdev==1
-					R_si_hn = R_si_hn * obj.obj.param_dev_per(ci,1);
-					R_si_hs = R_si_hs * obj.obj.param_dev_per(ci,1);
-					R_si_he = R_si_he * obj.obj.param_dev_per(ci,1);
-					R_si_hw = R_si_hw * obj.obj.param_dev_per(ci,1);
+					R_si_hn = R_si_hn * obj.param_dev_per(ci,1);
+					R_si_hs = R_si_hs * obj.param_dev_per(ci,1);
+					R_si_he = R_si_he * obj.param_dev_per(ci,1);
+					R_si_hw = R_si_hw * obj.param_dev_per(ci,1);
 
-					R_cu_hn = R_cu_hn * obj.obj.param_dev_per(ci,2);
-					R_cu_hs = R_cu_hs * obj.obj.param_dev_per(ci,2);
-					R_cu_he = R_cu_he * obj.obj.param_dev_per(ci,2);
-					R_cu_hw = R_cu_hw * obj.obj.param_dev_per(ci,2);
+					R_cu_hn = R_cu_hn * obj.param_dev_per(ci,2);
+					R_cu_hs = R_cu_hs * obj.param_dev_per(ci,2);
+					R_cu_he = R_cu_he * obj.param_dev_per(ci,2);
+					R_cu_hw = R_cu_hw * obj.param_dev_per(ci,2);
 
-					R_sicu_v = R_sicu_v * obj.obj.param_dev_per(ci,3);
-					R_cual_v = R_cual_v * obj.obj.param_dev_per(ci,4);
+					R_sicu_v = R_sicu_v * obj.param_dev_per(ci,3);
+					R_cual_v = R_cual_v * obj.param_dev_per(ci,4);
 
-					C_si = Ci_si * obj.obj.param_dev_per(ci,5);
-					C_cu = Ci_cu * obj.obj.param_dev_per(ci,6);
+					C_si = Ci_si * obj.param_dev_per(ci,5);
+					C_cu = Ci_cu * obj.param_dev_per(ci,6);
 					end
 					
 					switch tm_ver
@@ -477,21 +476,21 @@ end
 
 							% Noise
 							if pdev==1
-							R_si_hn = R_si_hn * obj.obj.param_dev_per(ci,1);
-							R_si_hs = R_si_hs * obj.obj.param_dev_per(ci,1);
-							R_si_he = R_si_he * obj.obj.param_dev_per(ci,1);
-							R_si_hw = R_si_hw * obj.obj.param_dev_per(ci,1);
+							R_si_hn = R_si_hn * obj.param_dev_per(ci,1);
+							R_si_hs = R_si_hs * obj.param_dev_per(ci,1);
+							R_si_he = R_si_he * obj.param_dev_per(ci,1);
+							R_si_hw = R_si_hw * obj.param_dev_per(ci,1);
 		
-							R_cu_hn = R_cu_hn * obj.obj.param_dev_per(ci,2);
-							R_cu_hs = R_cu_hs * obj.obj.param_dev_per(ci,2);
-							R_cu_he = R_cu_he * obj.obj.param_dev_per(ci,2);
-							R_cu_hw = R_cu_hw * obj.obj.param_dev_per(ci,2);
+							R_cu_hn = R_cu_hn * obj.param_dev_per(ci,2);
+							R_cu_hs = R_cu_hs * obj.param_dev_per(ci,2);
+							R_cu_he = R_cu_he * obj.param_dev_per(ci,2);
+							R_cu_hw = R_cu_hw * obj.param_dev_per(ci,2);
 		
-							R_sicu_v = R_sicu_v * obj.obj.param_dev_per(ci,3);
-							R_cual_v = R_cual_v * obj.obj.param_dev_per(ci,4);
+							R_sicu_v = R_sicu_v * obj.param_dev_per(ci,3);
+							R_cual_v = R_cual_v * obj.param_dev_per(ci,4);
 		
-							C_si = Ci_si * obj.obj.param_dev_per(ci,5);
-							C_cu = Ci_cu * obj.obj.param_dev_per(ci,6);
+							C_si = Ci_si * obj.param_dev_per(ci,5);
+							C_cu = Ci_cu * obj.param_dev_per(ci,6);
 							end
 
 						case 1				
@@ -821,21 +820,21 @@ end
 			end % for i
 
 			%HeatSink
-			A(end-lAlPos, end-lAirPos) = 1/C_al * (1/R_alair_v + 2/R_alair_len + 2/R_alair_wid) + heatsink_fan_dis/C_al;
-			A(end-lAirPos, end-lAlPos) = 1/C_air * (1/R_alair_v + 2/R_alair_len + 2/R_alair_wid) + heatsink_fan_dis/C_al; %here C_al or C_air?
+			A(end-lAlPos, end-lAirPos) = 1/C_al * (1/R_alair_v + 2/R_alair_len + 2/R_alair_wid) + obj.al_fan_dis/C_al;
+			A(end-lAirPos, end-lAlPos) = 1/C_air * (1/R_alair_v + 2/R_alair_len + 2/R_alair_wid) + obj.al_fan_dis/C_al; %here C_al or C_air?
 			A(end-lAlPos, end-lAlPos) = 0;
 			A(end-lAlPos, end-lAlPos) = -sum(A(end-lAlPos,:));
 			
 			%PCB
 			%negligible with air
 			A(end-lPcbPos, end-lMbPos) =1/(C_pcb*R_pcbmb_v) * obj.pcb_mb_fact;
-			A(end-lMbPos, end-lPcbPos) =1/(C_mb*R_pcbmb_v) * obj.ppcb_mb_fact;
+			A(end-lMbPos, end-lPcbPos) =1/(C_mb*R_pcbmb_v) * obj.pcb_mb_fact;
 			A(end-lPcbPos, end-lPcbPos) = 0;
 			A(end-lPcbPos, end-lPcbPos) = -sum(A(end-lPcbPos,:));
 			
 			%Motherboard
-			A(end-lMbPos, end-lAirPos) = 1/(C_mb * R_mbair_v) * obj.pmb_air_fact;
-			A(end-lAirPos, end-lMbPos) = 1/(C_air * R_mbair_v) * obj.pmb_air_fact;
+			A(end-lMbPos, end-lAirPos) = 1/(C_mb * R_mbair_v) * obj.mb_air_fact;
+			A(end-lAirPos, end-lMbPos) = 1/(C_air * R_mbair_v) * obj.mb_air_fact;
 			A(end-lMbPos, end-lMbPos) = 0;
 			A(end-lMbPos, end-lMbPos) = -sum(A(end-lMbPos,:));
 			
@@ -863,7 +862,7 @@ end
 					li = obj.CPw_fp_dim(irow,icol, North) + obj.CPw_fp_dim(irow,icol, South);
 					wi = obj.CPw_fp_dim(irow,icol, East) + obj.CPw_fp_dim(irow,icol, West);
 					C_core = obj.C_fp_material(irow, icol, Si) * li*wi*obj.t_si;					
-					if d==1
+					if pdev==1
 						C_core = C_core * obj.param_dev_per(ci,5);
 					end
 					
@@ -932,15 +931,17 @@ end
 			rows = core_rows + obj.extt_rows + obj.extb_rows;
 
 			%TODO instead of initial values, add air
-			obj.RC_fp_dim		= zeros(cols, rows, 4);
-			obj.CPw_fp_dim		= zeros(core_cols, core_rows, 4);
-			obj.R_fp_material	= zeros(cols, rows, obj.full_model_layers);
-			obj.C_fp_material	= zeros(cols, rows, obj.full_model_layers);
+			obj.RC_fp_dim		= zeros(rows, cols, 4);
+			obj.CPw_fp_dim		= zeros(core_rows, core_cols, 4);
+			obj.R_fp_material	= zeros(rows, cols, obj.full_model_layers);
+			obj.C_fp_material	= zeros(rows, cols, obj.full_model_layers);
 
 			% Populating:
-			obj.RC_fp_dim([1:obj.extt_rows, end-obj.extb_rows+1:end])		= 0.05;
-			obj.R_fp_material([1:obj.extt_rows, end-obj.extb_rows+1:end])	= 1e-16;
-			obj.C_fp_material([1:obj.extt_rows, end-obj.extb_rows+1:end])	= 0.025;
+			%([1:obj.extt_rows, end-obj.extb_rows+1:end], ...
+			%	[1:obj.extl_cols, end-obj.extr_cols+1:end],:)
+			obj.RC_fp_dim(:,:,:)		= 0.05;
+			obj.R_fp_material(:,:,:)	= 1e-16;
+			obj.C_fp_material(:,:,:)	= 0.025;
 
 			for r = (1+obj.extt_rows):(rows - obj.extb_rows)
 				for c = (1+obj.extl_cols):(cols - obj.extr_cols)
@@ -977,8 +978,8 @@ end
 					obj.C_fp_material(r,c,Cu) = obj.c_cu;
 				end	
 			end
-			for r = 1:rows
-				for c = 1:cols
+			for r = 1:core_rows
+				for c = 1:core_cols
 					obj.CPw_fp_dim(r,c,North) = 1e-3;
 					obj.CPw_fp_dim(r,c,South) = 1e-3;
 					obj.CPw_fp_dim(r,c,West) = 0.75e-3;
@@ -1002,6 +1003,9 @@ end
 		% Outputs
 		function value = get.Nout(obj)
 			value = obj.Nc+obj.add_outputs;
+		end	
+		function value = get.add_outputs(obj)
+			value = sum(obj.sensors_active>0);
 		end	
 
 		% Matrices
@@ -1036,7 +1040,7 @@ end
 			obj.model_deviations = val;
 		end
 
-		% Matrices
+		% Matrices & Vectors
 		function obj = set.Ac_nom(obj, val)
 			cmp = [obj.Ns obj.Ns];
 			if all(size(val) == cmp) && ~isempty(val)
@@ -1102,20 +1106,62 @@ end
 			end
 		end
 
-		function obj = set.sensor_active(obj, val)
-			cmp = [obj.add_states 1];
+		function obj = set.sensors_active(obj, val)
+			cmp = [1 obj.add_states];
+			if length(val) > size(val,2)
+				val = val';
+			end
 			if all(size(val) == cmp) && ~isempty(val)
-				obj.sensor_active = val;
+				obj.sensors_active = val;
 			else
 				warning("[TM Error]: sensor_active wrong input size.");
-				disp(strcat("[TM] sensor_active required size: [", num2str(cmp(1)), ",", num2str(cmp(2)),"]"));
+				disp(strcat("[TM] sensor_active required size:", num2str(cmp(2))));
+			end
+		end
+
+		function obj = set.t_comp(obj, val)
+			cmp = [1 obj.add_states];
+			if length(val) > size(val,2)
+				val = val';
+			end
+			if all(size(val) == cmp) && ~isempty(val)
+				obj.t_comp = val;
+			else
+				warning("[TM Error]: t_comp wrong input size.");
+				disp(strcat("[TM] t_comp required size:", num2str(cmp(2))));
+			end
+		end
+
+		function obj = set.wid_comp(obj, val)
+			cmp = [1 obj.add_states];
+			if length(val) > size(val,2)
+				val = val';
+			end
+			if all(size(val) == cmp) && ~isempty(val)
+				obj.wid_comp = val;
+			else
+				warning("[TM Error]: wid_comp wrong input size.");
+				disp(strcat("[TM] wid_comp required size:", num2str(cmp(2))));
+			end
+		end
+
+		function obj = set.len_comp(obj, val)
+			cmp = [1 obj.add_states];
+			if length(val) > size(val,2)
+				val = val';
+			end
+			if all(size(val) == cmp) && ~isempty(val)
+				obj.len_comp = val;
+			else
+				warning("[TM Error]: len_comp wrong input size.");
+				disp(strcat("[TM] len_comp required size:", num2str(cmp(2))));
 			end
 		end
 
 		function obj = set.RC_fp_dim(obj, val)
 			cols = obj.Nv + obj.extl_cols + obj.extr_cols;
 			rows = obj.Nh + obj.extt_rows + obj.extb_rows;
-			cmp = [cols, rows, 4];
+			cmp = [rows, cols, 4];
 			if all(size(val) == cmp) && ~isempty(val)
 				obj.RC_fp_dim = val;
 			else
@@ -1127,7 +1173,7 @@ end
 		function obj = set.CPw_fp_dim(obj, val)
 			cols = obj.Nv;
 			rows = obj.Nh;
-			cmp = [cols, rows, 4];
+			cmp = [rows, cols, 4];
 			if all(size(val) == cmp) && ~isempty(val)
 				obj.CPw_fp_dim = val;
 			else
@@ -1139,7 +1185,7 @@ end
 		function obj = set.R_fp_material(obj, val)
 			cols = obj.Nv + obj.extl_cols + obj.extr_cols;
 			rows = obj.Nh + obj.extt_rows + obj.extb_rows;
-			cmp = [cols, rows, obj.full_model_layers];
+			cmp = [rows, cols, obj.full_model_layers];
 			if all(size(val) == cmp) && ~isempty(val)
 				obj.R_fp_material = val;
 			else
@@ -1151,7 +1197,7 @@ end
 		function obj = set.C_fp_material(obj, val)
 			cols = obj.Nv + obj.extl_cols + obj.extr_cols;
 			rows = obj.Nh + obj.extt_rows + obj.extb_rows;
-			cmp = [cols, rows, obj.full_model_layers];
+			cmp = [rows, cols, obj.full_model_layers];
 			if all(size(val) == cmp) && ~isempty(val)
 				obj.C_fp_material = val;
 			else
