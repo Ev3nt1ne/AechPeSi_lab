@@ -13,7 +13,7 @@ classdef controllers
 			= 1e-3;			% Commands min Ts
 		Obs_poles = [0.8 0.1];		% Poles of the Luemberg Observer
 
-				tsim = 1;					% Simulation Time in [s]
+		tsim = 1;					% Simulation Time in [s]
 		tesim = 2;					% Free Simulation Time in [s]
 
 		x_init;						% Initial Conditions 

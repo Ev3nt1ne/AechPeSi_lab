@@ -74,3 +74,7 @@ len_comp
 %%
 			
 
+hpc = hpc_lab;
+
+hpc.tm.Nc
+
