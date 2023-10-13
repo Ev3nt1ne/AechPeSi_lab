@@ -73,7 +73,7 @@ function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma, show, save)
 				u = 10*ones(obj.Nc, 1);
 				figname = [figname "Temperature Gradient - P 10W"];
 			case 4 % Dispersion
-				midcore = ceil(obj.Nh/2)*obj.Nv + ceil(obj.Nv/2);
+				midcore = (ceil(obj.Nh/2)-1)*(obj.Nv) + ceil(obj.Nv/2);
 				%F = ones(obj.Nc,1)*obj.F_min;
 				%wl = ones(obj.Nc,1)*[1 zeros(1,obj.ipl-1)];
 				u = 1*ones(obj.Nc, 1);
