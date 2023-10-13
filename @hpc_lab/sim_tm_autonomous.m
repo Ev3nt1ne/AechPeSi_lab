@@ -1,9 +1,9 @@
-function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma)
+function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma, show, save)
 %SIM_TM_AUTONOMOUS Summary of this function goes here
 %   Detailed explanation goes here
 
 	if (nargin < 2) || isempty(ts)
-		ts = obj.tesim;
+		ts = obj.tasim;
 	end
 	if (nargin < 3) || isempty(Nsample)
 		Nsample = 5;
@@ -11,90 +11,100 @@ function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma)
 	if (nargin < 4) || isempty(exp_gamma)
 		exp_gamma = 4.5;
 	end
+	if (nargin < 5) || isempty(show)
+		show = obj.graph_show;
+	end
+	if (nargin < 6) || isempty(save)
+		save = obj.graph_save;
+	end
 	
-	show = 1;
-	save = 1;
-	
-	x_init = obj.x_init;
+	% Init the Simulation
+	x_init = obj.t_init;
 
 	N = ceil(ts / obj.Ts);
 
 	Adl_true = obj.Ad_true;
-	Bdl_true = obj.Bd_true;	
-	d_p = ones(obj.Nc,1);
+	Bdl_true = obj.Bd_true;
+
+	%TODO: Process
+	%process = ones(obj.Nc,1);
 	
+	% Define the figure timestamp
 	xim = 0:(1/(Nsample+1)):1;
 	yim = xim.^(exp_gamma);
 
-	pos = floor(yim * N);
-	
-	pos(1) = 1;
+	timestamp = floor(yim * N);	
+	timestamp(1) = 1;
 
-	for i=2:length(pos)
-		if pos(i) <= pos(i-1)
-			pos(i) = pos(i-1)+1;
+	for i=2:length(timestamp)
+		if timestamp(i) <= timestamp(i-1)
+			timestamp(i) = timestamp(i-1)+1;
 		end
 	end
 	
 	test_num = 4;
-	xfp = zeros(length(pos), obj.Ns, test_num);
-	spnum = obj.numSubplots(length(pos));
+	xfp = zeros(length(timestamp), obj.Ns, test_num);
+	spnum = obj.numSubplots(length(timestamp));
 	figname = [];
 	
 	for tst=1:test_num
-		x = obj.x_init;
+		x = x_init;
 		id = 1;
 		xp = zeros(N+1, obj.Ns);
 		xp(1,:) = x_init;
-		pp = zeros(N+1, obj.Nc);
+		pwp = zeros(N+1, obj.Nc);
 			
 		switch tst
-			case 1
-				F = ones(obj.Nc,1)*obj.F_min;
-				wl = ones(obj.Nc,1)*[1 zeros(1,obj.ipl-1)];
-				figname = [figname "Temperature Gradient - P min"];
-			case 2
-				F = ones(obj.Nc,1)*(obj.F_Max*4+obj.F_min)/5;
-
-				wpid = floor(obj.ipl/2);
-				wl = zeros(obj.Nc,obj.ipl);
-				wl(:, [wpid, wpid+1]) = 0.5;
-				figname = [figname "Temperature Gradient - P med"];
-			case 3
-				F = ones(obj.Nc,1)*obj.F_Max;
-				wl = ones(obj.Nc,1)*[zeros(1,obj.ipl-1) 1];
-				figname = [figname "Temperature Gradient - P Max"];
-			case 4
+			case 1 % u = 1W
+				%F = ones(obj.Nc,1)*obj.F_min;
+				%wl = ones(obj.Nc,1)*[1 zeros(1,obj.ipl-1)];
+				u = 1*ones(obj.Nc, 1);
+				figname = [figname "Temperature Gradient - P 1W"];
+			case 2 % u = 5W
+				%F = ones(obj.Nc,1)*(obj.F_Max*4+obj.F_min)/5;
+				%wpid = floor(obj.ipl/2);
+				%wl = zeros(obj.Nc,obj.ipl);
+				%wl(:, [wpid, wpid+1]) = 0.5;
+				u = 5*ones(obj.Nc, 1);
+				figname = [figname "Temperature Gradient - P 5W"];
+			case 3 % u = 10W
+				%F = ones(obj.Nc,1)*obj.F_Max;
+				%wl = ones(obj.Nc,1)*[zeros(1,obj.ipl-1) 1];
+				u = 10*ones(obj.Nc, 1);
+				figname = [figname "Temperature Gradient - P 10W"];
+			case 4 % Dispersion
 				midcore = ceil(obj.Nh/2)*obj.Nv + ceil(obj.Nv/2);
-				F = ones(obj.Nc,1)*obj.F_min;
-				wl = ones(obj.Nc,1)*[1 zeros(1,obj.ipl-1)];
-				F(midcore) = obj.F_Max;
-				wl(midcore, :) = [zeros(1,obj.ipl-1) 1];
-				figname = [figname "Temperature Dispersion"];
+				%F = ones(obj.Nc,1)*obj.F_min;
+				%wl = ones(obj.Nc,1)*[1 zeros(1,obj.ipl-1)];
+				u = 1*ones(obj.Nc, 1);
+				%F(midcore) = obj.F_Max;
+				%wl(midcore, :) = [zeros(1,obj.ipl-1) 1];
+				u(midcore) = 10;
+				figname = [figname "Temperature Dispersion - P 1W / 10W"];
 		end
 		
 		%here it is just a test to check the thermal model behavior, so,
 		%	INDEPENDENTLY from the domain, I will make 1 Vdd per core
-		V = obj.FV_table(sum(F > (obj.FV_table(:,3)*ones(1,obj.Nc))',2)+1,1);
+		%V = obj.FV_table(sum(F > (obj.FV_table(:,3)*ones(1,obj.Nc))',2)+1,1);
 	
 		for s=1:N			
-			u = obj.power_compute(F,V,obj.C(1:obj.Nc,:)*x,wl,d_p);
-			x = Adl_true*x + Bdl_true*[u;obj.temp_amb*1000];
+			%u = obj.power_compute(F,V,obj.C(1:obj.Nc,:)*x,wl,process);
+			x = Adl_true*x + Bdl_true*[u;obj.t_outside*obj.case_fan_nom_speed];
 			xp(s+1,:) = x;
-			pp(s+1,:) = u;
-			if sum(s==pos)
+			pwp(s+1,:) = u;
+			if sum(s==timestamp)
 				xfp(id,:,tst) = x-273.15;
 				id = id + 1;
 			end
 		end
 		
-		pp(1,:) = pp(2,:);
+		pwp(1,:) = pwp(2,:);
 		if show
-			fig = obj.xutplot(xp, pp);
+			fig = obj.xutplot(xp, pwp);
 			%fig.Position = [1         865        1920        1080];
 		end
 		
-		if save && ((tst==2) || (tst==4))
+		if save %&& ((tst==2) || (tst==4))
 			obj.savetofile(fig, strcat("C:\temp\MATLAB-Figures\", figname(tst)), 1);
 		end
 	end
@@ -120,7 +130,7 @@ function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma)
 				cc = reshape(obj.C(1:obj.Nc,:)*squeeze(xfp(f,:,tst))', obj.Nv, obj.Nh)';
 				h(f) = heatmap(cc);
 
-				h(f).Title = strcat('T = ', sprintf('%.5f',(pos(f)*time)));
+				h(f).Title = strcat('T = ', sprintf('%.5f',(timestamp(f)*time)));
 				h(f).Colormap = obj.customColormap; %turbo; %parula;
 				h(f).ColorLimits = hclrlim;
 				h(f).ColorbarVisible = 'off';

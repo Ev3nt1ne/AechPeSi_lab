@@ -5,11 +5,11 @@ classdef thermal_model
 	properties		
 		%% System Structure
 		Nc (1,1) {mustBePositive, mustBeInteger} ...
-			= 36;		% Number of Cores
+			= 9;		% Number of Cores
 		Nh (1,1) {mustBePositive, mustBeInteger} ...
-			= 6;		% Number of rows
+			= 3;		% Number of rows
 		Nv (1,1) {mustBePositive, mustBeInteger} ...
-			= 6;		% Number of cols
+			= 3;		% Number of cols
 		% TODO: Maybe move vd and VDom out?
 		vd (1,1) {mustBePositive, mustBeInteger} ...
 			= 4;		% Voltage/Power Domains
@@ -133,6 +133,9 @@ end
 
 	properties(SetAccess=protected, GetAccess=public)
 		observable = 0;
+		
+		Cc {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= [1];
 	end
 	
 	properties(SetAccess=immutable, GetAccess=public)
@@ -262,21 +265,37 @@ end
 	end
 
 	methods
-		function obj = model_init(obj)
+		function obj = model_init(obj, tm_ver)
 			
-			tm_ver = obj.model_ver;
+			if nargin < 2
+				tm_ver = obj.model_ver;
+			end
 			
 			% ==============
 			% C & D
 			% ==============
 			obj.C = zeros(obj.Nout,obj.Ns);
-			k=-2;
+			fml = obj.full_model_layers;
+			k=-fml;
 			for i=1:obj.Nc
-				k=k+2;
+				k=k+fml;
 				obj.C(i,k+1)=1;
 			end
-			obj.C(end, end) = 1;
+			% to consider the case obj.add_outputs = 0
+			i = obj.Nc+1;
+			cadd = sum(diag(obj.sensors_active),2) > 0;
+			j=1;
+			while (i <= obj.Nc+obj.add_outputs)
+				while(cadd(j) ~= 1)
+					j=j+1;
+				end
+				obj.C(i, end-obj.add_states+j) = 1;
+				i=i+1;
+				j=j+1;
+			end
 			obj.D = zeros(obj.Nout, obj.Ni);
+
+			obj.Cc = obj.C(1:obj.Nc,:);
 			
 			[obj.Ac_nom, obj.Bc_nom] = obj.create_model(obj.temp_amb, 0, tm_ver);
 			[obj.Ac_true, obj.Bc_true] = obj.create_model(obj.temp_amb, 1, tm_ver);
@@ -296,6 +315,8 @@ end
 			dmean = 1.01;
 			obj.param_dev_per = (randn(obj.Nc, 8) / ddiv + dmean);
 		end
+	end
+	methods(Access=protected)
 		obj = default_floorplan_config(obj);
 		[A, B] = create_model(obj, T, pdev, tm_ver);
 	end %Methods
@@ -405,7 +426,16 @@ end
 				disp(strcat("[TM] D required size: [", num2str(cmp(1)), ",", num2str(cmp(2)),"]"));
 			end
 		end
-		
+		function obj = set.Cc(obj, val)
+			cmp = [obj.Nc obj.Ns];
+			if all(size(val) == cmp) && ~isempty(val)
+				obj.Cc = val;
+			else
+				warning("[TM Error]: Cc wrong input size.");
+				disp(strcat("[TM] Cc required size: [", num2str(cmp(1)), ",", num2str(cmp(2)),"]"));
+			end
+		end
+		%
 		function obj = set.param_dev_per(obj, val)
 			cmp = [obj.Nc obj.param_dev_dim2];
 			if all(size(val) == cmp) && ~isempty(val)

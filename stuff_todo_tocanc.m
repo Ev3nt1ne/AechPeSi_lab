@@ -72,9 +72,51 @@ len_comp
 
 
 %%
-			
-
 hpc = hpc_lab;
 
-hpc.tm.Nc
+hpc.t_init = hpc.temp_amb*ones(hpc.Ns,1);
+hpc.sim_tm_autonomous()
+
+%%
+tm = thermal_model();
+
+tm.C
+
+tm.sensors_active = [1 1 1 0];
+
+tm = tm.model_init();
+tm.C
+%%
+tnA = hpc.Ac_nom;
+
+hpc2 = hpc_system();
+
+% Cores:
+hpc2.Nc = 9; %72;
+hpc2.Nh = 3; %9;			% Number of rows
+hpc2.Nv = 3; %8;			% Number of cols
+
+% Version of the Thermal Model
+hpc2.thermal_model_ver = 0;
+% Exponential Leakage
+hpc2.exp_leakage = 1;
+% Noise and Variation
+hpc2.model_variation = 1;
+hpc2 = hpc2.create_core_pw_noise();
+hpc2.measure_noise = 1;
+
+% External Ambient Temperature
+temp_amb = 25.0 + 273.15;
+
+% Create Thermal Model:
+hpc2 = hpc2.create_thermal_model();
+
+toA = hpc2.Ac_nom;
+
+dif = tnA - toA
+
+
+difB = hpc.Bc_nom - hpc2.Bc_nom
+
+
 

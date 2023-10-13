@@ -47,7 +47,7 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 	%TODO: Move this to functions to make it less WOT
 	%partial
 	Ri_air_tot_v = obj.t_comp(end-lAirPos) / A_comp(end-lAirPos) / obj.k_air / obj.air_factor;
-	air_al_t = obj.t_comp(end-lAirPos) - (obj.t_comp(end-lAlPos)+obj.t_cu+obj.t_si+obj.t_comp(end-lAirPos));
+	air_al_t = obj.t_comp(end-lAirPos) - (obj.t_comp(end-lAlPos)+obj.t_cu+obj.t_si+obj.t_comp(end-lPcbPos));
 	Ri_air_al_t = air_al_t / A_comp(end-lAirPos) / obj.k_air / obj.air_factor;
 	Ri_air_al_len = (obj.len_comp(end-lAirPos)-obj.len_comp(end-lAlPos)) / 2 ...
 					/ (obj.wid_comp(end-lAirPos) * obj.t_comp(end-lAirPos)) ...
@@ -601,7 +601,7 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 			
 			li = obj.CPw_fp_dim(irow,icol, North) + obj.CPw_fp_dim(irow,icol, South);
 			wi = obj.CPw_fp_dim(irow,icol, East) + obj.CPw_fp_dim(irow,icol, West);
-			C_core = obj.C_fp_material(irow, icol, Si) * li*wi*obj.t_si;					
+			C_core = obj.C_fp_material(irow + obj.extt_rows, icol + obj.extl_cols, Si) * li*wi*obj.t_si;					
 			if pdev==1
 				C_core = C_core * obj.param_dev_per(ci,5);
 			end
