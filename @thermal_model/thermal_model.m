@@ -19,8 +19,8 @@ classdef thermal_model
 		%% Matlab/Simulation
 		model_ver (1,1) {mustBeNonnegative, mustBeInteger} ...
 			= 0;				% Version of the Thermal Model
-		model_deviations (1,1) {mustBeNonnegative, mustBeNumericOrLogical} ...
-			= 1;				% If the true system should be != from nominal
+		%model_deviations (1,1) {mustBeNonnegative, mustBeNumericOrLogical} ...
+		%	= 1;				% If the true system should be != from nominal
 		%measure_noise = 1;
 		sensor_noise (1,1) {mustBeNonnegative, mustBeNumericOrLogical} ...
 			= 1;
@@ -358,6 +358,7 @@ end
 		end
 
 		%% SET
+		%{
 		function obj = set.model_deviations(obj, val)
 			%check modifications
 			if val
@@ -370,6 +371,7 @@ end
 			end
 			obj.model_deviations = val;
 		end
+		%}
 
 		% Matrices & Vectors
 		function obj = set.Ac_nom(obj, val)

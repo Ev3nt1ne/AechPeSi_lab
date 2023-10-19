@@ -4,12 +4,21 @@ classdef hpc_lab < thermal_model
 	
 	properties
 		%tm;
-		tasim = 2;
+		tasim = 2; % Free Simulation Time in [s]
+		tsim = 1;					% Simulation Time in [s]
 		t_init;
 		t_outside = 25+273;
 
 		graph_show = 1;
 		graph_save = 0;
+
+		core_pm;
+
+		x_init;						% Initial Conditions 
+		urplot;						% Input Reference Plot
+		frplot;						% Freq Reference Plot
+		zrplot;						% Power Noise Plot
+		wrplot;						% Wokrload Plot
 
 
 		% TO CANC

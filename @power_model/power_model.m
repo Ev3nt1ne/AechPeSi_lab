@@ -3,99 +3,176 @@ classdef power_model
 	%   Detailed explanation goes here
 	
 	properties
-		exp_leakage = 1;
-
-		leak_vdd = 324.29;
-		leak_temp = 1.0;
-		leak_process = 528.04;
 		
-		ceff_pw_coeff = [306.741, 694.866, 1235.452, 1651.217, 1600.92];
-		%[466.741, 694.866, 1235.452, 1651.217, 1600.92];
-		exp_leak_coeff = [4507.748, 29.903, 6033.035];
-		
-		min_pw_red;
+		leak_exp (1,1) {mustBeNonnegative, mustBeNumericOrLogical} ...
+			= 1;
 
-		FV_table = [0.50, 0.40, 1.3500;
-				 0.55, 0.40, 1.6000;
-				 0.60, 1.35, 1.8000;
-				 0.65, 1.35, 2.0000;
-				 0.70, 1.35, 2.2000;
-				 0.75, 1.60, 2.4000;
-				 0.80, 1.80, 2.6000;
-				 0.85, 1.80, 2.7500;
-				 0.90, 2.00, 2.9000;
-				 0.95, 2.00, 3.0500;
-				 1.00, 2.00, 3.2000;
-				 1.05, 2.60, 3.3500;
-				 1.10, 2.60, 3.4500;
-				 1.15, 2.60, 3.5500;
-				 1.20, 2.60, 3.6600];
+		leak_vdd_k (1,1) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= 324.29e-3;
+		leak_temp_k	(1,1) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= 1.0;
+		leak_process_k (1,1) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= 528.04e-3;
+
+		leak_exp_vdd_k (1,1) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= 4507.748e-3;
+		leak_exp_t_k (1,1) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= 29.903e-3;
+		leak_exp_k (1,1) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= 6033.035e-3;
+		 
+		dyn_ceff_k {mustBeNumeric, mustBeNonempty, mustBeFinite, mustBeVector} ...
+			= [306.741e-3, 694.866e-3, 1235.452e-3, 1651.217e-3, 1600.92e-3];
+
+		FV_table (:,3) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= [0.50, 0.40, 1.3500;
+				0.55, 0.40, 1.6000;
+				0.60, 1.35, 1.8000;
+				0.65, 1.35, 2.0000;
+				0.70, 1.35, 2.2000;
+				0.75, 1.60, 2.4000;
+				0.80, 1.80, 2.6000;
+				0.85, 1.80, 2.7500;
+				0.90, 2.00, 2.9000;
+				0.95, 2.00, 3.0500;
+				1.00, 2.00, 3.2000;
+				1.05, 2.60, 3.3500;
+				1.10, 2.60, 3.4500;
+				1.15, 2.60, 3.5500;
+				1.20, 2.60, 3.6600];
+
+		pw_dev_per {mustBeNonnegative, mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= 1;
 			 
+		%
+		delay_F_mean (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
+			= 1e-5;			% Mean Frequency application Delay
+		delay_V_mean (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
+			= 1e-5;			% Mean Voltage application Delay
+		delay_F_max (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
+			= 5e-5;			% Max Frequency application Delay
+		delay_V_max (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
+			= 2e-5;			% Max Voltage application Delay
+		%
+		F_discretization_step (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
+			= 0.05;	
+
 		% Power Noise
-		%pn_mu = 0.1;
-		%pn_sigma = 2.0; %0.5
-		%pn_alpha = 0.2; %0.8
+		%TODO 
 		pw_gmean = 0.02;
 		pw_gvar = 1;
 		pw_glim = [-0.02 0.05];
 		pw_3sigma_on3 = 0.05;
 		
-		core_pw_noise_char;
-
-		%
-		delay_F_mean = 1e-5;		% Mean Frequency application Delay
-		delay_V_mean = 1e-5;		% Mean Voltage application Delay
-		delay_F_max = 5e-5;			% Max Frequency application Delay
-		delay_V_max = 2e-5;			% Max Voltage application Delay
-		%
-		F_discretization_step = 0.05;
-
-		%% WL Parameters
-		
-		wl_prob = [0.0345 0.3448 0.3448 0.2414 0.0345];			% Probability for each WL	
-		wl_min_exec_us = [510 100 100 480 520];					% minimal execution in us
-		wl_mean_exec_us = [520e2 210e1 180e1 560e2 1.2e6/1e1];	% mean execution in us
-
-		wl_uniq_min = [0.9 0.3 0.4 0.6 0.9];					% minimal percentage of presence when Primary Wl
-		wl_comb_array = [0 1 0 0 0;								% Combination for each wl with each other:
-						 1 0 1 1 1;								%	1 = they can be present together, 0 = they cannot
-						 0 1 0 1 1;								%	Matrix has to be symmetric, with 0 on the diagonal.
-						 0 1 1 0 1;
-						 0 1 1 1 0];
-		max_num_wl = 3;											% max number of contemporary wls (primary [1] + secondary). It may not be always respected.
-		mem_wl = [0.95 0.15 0.05 0.20 0];							% memory boundness
-		
 	end
 
 	properties(Dependent)
-		%% System Structure
+		% System Structure
 		ipl;						% Instruction power levels
 		FV_levels;
 		quantum_instr;
 
-		%% System Parameters
+		% System Parameters
 		static_pw_coeff;
 		polyFV;
 		
-		V_Max;
+		V_max;
 		V_min;
-		F_Max;
+		F_max;
 		F_min;
-		core_Max_power;
+		core_max_power;
 		core_min_power;	
 	end
 	
 	methods
-		function obj = power_model(inputArg1,inputArg2)
+		function obj = power_model()
 			%POWER_MODEL Construct an instance of this class
 			%   Detailed explanation goes here
 			%obj.Property1 = inputArg1 + inputArg2;
+			obj = obj.create_core_pw_noise();
 		end
-		
-		function outputArg = method1(obj,inputArg)
-			%METHOD1 Summary of this method goes here
-			%   Detailed explanation goes here
-			%outputArg = obj.Property1 + inputArg;
+	end
+
+	methods
+		function pu = power_compute(obj, F, V, T, instr, process, noise)
+
+			if nargin < 7 || isempty(noise)
+				noise = 0;
+			end
+
+			% F,V,d_i,d_p can be any dim
+			% T has to be dim = #cores
+			dim = length(T);
+			
+			kps = [obj.leak_vdd_k, obj.leak_temp_k, obj.leak_process_k, ...
+					obj.leak_exp_vdd_k, obj.leak_exp_t_k, obj.leak_exp_k];
+
+			Power_static = V*kps(1) + process*kps(3);
+			%TODO: is this better as an if, or as a "vectorized if"
+			%computation?
+			if obj.leak_exp
+				maxT = 125+273.15;
+				Power_static = Power_static .* ...
+					exp(V*kps(4) + (min(T,ones(dim,1)*maxT)-273.15)*kps(5) - kps(6));
+			end
+			
+			tt = dim > 1;
+			npw = obj.pw_dev_per(1:dim) * (tt && noise) + ~(tt && noise);
+			
+			Ceff = instr * obj.dyn_ceff_k' .* npw;
+			Power_dyn = Ceff .* F .* (V .* V);
+
+			pu = Power_static + Power_dyn;		
+		end
+		function obj = create_core_pw_noise(obj)
+			Covr = chol(obj.pw_gvar);
+			obj.pw_dev_per = ones(obj.Nc, 1);
+			for c=1:obj.Nc
+				stop = 0;
+				while(~stop)	
+					z = repmat(obj.pw_gmean,1,1) + randn(1,1)*Covr * obj.pw_3sigma_on3/3;	
+					if (z>obj.pw_glim(1)) && (z<obj.pw_glim(2))
+						stop = 1;
+					end
+				end %while
+				obj.pw_dev_per(c) = obj.core_pw_noise_char(c) + z;
+			end %for
+		end %func
+	end
+
+	%% Dependent Variables
+	methods
+		function value = get.static_pw_coeff(obj)
+			value = [obj.leak_vdd_k, obj.leak_temp_k, obj.leak_process_k];
+		end
+		function value = get.FV_levels(obj)
+			value = size(obj.FV_table,1);
+		end
+		function value = get.V_max(obj)
+			value = obj.FV_table(end,1);
+		end
+		function value = get.V_min(obj)
+			value = obj.FV_table(1,1);
+		end
+		function value = get.F_min(obj)
+			value = obj.FV_table(1,2);
+		end
+		function value = get.F_max(obj)
+			value = obj.FV_table(end,3);
+		end
+		function value = get.core_max_power(obj)
+			value = 10.5348;
+			%TODO: here put the call to the function model
+		end
+		function value = get.core_min_power(obj)
+			value = 0.8939;
+			%TODO: here put the call to the function model
+		end
+		function value = get.ipl(obj)
+			value = size(obj.dyn_ceff_k,2);
+		end
+		function value = get.polyFV(obj)
+			value = polyfit(obj.FV_table(:,3),obj.FV_table(:,1), 3);
 		end
 	end
 end

@@ -113,11 +113,10 @@ function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma, show, save)
 	
 	if show	
 		time = ts/N;
-		%figname
-		%xfp
 
 		%TODO parametrize 25 and 130
-		hclrlim = [ max(min(xfp,[],'All'), 25) min(max(xfp,[],'All'), 130)];	
+		mt = round( (obj.core_crit_temp - 273.15)*1.5 /5) * 5;
+		hclrlim = [ max(min(xfp,[],'All'), min(x_init)-273.15) min(max(xfp,[],'All'), mt) ];	
 
 		for tst=1:length(figname)		
 			fig = figure('Name', figname(tst)); %, 'Position', get(0, 'Screensize'));
@@ -143,31 +142,12 @@ function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma, show, save)
 
 			%fig.Position = [1921    220.2    2560    1440];
 
-			if save && ((tst==2) || (tst==4))
+			if save %&& ((tst==2) || (tst==4))
 				obj.savetofile(fig, strcat("C:\temp\MATLAB-Figures\", figname(tst), "_map"), 1);
 			end
 
 		end
 	end
 	
-
-	
-	%{	
-	axpc = axes(fig);
-	c = colorbar(axpc,'Position',[0.93 0.168 0.022 0.7]);  % attach colorbar to h
-	%c.Colormap = obj.customColormap;
-	%caxis(axpc,hclrlim);             % set colorbar limits
-	
-	%%
-
-	hcr = axes(fig);
-	cbh = colorbar; 
-	% Reposition to figure's left edge, centered vertically
-	cbh.Position(1) = .95-cbh.Position(3);
-	cbh.Position(2) = 0.5-cbh.Position(4)/2;
-	% decrease horizontal extent of subplots to 92% of their current width
-	set(hcr, {'Position'}, mat2cell(vertcat(hcr.Position) .* [1 1 .92, 1], ones(size(hcr(:))),4))
-	%}
-
 end
 
