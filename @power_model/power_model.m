@@ -70,7 +70,6 @@ classdef power_model
 		% System Structure
 		ipl;						% Instruction power levels
 		FV_levels;
-		quantum_instr;
 
 		% System Parameters
 		static_pw_coeff;

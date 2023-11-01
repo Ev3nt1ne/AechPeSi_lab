@@ -2,27 +2,18 @@
 %{ 
 % Missing:
 
-quantum_us = 50;
+
 
 properties(SetAccess=protected, GetAccess=public)		
-	Controller;					% Persistent variable to optimize controller
 	polyFV_opt;
-	
-	% wl:
-	% How much? coefficient
-	dur_c = 5/6;
-	min_secondary_space = 0.075;
-	
-	% model
-	 wl_index;
-	 qt_storage;
-	 V_s;
-	 F_s;
-	 A_s;
-	 B_s;
 end
 
 freq_fact = 8;				% Times per seconds expected Target Freq Changes
+
+		Ni_nl;						% Number of inputs for the non-linear case
+		Ni_c;						% Number of controllable inputs
+		Ni_nc;						% Number of non-controllable inputs
+
 
 
 

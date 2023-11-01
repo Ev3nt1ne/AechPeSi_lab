@@ -17,7 +17,15 @@ classdef perf_model
 						 0 1 1 1 0];
 		max_num_wl = 3;											% max number of contemporary wls (primary [1] + secondary). It may not be always respected.
 		mem_wl = [0.95 0.15 0.05 0.20 0];							% memory boundness
-		
+
+		quantum_us = 50;
+	end
+
+	properties(SetAccess=protected, GetAccess=public)		
+		% wl:
+		% How much? coefficient
+		dur_c = 5/6;
+		min_secondary_space = 0.075;		
 	end
 	
 	methods
@@ -28,5 +36,7 @@ classdef perf_model
 		end
 		
 	end
+
+	
 end
 
