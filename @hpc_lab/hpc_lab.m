@@ -55,8 +55,25 @@ classdef hpc_lab < thermal_model
 		% model
 	 	wl_index;
 	 	qt_storage;
+		F_cng_times;
+		V_cng_times;
+		F_cng_us;
+		V_cng_us;
+		F_cng_error;
+		V_cng_error;
+
+		V_T;
+		F_T;
+
 	 	V_s;
 	 	F_s;
+
+		delay_F_index;
+		delay_V_index;
+
+		delay_F_div;
+		delay_V_div;
+
 	 	A_s;
 	 	B_s;
 	end
@@ -97,8 +114,21 @@ classdef hpc_lab < thermal_model
 		function [obj] = init_compute_model(obj, A, B)
 			obj.qt_storage = obj.quantum_instr*ones(obj.Nc, 1);
 			obj.wl_index = ones(obj.Nc, 1);
+			obj.F_cng_times = zeros(obj.Nc,1);
+			obj.V_cng_times = zeros(obj.vd,1);
+			obj.F_cng_us = zeros(obj.Nc,1);
+			obj.V_cng_us = zeros(obj.vd,1);
+			obj.F_cng_error = zeros(obj.Nc,1);
+			obj.V_cng_error = zeros(obj.vd,1);
+
+			obj.F_T = obj.F_min*ones(obj.Nc,1);
+			obj.V_T = obj.V_min*ones(obj.vd,1);
 			obj.F_s = obj.F_min*ones(obj.Nc,1);
 			obj.V_s = obj.V_min*ones(obj.vd,1);
+			obj.delay_F_index = zeros(obj.Nc,1);
+			obj.delay_V_index = zeros(obj.vd,1);
+			obj.delay_F_div = ceil(obj.delay_F_mean / obj.Ts);
+			obj.delay_V_div = ceil(obj.delay_V_mean / obj.Ts);
 			obj.A_s = A;
 			obj.B_s = B;
 			% cannot put it here, if I want it to be constant among several
@@ -112,28 +142,49 @@ classdef hpc_lab < thermal_model
 		function [uplot, xplot, d_is, pw_ms, obj] = compute_model(obj, N, x, V, F, d_p)
 			
 			d_is = zeros(1,obj.ipl);
-			delay_F_index = zeros(obj.Nc,1);
-			delay_V_index = zeros(obj.vd,1);		
-			pw_ms = 0;
-			
-			delay_F_div = ceil(obj.delay_F_mean / obj.Ts);
-			delay_V_div = ceil(obj.delay_V_mean / obj.Ts);
+			%delay_F_index = zeros(obj.Nc,1);
+			%delay_V_index = zeros(obj.vd,1);		
+			pw_ms = 0;			
 			
 			uplot = zeros(N, obj.Ni_c);
 			xplot = zeros(N, obj.Ns);
+
+			%F
+			ttd = (obj.delay_F_index > 0);
+			cng = (~ttd).*(obj.F_T ~= F);
+
+			obj.F_cng_times = obj.F_cng_times + cng;
+
+			obj.delay_F_index = obj.delay_F_index.*ttd + cng.*obj.delay_F_div;
+			obj.F_T = ttd.*obj.F_T + cng.*F;
+			obj.F_cng_error = obj.F_cng_error + ttd.*(obj.F_T ~= F);
+
+			%V
+			ttd = (obj.delay_V_index > 0);
+			cng = (~ttd).*(obj.V_T ~= V);
+
+			obj.V_cng_times = obj.V_cng_times + cng;
+
+			obj.delay_V_index = obj.delay_V_index.*ttd + cng.*obj.delay_V_div;
+			obj.V_T = ttd.*obj.V_T + cng.*V;
+			obj.V_cng_error = obj.V_cng_error + ttd.*(obj.V_T ~= V);
 			
 			for sim=1:N
 				%index = (ix0-1)*N + sim;
 
 				% Delay Application
-				% Application of V before F
-				delay_F_index = delay_F_index + obj.VDom*(V==obj.V_s);
-				delay_V_index = delay_V_index + (V~=obj.V_s);
-				tv = delay_V_index > (delay_V_div*ones(obj.vd,1));
+				tv = obj.delay_V_index == 0;
 				obj.V_s = obj.V_s - obj.V_s.*tv + V.*tv;
-				%
-				tf = delay_F_index > (delay_F_div*ones(obj.Nc,1));
+				tf = obj.delay_F_index == 0;
 				obj.F_s = obj.F_s - obj.F_s.*tf + F.*tf;
+
+				obj.F_cng_us = obj.F_cng_us + ~tf;
+				obj.V_cng_us = obj.V_cng_us + ~tv;
+
+				obj.delay_F_index = obj.delay_F_index - (obj.F_T~=obj.F_s);
+				obj.delay_V_index = obj.delay_V_index - (obj.V_T~=obj.V_s);
+				%
+
 				%noise 
 
 				%wl
