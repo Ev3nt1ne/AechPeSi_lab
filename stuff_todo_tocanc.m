@@ -58,7 +58,11 @@ function [dxdt, power] = nl_model_dyn(obj,A,B,x,u,d_i,d_p, ot) %, pw, ceff, pw_l
 hpc = hpc_lab;
 
 hpc.t_init = hpc.temp_amb*ones(hpc.Ns,1);
-hpc.sim_tm_autonomous()
+%hpc.sim_tm_autonomous()
+addpath Controllers/
+ctrl = controller;
+hpc.x_init = hpc.temp_amb * ones(hpc.Ns,1);
+hpc.simulation(ctrl,[])
 
 %%
 tnA = hpc.Ac_nom;

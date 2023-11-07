@@ -9,9 +9,9 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	% initial offset:
 	ctrl_ts_offset = 0;
 	% frequency
-	ctrl_mul = round(obj.Ts_ctrl / obj.Ts);
+	ctrl_mul = round(ctrl.Ts_ctrl / obj.Ts);
 	% output completed
-	ctrl_output_mul = round(obj.ctrl_Texec / obj.Ts);
+	%ctrl_output_mul = round(obj.ctrl_Texec / obj.Ts);
 
 	% Inputs
 	% initial offset:
@@ -23,6 +23,20 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 
 	% INIT
 	obj = obj.init_compute_model(obj.Ad_true, obj.Bd_true);
+
+	%TODO
+	x = obj.x_init + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
+	F = obj.F_min*ones(obj.Nc,1);
+	V = obj.V_min*ones(obj.vd,1);
+	process = 0;
+	cpuplot = zeros(Nsim+1,obj.Ni);
+	cpxplot = zeros(Nsim+1,obj.Ns);
+	cpxplot(1,:) = x;
+	cpuplot(1,:) = NaN;
+	cpfplot = zeros(Nsim+1,obj.Nc);
+	cpvplot = zeros(Nsim+1,obj.vd);
+	cpfplot(1,:) = F;
+	cpvplot(1,:) = V;
 
 	% LOOOP
 	for s=1:Nsim

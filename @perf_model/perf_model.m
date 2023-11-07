@@ -16,9 +16,14 @@ classdef perf_model
 						 0 1 1 0 1;
 						 0 1 1 1 0];
 		max_num_wl = 3;											% max number of contemporary wls (primary [1] + secondary). It may not be always respected.
-		mem_wl = [0.95 0.15 0.05 0.20 0];							% memory boundness
+		wl_mem_weigth = [0.95 0.15 0.05 0.20 0];				% memory boundness
 
 		quantum_us = 50;
+		quantum_F = 1; %GHz
+	end
+
+	properties(Dependent)
+		quantum_instr;
 	end
 
 	properties(SetAccess=protected, GetAccess=public)		
@@ -34,7 +39,37 @@ classdef perf_model
 			%   Detailed explanation goes here
 			
 		end
+		function [pwl, res] = quanta2wl(wlp, instr, mem_instr_conv)
+			mem_wgt = sum(wlp.*obj.wl_mem_weigth,2).*(instr>0);
+			cinstr = mem_wgt.*mem_instr_conv + (1-mem_wgt).*instr;
+						
+			pwl = min(cinstr, obj.qt_storage); %obj.qt_storage./cinstr;
+			res = instr - ((pwl - mem_wgt.*mem_instr_conv) ./ (1-mem_wgt));
+			% saturate to 0
+			% instr = ..
+		end
+
 		
+	end
+
+	%% Dependent Variables
+	methods
+		function value = get.quantum_instr(obj)
+			% quantum_instr has to be >= than the maximum reachable
+			% frequency. This is needed because in "compute_model" we
+			% assumed that the maximum number of quanta considered for the
+			% computation of wl is 2. In case we compute quantum_instr with
+			% a value < F_Max it is possible that in the qt_storage there
+			% is only a small fraction of instructions, and so the F_s will
+			% take the small fraction, a whole new quanta, plus a little
+			% part of a third quanta. If the chosen value here is << F_Max
+			% the number could be even greater.
+	
+			%This has to be fixed, since quanta are considered at the
+			%benchmark executed frequency, so not always max one.
+			%TODO
+			value = obj.quantum_F * 1e9 * (obj.quantum_us * 1e-6);
+		end
 	end
 
 	

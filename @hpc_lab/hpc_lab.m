@@ -1,4 +1,4 @@
-classdef hpc_lab < thermal_model
+classdef hpc_lab < thermal_model & power_model & perf_model
 	%HPC_LAB Summary of this class goes here
 	%   Detailed explanation goes here
 	
@@ -38,23 +38,15 @@ classdef hpc_lab < thermal_model
 		min_pw_red;		
 
 
-		% TO CANC
-		%F_min = 0.8;
-		%ipl = 5;
-		core_max_power = 15;
-		core_min_power = 0.4;
-
-
 	end
 
-	properties(Dependent)
-		quantum_instr;
-	end
+	properties(SetAccess=protected, GetAccess=public)	
 
-	properties(SetAccess=protected, GetAccess=public)		
-		% model
+		% Internal Variables for Simulation() fnc
 	 	wl_index;
 	 	qt_storage;
+		mem_instr
+
 		F_cng_times;
 		V_cng_times;
 		F_cng_us;
@@ -114,6 +106,7 @@ classdef hpc_lab < thermal_model
 		function [obj] = init_compute_model(obj, A, B)
 			obj.qt_storage = obj.quantum_instr*ones(obj.Nc, 1);
 			obj.wl_index = ones(obj.Nc, 1);
+			obj.mem_instr = obj.F_min * 1e9 * (obj.Ts);
 			obj.F_cng_times = zeros(obj.Nc,1);
 			obj.V_cng_times = zeros(obj.vd,1);
 			obj.F_cng_us = zeros(obj.Nc,1);
@@ -187,31 +180,27 @@ classdef hpc_lab < thermal_model
 
 				%noise 
 
-				%wl
-				wlp = zeros(obj.Nc, obj.ipl);
-				wlpn = zeros(obj.Nc, obj.ipl);
-				for c=1:obj.Nc
-					wlp(c,:) = obj.wrplot(c,:,max(mod(obj.wl_index(c), size(obj.wrplot,3)),1));
-					wlpn(c,:) = obj.wrplot(c,:,max(mod(obj.wl_index(c)+1, size(obj.wrplot,3)),1+1));
-				end
-				if (obj.F_s(1) > obj.F_min)
-					asd = 1;
-				end
 				instr = obj.F_s * 1e9 * (obj.Ts);
-				mem_instr = obj.F_min * 1e9 * (obj.Ts);
-				a_citr = sum(wlp.*obj.mem_wl,2);
-				a_citrn = sum(wlpn.*obj.mem_wl,2);
-				citr = a_citr.*mem_instr + (1-a_citr).*instr;
-				citrn = a_citrn.*mem_instr + (1-a_citrn).*instr;
-				pwl = obj.qt_storage./citr;
-				ttwl = (pwl>1);
-				pwl = pwl + ttwl.*(1-pwl);
+				wl = zeros(obj.Nc, obj.ipl);
+				wld = zeros(obj.Nc, 1);
+				while (sum(instr) > 0)
+					wlp = squeeze(obj.wrplot(:,:,max(mod(obj.wl_index(c), size(obj.wrplot,3)),1)));
+					
+					[pwl, instr] = obj.quanta2wl(wlp, instr, obj.mem_instr);					
 
-				wl = pwl .* wlp + ...
-					(1-pwl) .* wlpn;
+					% add to accumulator
+					wld = wld + pwl;
+					wl = wl + pwl .* wlp;
 
-				obj.qt_storage = obj.quantum_instr*(1-ttwl) - (citr - obj.qt_storage);
-				obj.wl_index = obj.wl_index + (1-ttwl);
+					% compute new values
+					obj.qt_storage = obj.qt_storage - pwl;
+					ttwl = (obj.qt_storage<=0);
+					obj.qt_storage = obj.qt_storage + obj.quantum_instr .* ttwl;
+					% obj.quantum_instr*(1-ttwl) + ttwl.*(obj.qt_storage - cinstr);
+					obj.wl_index = obj.wl_index + ttwl.*pwl;
+				end
+
+				wl = wl ./ wld;
 
 				d_is = d_is + wl;
 
@@ -291,22 +280,7 @@ classdef hpc_lab < thermal_model
 
 	%% Dependent Variables
 	methods
-		function value = get.quantum_instr(obj)
-			% quantum_instr has to be >= than the maximum reachable
-			% frequency. This is needed because in "compute_model" we
-			% assumed that the maximum number of quanta considered for the
-			% computation of wl is 2. In case we compute quantum_instr with
-			% a value < F_Max it is possible that in the qt_storage there
-			% is only a small fraction of instructions, and so the F_s will
-			% take the small fraction, a whole new quanta, plus a little
-			% part of a third quanta. If the chosen value here is << F_Max
-			% the number could be even greater.
 
-			%This has to be fixed, since quanta are considered at the
-			%benchmark executed frequency, so not always max one.
-			%TODO
-			value = obj.F_max * 1e9 * (obj.quantum_us * 1e-6);
-		end
 	end
 end
 

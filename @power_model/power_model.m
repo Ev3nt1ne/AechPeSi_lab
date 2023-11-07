@@ -134,7 +134,7 @@ classdef power_model
 						stop = 1;
 					end
 				end %while
-				obj.pw_dev_per(c) = obj.core_pw_noise_char(c) + z;
+				obj.pw_dev_per(c) = obj.pw_dev_per(c) + z;
 			end %for
 		end %func
 	end
