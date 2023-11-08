@@ -28,7 +28,7 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	x = obj.x_init + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
 	F = obj.F_min*ones(obj.Nc,1);
 	V = obj.V_min*ones(obj.vd,1);
-	process = 0;
+	process = ones(obj.Nc,1);
 	cpuplot = zeros(Nsim+1,obj.Ni);
 	cpxplot = zeros(Nsim+1,obj.Ns);
 	cpxplot(1,:) = x;
@@ -50,15 +50,15 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		% Noise:
 		T = T + (obj.sensor_noise)*( (rand(size(T)) - 0.5)*2 * obj.sensor_noise_amplitude(obj.PVT_T) );	
 
-		if (mod(s-1 + ctrl_ts_offset, ctrl_mul) == 0)
-			pvt = {process, [], T};
-			[F, Vc] = ctrl_fcn(obj, ctrl, target_index, pvt, pws);
-		end
+		%if (mod(s-1 + ctrl_ts_offset, ctrl_mul) == 0)
+		%	pvt = {process, [], T};
+		%	[F, Vc] = ctrl_fcn(obj, ctrl, target_index, pvt, pws);
+		%end
 
-		V = obj.VDom * Vc;
+		%V = obj.VDom * Vc;
 		
 		%Compute model:
-		[cpuplot(s+1,:), cpxplot(s+1,:), d_is, pw_ms, obj] = obj.compute_model(1, cpxplot(s,:)', V, F, d_p);	
+		[cpuplot(s+1,:), cpxplot(s+1,:), d_is, pw_ms, obj] = obj.compute_model(1, cpxplot(s,:)', V, F, process);	
 
 	end
 

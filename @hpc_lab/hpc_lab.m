@@ -25,10 +25,10 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 		core_pm;
 
 		x_init;						% Initial Conditions 
-		urplot;						% Input Reference Plot
-		frplot;						% Freq Reference Plot
-		zrplot;						% Power Noise Plot
-		wrplot;						% Wokrload Plot
+		%urplot;						% Input Reference Plot
+		frtrc;						% Freq Reference Trace
+		%zrplot;						% Power Noise Plot
+		wltrc;						% Wokrload Trace
 
 		core_crit_temp = 358.15;	
 
@@ -139,7 +139,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			%delay_V_index = zeros(obj.vd,1);		
 			pw_ms = 0;			
 			
-			uplot = zeros(N, obj.Ni_c);
+			uplot = zeros(N, obj.Ni);
 			xplot = zeros(N, obj.Ns);
 
 			%F
@@ -149,7 +149,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			obj.F_cng_times = obj.F_cng_times + cng;
 
 			obj.delay_F_index = obj.delay_F_index.*ttd + cng.*obj.delay_F_div;
-			obj.F_T = ttd.*obj.F_T + cng.*F;
+			obj.F_T = (~cng).*obj.F_T + cng.*F;
 			obj.F_cng_error = obj.F_cng_error + ttd.*(obj.F_T ~= F);
 
 			%V
@@ -159,7 +159,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			obj.V_cng_times = obj.V_cng_times + cng;
 
 			obj.delay_V_index = obj.delay_V_index.*ttd + cng.*obj.delay_V_div;
-			obj.V_T = ttd.*obj.V_T + cng.*V;
+			obj.V_T = (~cng).*obj.V_T + cng.*V;
 			obj.V_cng_error = obj.V_cng_error + ttd.*(obj.V_T ~= V);
 			
 			for sim=1:N
@@ -167,9 +167,9 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 
 				% Delay Application
 				tv = obj.delay_V_index == 0;
-				obj.V_s = obj.V_s - obj.V_s.*tv + V.*tv;
+				obj.V_s = obj.V_s.*(~tv) + V.*tv;
 				tf = obj.delay_F_index == 0;
-				obj.F_s = obj.F_s - obj.F_s.*tf + F.*tf;
+				obj.F_s = obj.F_s.*(~tf) + F.*tf;
 
 				obj.F_cng_us = obj.F_cng_us + ~tf;
 				obj.V_cng_us = obj.V_cng_us + ~tv;
@@ -184,7 +184,8 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 				wl = zeros(obj.Nc, obj.ipl);
 				wld = zeros(obj.Nc, 1);
 				while (sum(instr) > 0)
-					wlp = squeeze(obj.wrplot(:,:,max(mod(obj.wl_index(c), size(obj.wrplot,3)),1)));
+					idx = max(mod(obj.wl_index, size(obj.wltrc,3)),1);
+					wlp = squeeze(obj.wltrc(:,:,idx));
 					
 					[pwl, instr] = obj.quanta2wl(wlp, instr, obj.mem_instr);					
 
