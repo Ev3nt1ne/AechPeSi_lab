@@ -63,6 +63,7 @@ hpc.wltrc = hpc.generate_wl_trace(hpc.Nc, hpc.tsim, 0);
 addpath Controllers/
 ctrl = controller;
 hpc.x_init = hpc.temp_amb * ones(hpc.Ns,1);
+%%
 hpc.simulation(ctrl,[])
 
 	
@@ -120,6 +121,47 @@ pw.power_compute(1,[1;1;1],[300;300;300],ones(3,1)*[0 0.5 0.5 0 0], 1, 0)
 pw.power_compute([1;1;1],[1;1;1],[300;300;300],[0 0.5 0.5 0 0], 1, 1)
 pw.power_compute(1,[1;1;1],[300;300;300],ones(3,1)*[0 0.5 0.5 0 0], 1, 1)
 %}
+
+
+%%
+%Taking a big sample for proper testing
+A = rand(2500,500,100);
+v = randi(size(A,3),size(A,1),1);
+
+fun1 = @() forloop(A,v);
+fun2 = @() vectorization(A,v);
+
+tic
+z1 = fun1();
+toc
+
+z2 = fun2();
+
+
+%Check for equality
+isequal(z1,z2)
+
+%%
+
+function F = forloop(A,v)
+[m,n,l] = size(A);
+F = zeros(m,n);
+for k=1:m
+    F(k,:) = A(k,:,v(k));
+end
+
+end
+function F = vectorization(A,v)
+[m,n,l] = size(A);
+tic
+idx = sub2ind([m,n,l],repelem(1:m,1,n),repmat(1:n,1,m),repelem(v(:).',1,n));
+toc
+tic
+F = (A(idx));
+F = reshape(F,[],m).';
+toc
+end
+
 
 
 

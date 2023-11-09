@@ -288,7 +288,8 @@ classdef perf_model
 			cinstr = mem_wgt.*mem_instr_conv + (1-mem_wgt).*instr;
 						
 			pwl = min(cinstr, obj.qt_storage); %obj.qt_storage./cinstr;
-			res = instr - ((pwl - mem_wgt.*mem_instr_conv) ./ (1-mem_wgt));
+			res = instr - pwl.*(instr./cinstr);
+			%((pwl - mem_wgt.*mem_instr_conv) ./ (1-mem_wgt));
 			% saturate to 0
 			% instr = ..
 		end

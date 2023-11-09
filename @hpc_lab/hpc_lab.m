@@ -184,8 +184,10 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 				wl = zeros(obj.Nc, obj.ipl);
 				wld = zeros(obj.Nc, 1);
 				while (sum(instr) > 0)
-					idx = max(mod(obj.wl_index, size(obj.wltrc,3)),1);
-					wlp = squeeze(obj.wltrc(:,:,idx));
+					vidx = max(mod(obj.wl_index, size(obj.wltrc,3)),1);
+					[m,n,l] = size(obj.wltrc);
+					idx = sub2ind([m,n,l],repelem(1:m,1,n),repmat(1:n,1,m),repelem(vidx(:).',1,n));
+					wlp = reshape(obj.wltrc(idx),[],m).';
 					
 					[pwl, instr] = obj.quanta2wl(wlp, instr, obj.mem_instr);					
 
