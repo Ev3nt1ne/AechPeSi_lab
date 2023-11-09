@@ -175,7 +175,7 @@ for values = experiments.'
     
     
     % dump Quadratic Program matrix data for further optimization, code generation
-    filename = char(compose('%s/_HPC_%dx%x_H%d.mat',basename, hpc.Nh, hpc.Nv, hpc.Nhzn));
+    filename = char(compose('%s/_HPC_%dx%d_H%d.mat',basename, hpc.Nh, hpc.Nv, hpc.Nhzn));
     display(strcat('Saving model to file:  ',filename));
     ops = sdpsettings('verbose',1,'solver','osqp', 'usex0',0);
     hpc.ylmp_constraints;
