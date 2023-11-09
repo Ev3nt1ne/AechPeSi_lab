@@ -75,6 +75,11 @@ classdef hpc_system
 		xMax;
 		ymin;
 		yMax;
+        ylmp_constraints;                % save yalmip constraints 
+        ylmp_objective;                   % save yalmip objective
+        ylmp_opt_variables;              % save the yalmip optimization variables used
+        ylmp_opt_output;                 % save the yalmip variable that is extracted after optimization
+        
 		
 		%% SoA/PID Controller
 		kp = 1.9518;				% PID Kp
@@ -1183,7 +1188,7 @@ classdef hpc_system
 			obj.Q = zeros(obj.Ns);
 			obj.R = zeros(obj.Ni_c);
 			obj.R2 = zeros(obj.Ni_c);
-			obj.Nhzn = 3;
+			%obj.Nhzn = 3;
 			obj.Ctx = zeros(obj.Nhzn, obj.Ns);
 			obj.Ctu = zeros(obj.Nhzn, obj.Ni_c);
 			obj.Cty = zeros(obj.Nhzn, obj.Nout);
@@ -1288,7 +1293,13 @@ classdef hpc_system
 			ops.quadprog.TolFun = 1e-3;
 			%ops.quadprog.MaxPCGIter = max(1, ops.quadprog.MaxPCGIter * 3);
 			ops.quadprog.MaxIter = 50;
-			obj.Controller = optimizer(constraints,objective,ops,{x{1},ot,ly_uref,ly_usum},u{1});
+            % save yalmip model for potential extraction to external solver or code generation
+            obj.ylmp_opt_variables = {x{1},ot,ly_uref,ly_usum};
+            obj.ylmp_opt_output = u{1};
+            obj.ylmp_constraints = constraints;
+            obj.ylmp_objective = objective;
+            % Controller
+            obj.Controller = optimizer(constraints,objective,ops,obj.ylmp_opt_variables,obj.ylmp_opt_output);
 			
 		end %lin_mpc_setup			
 		function uout = lin_mpc(obj, currentx, ot, uref, usum)
@@ -2748,6 +2759,8 @@ classdef hpc_system
 					obj.Nc = Nc;
 					obj.Nh = Nh;
 					obj.Nv = Nv;
+                    obj.VDom = eye(obj.Nc);
+                    obj.vd = obj.Nc;
 				case 4
 					obj.Nc = Nc;
 					obj.Nh = Nh;
