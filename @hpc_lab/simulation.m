@@ -43,6 +43,8 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	pwm = 1;
 	wl  = 1;
 
+	ctrl.init_fnc(obj);
+
 	% LOOOP
 	for s=1:Nsim
 
@@ -55,7 +57,7 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		
 		%Compute model:
 		index = 1+(s-1)*sys_mul;
-		[cpuplot(index+1:index+sys_mul,:), cpxplot(index+1:index+sys_mul,:), wl, pwm, obj] = obj.compute_model(1, cpxplot(index,:)', V, F, process);	
+		[cpuplot(index+1:index+sys_mul,:), cpxplot(index+1:index+sys_mul,:), wl, pwm, obj] = obj.compute_model(sys_mul, cpxplot(index,:)', V, F, process);	
 
 
 		% Sim output managing

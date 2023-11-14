@@ -60,8 +60,9 @@ hpc = hpc_lab;
 hpc.t_init = hpc.temp_amb*ones(hpc.Ns,1);
 hpc.wltrc = hpc.generate_wl_trace(hpc.Nc, hpc.tsim, 0);
 %hpc.sim_tm_autonomous()
+%%
 addpath Controllers/
-ctrl = controller;
+ctrl = Fuzzy;
 hpc.x_init = hpc.temp_amb * ones(hpc.Ns,1);
 %%
 hpc.simulation(ctrl,[])
