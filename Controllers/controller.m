@@ -6,7 +6,6 @@ classdef controller
 		Ts_ctrl (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
 			= 5e-4;			% Controller Ts
 
-		Nic;
 		
 	end
 
@@ -29,6 +28,12 @@ classdef controller
 			%   Detailed explanation goes here
 			%outputArg = obj.Property1 + inputArg;
 		end
+	end
+
+	methods(Abstract=true)
+		[F,V,obj] = ctrl_fnc(obj, hpc_class, target_index, pvt, i_pwm, i_wl)
+		[] = cleanup_fnc(obj, hpc_class)
+		[] = plot_fnc(obj, hpc_class)
 	end
 end
 

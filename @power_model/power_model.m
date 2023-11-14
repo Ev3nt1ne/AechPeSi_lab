@@ -22,7 +22,7 @@ classdef power_model
 			= 6033.035e-3;
 		 
 		dyn_ceff_k {mustBeNumeric, mustBeNonempty, mustBeFinite, mustBeVector} ...
-			= [306.741e-3, 694.866e-3, 1235.452e-3, 1651.217e-3, 1600.92e-3];
+			= [306.741, 694.866, 1235.452, 1651.217, 1600.92]*1e-3;
 
 		FV_table (:,3) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
 			= [0.50, 0.40, 1.3500;

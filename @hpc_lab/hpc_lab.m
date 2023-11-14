@@ -197,7 +197,6 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 					obj.qt_storage = obj.qt_storage - pwl;
 					ttwl = (obj.qt_storage<=0);
 					obj.qt_storage = obj.qt_storage + obj.quantum_instr .* ttwl;
-					% obj.quantum_instr*(1-ttwl) + ttwl.*(obj.qt_storage - cinstr);
 					obj.wl_index = obj.wl_index + ttwl;
 				end
 
@@ -207,7 +206,6 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 
 				pu_s = obj.power_compute(obj.F_s,obj.VDom*obj.V_s,obj.C(1:obj.Nc,:)*x,wl,d_p);
 				pw_ms = pw_ms + sum(pu_s);
-				%x = A_nom*x + B_nom*[u;temp_amb*1000];
 				x = obj.A_s*x + obj.B_s*[pu_s;obj.temp_amb*1000];		
 
 				uplot(sim,:) = pu_s;
@@ -271,6 +269,380 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			end
 			
 			linkaxes([ax1,ax2,ax3,ax4],'x');
+		end
+		function [fig] = powerconstrplot(obj,u1,u2)
+						
+			fig = figure('Name', 'Power Constraints Compliance');
+			movegui(fig, 'southeast');
+			title('Power Constraints analysis')
+			
+			t1 = [0:1:length(u1)-1]*obj.Ts;
+			
+			ax1 = subplot(3,4,[1:4]);
+			gr = sum(u1,2);
+			plot(t1,gr, '.');
+			grid on,title('Total Power'),ylabel('[W]'),xlabel('Time [s]'),hold on;
+			if ((nargin >=4) && (isempty(u2)==0))
+				gr = sum(u2,2);
+				plot(t1,gr);
+			end
+			%if max(gr) >= obj.usum(1)*0.2
+			plot([0:max(length(obj.tot_pw_budget)-1,1)]*(obj.tsim/max(length(obj.tot_pw_budget)-1,1)),[obj.tot_pw_budget], '--', 'LineWidth',1,  'Color', '#CC0000');
+			ax2 = subplot(3,4,[5:8]);
+			p = plot(t1,u1*obj.VDom, '.');
+			grid on,title('Domain Power'),ylabel('[W]'),xlabel('Time [s]'),hold on;
+			if ((nargin >=4) && (isempty(u2)==0))
+				p = plot(t1,u2*obj.VDom);
+			end
+			for pl=1:obj.vd
+				plot([0:max(size(obj.quad_pw_budget,1)-1,1)]*(obj.tsim/max(size(obj.quad_pw_budget,1)-1,1)), [obj.quad_pw_budget], '--', 'LineWidth',1,  'Color', p(pl).Color);
+			end
+			
+			u1 = u1(2:end,:);	
+			dim = size(u1,1);
+			%dim2 = dim
+			
+			pbt = repelem(obj.tot_pw_budget(min(2, length(obj.tot_pw_budget)):end),max(round(size(u1,1)/max(length(obj.tot_pw_budget)-1,1)),1),1);
+			pbq = repelem(obj.quad_pw_budget(min(2, size(obj.quad_pw_budget,1)):end,:),max(round(size(u1,1)/max(size(obj.quad_pw_budget,1)-1,1)),1),1 );
+			gr1 = [sum(sum(u1,2) > pbt)*obj.Ts; ...
+					sum( (u1*obj.VDom) > pbq )'*obj.Ts];
+			
+			ttqt = [sum( (sum(u1,2) > pbt)>0 ); sum( ((u1*obj.VDom) > pbq )>0 )'];
+			ttqt(ttqt<1) = 1;
+			gp1 = [ sum((sum(u1,2) - pbt).*(sum(u1,2) > pbt)) / ttqt(1); ...
+				sum( ((u1*obj.VDom) - pbq).*((u1*obj.VDom) > pbq))' ./  ttqt(2:end)];
+			
+			if (nargin < 4) || isempty(u2)
+				BAR1 = [gr1(1) 0];
+				BAR2 = [0 gp1(1)];
+			else
+				%TODO:
+				%u2 = u2(2:end,:);
+				%gr2 = [sum(sum(u2,2) > obj.tot_pw_budget)*obj.Ts; sum( (u2*obj.VDom)' > obj.quad_pw_budget, 2 )*obj.Ts];
+				%BAR1 = [gr1(1) gr2(1) 0 0];
+				%BAR2 = [0 0 gp1(1) gp2(1)];
+			end
+			
+			subplot(3,4,9);
+			%yyaxis left
+			%axl = gca; % current axes
+			b = bar(1,BAR1);
+			%axl.Color = 'none';
+			grid on,xlabel('Total'),ylabel('Time [s]');
+
+			for pb = 1:2:floor(length(b)/2)
+				xtips = b(pb).XEndPoints;
+				ytips = b(pb).YEndPoints;
+				labels = string(round(b(pb).YData/(dim*obj.Ts)*100,2))+'%';
+				text(xtips,ytips,labels,'HorizontalAlignment','center',...
+					'VerticalAlignment','bottom');
+			end			
+			
+			yyaxis right
+			b2 = bar(1, BAR2);
+			grid on,ylabel('\DeltaPw [W]');
+			%axr = gca;
+			%bar(BAR/(dim*obj.Ts)*100, 'FaceColor', "#0072BD");
+			%axr.Color = 'none';
+			%axr.YTick = axl.YTick/(dim*obj.Ts)*100;
+			%ylabel('[%]');
+
+			
+			subplot(3,4,[10:12]);
+			if (nargin < 4) || isempty(u2)
+				BAR1 = [gr1(2:end) zeros(length(gr1)-1,1)];
+				BAR2 = [zeros(length(gp1)-1,1) gp1(2:end)];
+			else
+				%TODO:
+				%BAR = [gr1(2:end) gr2(2:end)];
+			end
+			%yyaxis left
+			%axl = gca; % current axes
+			b = bar(1:obj.vd, BAR1);
+			%axl.Color = 'none';
+			grid on,xlabel('Domain'),ylabel('Time [s]');
+			
+			for pb = 1:2:floor(length(b)/2)
+				xtips = b(pb).XEndPoints;
+				ytips = b(pb).YEndPoints;
+				labels = string(round(b(pb).YData/(dim*obj.Ts)*100,2))+'%';
+				text(xtips,ytips,labels,'HorizontalAlignment','center',...
+					'VerticalAlignment','bottom');
+			end
+			
+			yyaxis right
+			b2 = bar(1:obj.vd, BAR2);
+			grid on,ylabel('\DeltaPw [W]');
+			
+			%axr = gca;
+			%bar(BAR/(dim*obj.Ts)*100, 'FaceColor', "#0072BD");
+			%axr.Color = 'none';
+			%axr.YTick = axl.YTick/(dim*obj.Ts)*100;
+			%ylabel('[%]');
+
+		end
+		function [fig] = tempconstrplot(obj,x1,x2)
+			
+			x1 = x1(2:end,:);
+			dim = size(x1,1);
+			%dim2 = dim
+			gr1=obj.C(1:obj.Nc,:)*sum(x1 > obj.core_crit_temp)';
+			tt1 = sum(x1 > obj.core_crit_temp);
+			tt1(tt1==0) = 1;
+			gt1=obj.C(1:obj.Nc,:)*(sum( (x1 - obj.core_crit_temp) .* (x1 > obj.core_crit_temp)) ./ tt1 )';
+
+			if (nargin < 3) || isempty(x2)
+				BAR1 = [sum(obj.Ts*gr1)/obj.Nc 0];
+				BAR2 = [0 sum(gt1)/sum(tt1>1)];
+			else
+				x2 = x2(2:end,:);
+				gr2=obj.C(1:obj.Nc,:)*sum(x2 > obj.core_crit_temp)';
+				tt2 = sum(x2 > obj.core_crit_temp);
+				tt2(tt2==0) = 1;
+				gt2=obj.C(1:obj.Nc,:)*(sum( (x2 - obj.core_crit_temp) .* (x2 > obj.core_crit_temp)) ./ tt2 )';
+				BAR1 = [sum(obj.Ts*gr1)/obj.Nc sum(obj.Ts*gr2)/obj.Nc 0 0 ];
+				BAR2 = [0 0 sum(gt1)/sum(tt1>1) sum(gt2)/sum(tt2>1)];
+			end			
+			
+			fig = figure('Name', 'Temperature Constraints Compliance');
+			movegui(fig, 'southwest');
+			title('Temperature Constraints analysis');
+			subplot(5,4,[1,5,9])			
+			%yyaxis left
+			b = bar(1,BAR1);
+			ylabel('Time [s]'),xlabel('Average'),grid on;
+			for pb = 1:2:floor(length(b)/2)
+				xtips = b(pb).XEndPoints;
+				ytips = b(pb).YEndPoints;
+				labels = string(round(b(pb).YData/(dim*obj.Ts)*100,2))+'%';
+				text(xtips,ytips,labels,'HorizontalAlignment','center',...
+					'VerticalAlignment','bottom');
+			end
+			yyaxis right
+			b2 = bar(1,BAR2);
+			yl = ylabel('\DeltaT_{crit} [°C]');grid on;
+			%yl.Position(2) = 0;
+			%BAR = [(sum(gr1)/obj.Nc/(dim)*100)' (sum(gr2)/obj.Nc/(dim)*100)'];
+			%bar(BAR,'FaceColor', "#0072BD");
+			%ylabel('[%]');
+
+			subplot(5,4,[2:4, 6:8, 10:12])
+			if (nargin < 3) || isempty(x2)
+				BAR1 = [obj.Ts*gr1 zeros(obj.Nc,1)];
+				BAR2 = [zeros(obj.Nc,1) gt1];
+			else
+				BAR1 = [obj.Ts*gr1 obj.Ts*gr2 zeros(obj.Nc,1) zeros(obj.Nc,1)];
+				BAR2 = [zeros(obj.Nc,1) zeros(obj.Nc,1) gt1 gt2];
+			end
+			%yyaxis left
+			b = bar(1:obj.Nc, BAR1);
+			ylabel('Time [s]'),xlabel('Core'),grid on;
+			%{
+			for pb = 1:2:floor(length(b)/2)
+				xtips = b(pb).XEndPoints;
+				ytips = b(pb).YEndPoints;
+				labels = string(round(b(pb).YData/(dim*obj.Ts)*100,2))+'%';
+				text(xtips,ytips,labels,'HorizontalAlignment','center',...
+					'VerticalAlignment','bottom');
+			end
+			%}
+			yyaxis right
+			b2 = bar(1:obj.Nc, BAR2);
+			ylabel('\DeltaT_{crit} [°C]'),grid on;
+			%BAR = [(gr1/(dim)*100)' (gr2/(dim)*100)'];
+			%bar(BAR,'FaceColor', "#0072BD");
+			%ylabel('[%]');
+			%total_temp_violation = (obj.Ts*sum(gr))
+			
+			subplot(5,4,[13:20])
+			if (nargin < 3) || isempty(x2)
+				BAR1 = [obj.C(1:obj.Nc,:)*max(x1,[],1)' - 273.15, zeros(obj.Nc,1)];
+				BAR2 = [zeros(obj.Nc,1), obj.C(1:obj.Nc,:)*mean(x1)' - 273.15];
+				ymlj = min(x1, [], "all");
+			else
+				BAR = [obj.C(1:obj.Nc,:)*max(x1,[],1)' obj.C(1:obj.Nc,:)*max(x2,[],1)'] - 273.15;
+				ymlj = min(min(x1, [], "all"),  min(x2, [], "all"));
+			end
+			
+			b = bar(1:obj.Nc, BAR1);
+			yl = ylim;
+			ylim([min(min(obj.x_init), ymlj)-273.15, yl(2)]);
+			ylabel('T_{Max} [°C]'),xlabel('Core'),grid on;
+			hold on;
+			plot(xlim, [obj.core_crit_temp obj.core_crit_temp]-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
+			
+			ylp = ylim;
+			
+			yyaxis right
+			b2 = bar(1:obj.Nc, BAR2);
+			ylabel('T_{Average} [°C]'),grid on;
+			ylim(ylp);
+
+		end
+		function [fig] = fvplot(obj, f, v)
+			
+			fig = figure('Name', 'Frequency-Voltage-Domains Graphs');
+
+			ts = obj.tsim /length(f);
+			t = [0:1:length(f)-1]*ts;
+			
+			% TODO: NOT FULLY TESTED!
+			rp = 2;
+			cp = 2;
+			taken = 1;
+			stop = 0;
+			for i=1:obj.vd
+				rp = 1+i;
+				if (mod(rp,4)==0) || (mod(rp,3)==0) || (rp == 2)
+					taken = min([ceil(rp/3) ceil(rp/2) ceil(rp/4)]);
+					for j=2:2:rp			
+						if (rp-taken)*j >= obj.vd
+							stop = 1;
+							cp = j;
+							break;
+						end			
+					end		
+				end
+				if (stop)
+					break;
+				end
+			end
+			
+			posif = [];
+			posiv = [];
+			for i=1:taken
+				ind = (i-1)*cp+1;
+				posif = [posif, ind:(ind-1)+cp/2];
+				posiv = [posiv ind+cp/2:(ind-1)+cp];
+			end
+			
+			ax1 = subplot(rp,cp,posif);
+			plot(t, f);
+			grid on,xlabel('Time [s]'), ylabel('Applied Freq [GHz]');
+			xlim([0 obj.tsim]);
+			
+			ax2 = subplot(rp,cp,posiv);
+			plot(t, v);
+			grid on,xlabel('Time [s]'), ylabel('Applied Voltage [V]');
+			xlim([0 obj.tsim]);
+			
+			axi = [];
+			dim = sum(obj.VDom);
+			for d=1:obj.vd
+				axi = [axi subplot(rp,cp,taken*cp+d)];
+				hold on;
+				idx = obj.VDom(:,d).*[1:1:obj.Nc]';
+				idx = idx(idx>0);
+				plot(t, f(:,idx));
+				idx = sum((v(:,d) * ones(1,obj.FV_levels)) > obj.FV_table(:,1)',2) + 1;
+				plot(t, obj.FV_table(idx,3), '--', 'LineWidth',1, 'Color', "#0000FF");
+				grid on,xlabel('Time [s]'), ylabel(strcat("Applied Freq [GHz] - Domain: ", int2str(d)));
+				xlim([0 obj.tsim]);
+			end
+
+			linkaxes([ax1,ax2, axi],'x');
+		end
+		function [fig] = perfplot(obj, f, w)
+
+			font_size = 6;
+			
+			fig = figure('Name', 'Performance Comparison');
+			movegui(fig, 'northeast');
+			
+			ax1 = subplot(3,4,[1:4]);
+			smref = round((size(f,1)-1)/(size(obj.frplot,1)-1));
+			smf = round((size(obj.frplot,1)-1)/(size(f,1)-1));
+			
+			gr = repelem(f(2:1:end,:),max(smf,1),1) - repelem(obj.frplot(2:end,:),max(smref,1),1);
+			plot(obj.tsim*[0:(1/size(gr,1)):1]', [zeros(1,obj.Ni_c); gr]);
+			grid on,xlabel('Time [s]'), ylabel('Reference Difference [GHz]');
+			
+			subplot(3,4,[5:6]);
+			av = sum(obj.frplot(2:end,:)) / size(obj.frplot(2:end,:),1);
+			b = bar(sum(gr)/size(gr,1)./av*100);
+			for pb = 1:length(b)
+				xtips = b(pb).XEndPoints;
+				ytips = b(pb).YEndPoints;
+				labels = string(round(b(pb).YData,2))+'%';
+				text(xtips,ytips,labels,'HorizontalAlignment','center',...
+					'VerticalAlignment','bottom', 'FontSize', font_size);
+			end
+			grid on,xlabel('Cores'), ylabel('Mean Difference [%]');
+			
+			subplot(3,4,7);
+			%av = sum(obj.frplot(2:end,:)) / size(obj.frplot(2:end,:),1);
+			b = bar(sum(gr)*obj.VDom/size(gr,1)./(av*obj.VDom)*100);
+			for pb = 1:length(b)
+				xtips = b(pb).XEndPoints;
+				ytips = b(pb).YEndPoints;
+				labels = string(round(b(pb).YData,2))+'%';
+				text(xtips,ytips,labels,'HorizontalAlignment','center',...
+					'VerticalAlignment','bottom');
+			end
+			grid on,xlabel('Domains'), ylabel('Mean Difference [%]');
+			
+			subplot(3,4,8);
+			%av = sum(obj.frplot(2:end,:)) / size(obj.frplot(2:end,:),1);
+			b = bar(sum(sum(gr))/size(gr,1)/sum(av)*100);
+			for pb = 1:length(b)
+				xtips = b(pb).XEndPoints;
+				ytips = b(pb).YEndPoints;
+				labels = string(round(b(pb).YData,2))+'%';
+				text(xtips,ytips,labels,'HorizontalAlignment','center',...
+					'VerticalAlignment','bottom');
+			end
+			grid on,xlabel('Total'), ylabel('Total Mean Difference [%]');
+			
+			% % %
+			gr = w / (size(obj.wrplot,3)-1) * 100;
+			subplot(3,4,[9:10]);
+			b = bar(gr);
+			for pb = 1:length(b)
+				xtips = b(pb).XEndPoints;
+				ytips = b(pb).YEndPoints;
+				labels = string(round(b(pb).YData,2))+'%';
+				text(xtips,ytips,labels,'HorizontalAlignment','center',...
+					'VerticalAlignment','bottom', 'FontSize',font_size);
+			end
+			grid on,xlabel('Cores'), ylabel('Application Completion [%]');
+			
+			subplot(3,4,11);
+			grv = diag(gr)*obj.VDom;
+			tt = grv>0;
+			min_grv = [];
+			for v=1:obj.vd
+				min_grv = [min_grv min(grv(tt(:,v),v))];
+			end
+			b = bar([obj.VDom'*gr ./ sum(obj.VDom)' min_grv']);
+			for pb = 1:length(b)
+				xtips = b(pb).XEndPoints;
+				ytips = b(pb).YEndPoints;
+				labels = string(round(b(pb).YData,2))+'%';
+				text(xtips,ytips,labels,'HorizontalAlignment','center',...
+					'VerticalAlignment','bottom', 'FontSize',font_size);
+			end
+			if obj.vd == 1
+				b.FaceColor = 'flat';
+				b.CData(2,:) = [0.8500 0.3250 0.0980];
+				xticklabels({'Mean', 'Min'});
+			end
+			grid on,xlabel('Domains'), ylabel('Application Completion (Mean - Min) [%]');
+			
+			subplot(3,4,12);
+			b = bar([sum(gr)/obj.Nc min(min_grv)]);
+			for pb = 1:length(b)
+				xtips = b(pb).XEndPoints;
+				ytips = b(pb).YEndPoints;
+				labels = string(round(b(pb).YData,2))+'%';
+				text(xtips,ytips,labels,'HorizontalAlignment','center',...
+					'VerticalAlignment','bottom');
+			end
+			b.FaceColor = 'flat';
+			b.CData(2,:) = [0.8500 0.3250 0.0980];
+			grid on,xlabel(''), ylabel('Application Completion [%]'), xticklabels({'Mean', 'Min'});
+			
+			%linkaxes([ax1,ax2,ax3],'x');
+			
 		end
 	end
 
