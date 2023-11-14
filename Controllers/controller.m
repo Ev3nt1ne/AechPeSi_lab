@@ -5,6 +5,8 @@ classdef controller
 	properties
 		Ts_ctrl (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
 			= 5e-4;			% Controller Ts
+
+		Nic;
 		
 	end
 

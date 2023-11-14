@@ -29,7 +29,7 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	F = obj.F_min*ones(obj.Nc,1);
 	V = obj.V_min*ones(obj.vd,1);
 	process = ones(obj.Nc,1);
-	cpuplot = zeros(Nsim+1,obj.Ni);
+	cpuplot = zeros(Nsim+1,obj.Nc);
 	cpxplot = zeros(Nsim+1,obj.Ns);
 	cpxplot(1,:) = x;
 	cpuplot(1,:) = NaN;
@@ -56,6 +56,14 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		%end
 
 		%V = obj.VDom * Vc;
+		if mod(s,4) == 0
+			F=3.4*ones(obj.Nc,1);
+			V=1.1*ones(obj.vd,1);
+		end
+		if mod(s,4) == 1
+			F=obj.F_min*ones(obj.Nc,1);
+			V=obj.V_min*ones(obj.vd,1);
+		end
 		
 		%Compute model:
 		[cpuplot(s+1,:), cpxplot(s+1,:), d_is, pw_ms, obj] = obj.compute_model(1, cpxplot(s,:)', V, F, process);	

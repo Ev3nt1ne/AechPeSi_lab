@@ -5,16 +5,16 @@ classdef thermal_model
 	properties		
 		%% System Structure
 		Nc (1,1) {mustBePositive, mustBeInteger} ...
-			= 9;		% Number of Cores
+			= 12;		% Number of Cores
 		Nh (1,1) {mustBePositive, mustBeInteger} ...
 			= 3;		% Number of rows
 		Nv (1,1) {mustBePositive, mustBeInteger} ...
-			= 3;		% Number of cols
+			= 4;		% Number of cols
 		% TODO: Maybe move vd and VDom out?
 		vd (1,1) {mustBePositive, mustBeInteger} ...
-			= 4;		% Voltage/Power Domains
+			= 3;		% Voltage/Power Domains
 		VDom {mustBeNonnegative, mustBeNumericOrLogical, mustBeNonempty, mustBeLessThanOrEqual(VDom,1)} ...
-			= 1;		% Structure of the Voltage Domains Nc x vd
+			= [1 0 0; 1 0 0; 0 1 0; 0 1 0; 1 0 0; 1 0 0; 0 1 0; 0 1 0; 0 0 1; 0 0 1; 0 0 1; 0 0 1];		% Structure of the Voltage Domains Nc x vd
 		
 		%% Matlab/Simulation
 		model_ver (1,1) {mustBeNonnegative, mustBeInteger} ...

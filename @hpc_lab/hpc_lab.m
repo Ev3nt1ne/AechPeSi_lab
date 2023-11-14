@@ -45,7 +45,6 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 		% Internal Variables for Simulation() fnc
 	 	wl_index;
 	 	qt_storage;
-		mem_instr
 
 		F_cng_times;
 		V_cng_times;
@@ -106,7 +105,6 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 		function [obj] = init_compute_model(obj, A, B)
 			obj.qt_storage = obj.quantum_instr*ones(obj.Nc, 1);
 			obj.wl_index = ones(obj.Nc, 1);
-			obj.mem_instr = obj.F_min * 1e9 * (obj.Ts);
 			obj.F_cng_times = zeros(obj.Nc,1);
 			obj.V_cng_times = zeros(obj.vd,1);
 			obj.F_cng_us = zeros(obj.Nc,1);
@@ -139,11 +137,11 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			%delay_V_index = zeros(obj.vd,1);		
 			pw_ms = 0;			
 			
-			uplot = zeros(N, obj.Ni);
+			uplot = zeros(N, obj.Nc);
 			xplot = zeros(N, obj.Ns);
 
 			%F
-			ttd = (obj.delay_F_index > 0);
+			ttd = (obj.delay_F_index > 0)|(obj.F_T ~= obj.F_s);
 			cng = (~ttd).*(obj.F_T ~= F);
 
 			obj.F_cng_times = obj.F_cng_times + cng;
@@ -153,7 +151,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			obj.F_cng_error = obj.F_cng_error + ttd.*(obj.F_T ~= F);
 
 			%V
-			ttd = (obj.delay_V_index > 0);
+			ttd = (obj.delay_V_index > 0)|(obj.V_T ~= obj.V_s);
 			cng = (~ttd).*(obj.V_T ~= V);
 
 			obj.V_cng_times = obj.V_cng_times + cng;
@@ -167,9 +165,9 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 
 				% Delay Application
 				tv = obj.delay_V_index == 0;
-				obj.V_s = obj.V_s.*(~tv) + V.*tv;
+				obj.V_s = obj.V_s.*(~tv) + obj.V_T.*tv;
 				tf = obj.delay_F_index == 0;
-				obj.F_s = obj.F_s.*(~tf) + F.*tf;
+				obj.F_s = obj.F_s.*(~tf) + obj.F_T.*tf;
 
 				obj.F_cng_us = obj.F_cng_us + ~tf;
 				obj.V_cng_us = obj.V_cng_us + ~tv;
@@ -189,7 +187,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 					idx = sub2ind([m,n,l],repelem(1:m,1,n),repmat(1:n,1,m),repelem(vidx(:).',1,n));
 					wlp = reshape(obj.wltrc(idx),[],m).';
 					
-					[pwl, instr] = obj.quanta2wl(wlp, instr, obj.mem_instr);					
+					[pwl, instr] = obj.quanta2wl(wlp, instr, (obj.F_min./obj.F_s));					
 
 					% add to accumulator
 					wld = wld + pwl;
@@ -200,7 +198,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 					ttwl = (obj.qt_storage<=0);
 					obj.qt_storage = obj.qt_storage + obj.quantum_instr .* ttwl;
 					% obj.quantum_instr*(1-ttwl) + ttwl.*(obj.qt_storage - cinstr);
-					obj.wl_index = obj.wl_index + ttwl.*pwl;
+					obj.wl_index = obj.wl_index + ttwl;
 				end
 
 				wl = wl ./ wld;
