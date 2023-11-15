@@ -87,5 +87,6 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		ctrl.plot_fnc(obj);
 	end
 
+	
 end
 
