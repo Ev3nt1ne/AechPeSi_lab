@@ -64,11 +64,21 @@ hpc.wltrc = hpc.generate_wl_trace(hpc.Nc, hpc.tsim, 0);
 addpath Controllers/
 ctrl = Fuzzy;
 hpc.x_init = hpc.temp_amb * ones(hpc.Ns,1);
+hpc.frtrc = 3.45 * ones(min(ceil(hpc.tsim / hpc.Ts_target)+1,(hpc.tsim/ctrl.Ts_ctrl+1)), hpc.Nc);
+ts = ceil(hpc.tsim / hpc.Ts_target)+1;
+hpc.tot_pw_budget = 450/36*hpc.Nc*ones(ts,1);
+ts = ceil(ts/4);
+hpc.tot_pw_budget(ts+1:2*ts) = 2*hpc.Nc;
+hpc.tot_pw_budget(2*ts+1:3*ts) = 5*hpc.Nc;
+hpc.tot_pw_budget(3*ts+1:3*ts+ceil(ts/2)) = 3*hpc.Nc;
+hpc.tot_pw_budget(3*ts+ceil(ts/2)+1:end) = 8*hpc.Nc;
+hpc.quad_pw_budget = 450/36*hpc.Nc*ones(2,hpc.vd);
+
+hpc.min_pw_red = 0.6;
 %%
-hpc.simulation(ctrl,[])
+hpc.simulation(ctrl,1);
 
 	
-
 %%
 tnA = hpc.Ac_nom;
 

@@ -65,7 +65,7 @@ classdef CP < controller
 				%since the difference is negligible (0.7369 vs 0.8503), but also when
 				%	leakage, I will just use MAX_CEFF.
 				%min_pw_red = computed above
-				tt = (pu < min_pw_red*0.7);
+				tt = (pu <= min_pw_red*0.7);
 				pu = pu-(pu.*tt) + min_pw_red*0.7.*tt;
 				pw_storage = delta_p - sum(pu);
 			elseif obj.pw_inverse
@@ -106,7 +106,7 @@ classdef CP < controller
 					%since the difference is negligible (0.7369 vs 0.8503), but also when
 					%	leakage, I will just use MAX_CEFF.
 					%min_pw_red = computed above
-					tt2 = (pu < min_pw_red*0.7);
+					tt2 = (pu <= min_pw_red*0.7);
 					pu = pu-(pu.*tt2) + min_pw_red*0.7.*tt2;
 					pw_storage = (sum(ipu) - sum(pu)) - delta_p;
 					if sum(tt2)==length(ipu)
@@ -153,7 +153,7 @@ classdef CP < controller
 					%since the difference is negligible (0.7369 vs 0.8503), but also when
 					%	leakage, I will just use MAX_CEFF.
 					%min_pw_red = computed above
-					tt2 = (pu < min_pw_red*0.7);
+					tt2 = (pu <= min_pw_red*0.7);
 					pu = pu-(pu.*tt2) + min_pw_red*0.7.*tt2;
 					pw_storage = (sum(ipu) - sum(pu)) - delta_p;
 					if sum(tt2)==length(ipu)

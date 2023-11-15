@@ -41,12 +41,17 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	cpfplot(1,:) = F;
 	cpvplot(1,:) = V;
 	pwm = 1;
-	wl  = 1;
+	wl  = [ones(obj.Nc,1) zeros(obj.Nc, obj.ipl -1)];
+	pvt{obj.PVT_P} = process;
+	pvt{obj.PVT_V} = [];
+	pvt{obj.PVT_T} = obj.C*x;
 
-	ctrl.init_fnc(obj);
+	ctrl = ctrl.init_fnc(obj);
 
 	% LOOOP
 	for s=1:Nsim
+
+		s
 
 		% Input step managing
 		target_counter = (target_counter-1)*(target_counter>0) + (target_counter<=0)*(target_mul-1);
@@ -66,7 +71,9 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		T = T + (obj.sensor_noise)*( (rand(size(T)) - 0.5)*2 * obj.sensor_noise_amplitude(obj.PVT_T) );	
 
 		%if (mod(s-1 + ctrl_ts_offset, ctrl_mul) == 0)
-			pvt = {process, [], T};
+			pvt{obj.PVT_P} = process;
+			pvt{obj.PVT_V} = [];
+			pvt{obj.PVT_T} = T;
 			[F, V, ctrl] = ctrl.ctrl_fnc(obj, target_index, pvt, ctrl_pwm, ctrl_wl);
 		%end
 
@@ -74,7 +81,7 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		cpvplot(s+1,:) = V;
 	end
 
-	wlop = obj.wl_index / (size(obj.wrplot,3)-1) * 100;
+	wlop = obj.wl_index / (size(obj.wltrc,3)-1) * 100;
 	ctrl.cleanup_fnc(obj);
 
 	if show
@@ -87,6 +94,5 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		ctrl.plot_fnc(obj);
 	end
 
-	
 end
 

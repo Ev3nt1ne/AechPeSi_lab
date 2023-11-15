@@ -550,15 +550,15 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			movegui(fig, 'northeast');
 			
 			ax1 = subplot(3,4,[1:4]);
-			smref = round((size(f,1)-1)/(size(obj.frplot,1)-1));
-			smf = round((size(obj.frplot,1)-1)/(size(f,1)-1));
+			smref = round((size(f,1)-1)/(size(obj.frtrc,1)-1));
+			smf = round((size(obj.frtrc,1)-1)/(size(f,1)-1));
 			
-			gr = repelem(f(2:1:end,:),max(smf,1),1) - repelem(obj.frplot(2:end,:),max(smref,1),1);
-			plot(obj.tsim*[0:(1/size(gr,1)):1]', [zeros(1,obj.Ni_c); gr]);
+			gr = repelem(f(2:1:end,:),max(smf,1),1) - repelem(obj.frtrc(2:end,:),max(smref,1),1);
+			plot(obj.tsim*[0:(1/size(gr,1)):1]', [zeros(1,obj.Nc); gr]);
 			grid on,xlabel('Time [s]'), ylabel('Reference Difference [GHz]');
 			
 			subplot(3,4,[5:6]);
-			av = sum(obj.frplot(2:end,:)) / size(obj.frplot(2:end,:),1);
+			av = sum(obj.frtrc(2:end,:)) / size(obj.frtrc(2:end,:),1);
 			b = bar(sum(gr)/size(gr,1)./av*100);
 			for pb = 1:length(b)
 				xtips = b(pb).XEndPoints;
@@ -570,7 +570,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			grid on,xlabel('Cores'), ylabel('Mean Difference [%]');
 			
 			subplot(3,4,7);
-			%av = sum(obj.frplot(2:end,:)) / size(obj.frplot(2:end,:),1);
+			%av = sum(obj.frtrc(2:end,:)) / size(obj.frtrc(2:end,:),1);
 			b = bar(sum(gr)*obj.VDom/size(gr,1)./(av*obj.VDom)*100);
 			for pb = 1:length(b)
 				xtips = b(pb).XEndPoints;
@@ -582,7 +582,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			grid on,xlabel('Domains'), ylabel('Mean Difference [%]');
 			
 			subplot(3,4,8);
-			%av = sum(obj.frplot(2:end,:)) / size(obj.frplot(2:end,:),1);
+			%av = sum(obj.frtrc(2:end,:)) / size(obj.frtrc(2:end,:),1);
 			b = bar(sum(sum(gr))/size(gr,1)/sum(av)*100);
 			for pb = 1:length(b)
 				xtips = b(pb).XEndPoints;
@@ -594,7 +594,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			grid on,xlabel('Total'), ylabel('Total Mean Difference [%]');
 			
 			% % %
-			gr = w / (size(obj.wrplot,3)-1) * 100;
+			gr = w / (size(obj.wltrc,3)-1) * 100;
 			subplot(3,4,[9:10]);
 			b = bar(gr);
 			for pb = 1:length(b)
