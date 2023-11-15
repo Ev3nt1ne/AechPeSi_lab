@@ -44,12 +44,20 @@ classdef mpc < controller
 	end
 	
 	methods
-		function obj = mpc(inputArg1,inputArg2)
+		function obj = mpc()
 			%MPC Construct an instance of this class
 			%   Detailed explanation goes here
+
+			%% TODO
+			% check Yalmip
+			% check OSQP
 			
 		end
-		
+	end
+
+	methods(Abstract=true)
+		[obj] = setup_mpc(obj)
+		[uout] = call_mpc(obj)
 	end
 end
 

@@ -216,6 +216,11 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 		end
 	end
 
+	%% Approximation
+	methods
+		[k0, k1, k2] = pws_ls_approx(obj)
+	end
+
 	%% Graphs
 	methods(Static)
 		function [] = savetofile(fig, path_name, bmpres)
