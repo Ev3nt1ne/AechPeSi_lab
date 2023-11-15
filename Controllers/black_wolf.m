@@ -129,5 +129,17 @@ classdef black_wolf < mpc
 			end			
 		end %lin_mpc
 	end
+
+	%TODO don't know if these go here!!! or inside MPC!
+	methods
+		function [obj] = init_fnc(obj, hpc_class)
+		end
+		function [F,V,obj] = ctrl_fnc(obj, hpc_class, target_index, pvt, i_pwm, i_wl)
+		end
+		function [obj] = cleanup_fnc(obj, hpc_class)
+		end
+		function [obj] = plot_fnc(obj, hpc_class)
+		end
+	end
 end
 

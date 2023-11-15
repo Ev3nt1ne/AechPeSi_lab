@@ -51,6 +51,12 @@ classdef mpc < controller
 			%% TODO
 			% check Yalmip
 			% check OSQP
+			try 
+				yalmip('clear')
+			catch
+				addpath(genpath([pwd filesep 'YALMIP']));
+				savepath
+			end
 			
 		end
 	end
