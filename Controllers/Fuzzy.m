@@ -294,9 +294,9 @@ classdef Fuzzy < CP
 
 
 		end
-		function [] = cleanup_fnc(obj, hpc_class)
+		function [obj] = cleanup_fnc(obj, hpc_class)
 		end
-		function [] = plot_fnc(obj, hpc_class)
+		function [obj] = plot_fnc(obj, hpc_class)
 		end
 
 		function [pu, pw_storage] = cp_pw_dispatcher_c(obj, Ceff, delta_p, ipu, min_pw_red)

@@ -28,8 +28,8 @@ classdef controller
 	methods(Abstract=true)
 		[obj] = init_fnc(obj, hpc_class)
 		[F,V,obj] = ctrl_fnc(obj, hpc_class, target_index, pvt, i_pwm, i_wl)
-		[] = cleanup_fnc(obj, hpc_class)
-		[] = plot_fnc(obj, hpc_class)
+		[obj] = cleanup_fnc(obj, hpc_class)
+		[obj] = plot_fnc(obj, hpc_class)
 	end
 
 	methods(Static)

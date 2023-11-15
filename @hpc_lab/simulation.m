@@ -51,8 +51,6 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	% LOOOP
 	for s=1:Nsim
 
-		s
-
 		% Input step managing
 		target_counter = (target_counter-1)*(target_counter>0) + (target_counter<=0)*(target_mul-1);
 		target_index = target_index + (target_counter==target_mul-1);
@@ -82,16 +80,20 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	end
 
 	wlop = obj.wl_index / (size(obj.wltrc,3)-1) * 100;
-	ctrl.cleanup_fnc(obj);
+	ctrl = ctrl.cleanup_fnc(obj);
 
 	if show
 		obj.xutplot(cpxplot,cpuplot);
+		pause(0.5);
 		obj.powerconstrplot(cpuplot);
+		pause(0.5);
 		obj.tempconstrplot(cpxplot);
-		obj.perfplot(cpfplot,obj.wl_index);		
+		pause(0.5);
+		obj.perfplot(cpfplot,obj.wl_index);	
+		pause(0.5);
 		obj.fvplot(cpfplot,cpvplot);
 
-		ctrl.plot_fnc(obj);
+		ctrl = ctrl.plot_fnc(obj);
 	end
 
 end
