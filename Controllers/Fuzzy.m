@@ -177,6 +177,14 @@ classdef Fuzzy < CP
 				%pw_storage = pw_storage + pws;	
 			end
 
+			if sum(isempty(pu)) || sum(pu<=0)
+				disp("error, something wrong");
+				F = hpc_class.F_min * ones(hpc_class.Nc,1);
+				V = hpc_class.V_min * ones(hpc_class.vd,1);
+				%TODO should I trigger some other cleanup?
+				return;
+			end
+
 			% Compute Freq
 			%% Newton-Rapson		
 			for vi=1:hpc_class.vd

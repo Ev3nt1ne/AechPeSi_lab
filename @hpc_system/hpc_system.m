@@ -55,6 +55,7 @@ classdef hpc_system
 		quad_pw_budget;
 		
 		%% MPC Controller
+		separate_omega;
 		xref;
 		uref;
 		yref;
@@ -75,6 +76,12 @@ classdef hpc_system
 		xMax;
 		ymin;
 		yMax;
+		
+		
+		mpc_h0_T;
+		mpc_h0_F;
+		mpc_h0_app;
+		
 		
 		%% SoA/PID Controller
 		kp = 1.9518;				% PID Kp
@@ -208,7 +215,7 @@ classdef hpc_system
 		core_min_power;		
 	end
 	
-	properties(SetAccess=private, GetAccess=public)		
+	properties(SetAccess=protected, GetAccess=public)		
 		Controller;					% Persistent variable to optimize controller
 		polyFV_opt;
 		
@@ -1139,9 +1146,9 @@ classdef hpc_system
 					wlp(c,:) = obj.wrplot(c,:,max(mod(obj.wl_index(c), size(obj.wrplot,3)),1));
 					wlpn(c,:) = obj.wrplot(c,:,max(mod(obj.wl_index(c)+1, size(obj.wrplot,3)),1+1));
 				end
-				if (obj.F_s(1) > obj.F_min)
-					asd = 1;
-				end
+				%if (obj.F_s(1) > obj.F_min)
+				%	asd = 1;
+				%end
 				instr = obj.F_s * 1e9 * (obj.Ts);
 				mem_instr = obj.F_min * 1e9 * (obj.Ts);
 				a_citr = sum(wlp.*obj.mem_wl,2);
@@ -1156,6 +1163,9 @@ classdef hpc_system
 					(1-pwl) .* wlpn;
 
 				obj.qt_storage = obj.quantum_instr*(1-ttwl) - (citr - obj.qt_storage);
+				%if sum((obj.qt_storage <0)>0)
+				%	stop=1;
+				%end
 				obj.wl_index = obj.wl_index + (1-ttwl);
 
 				d_is = d_is + wl;
@@ -1278,7 +1288,7 @@ classdef hpc_system
 
 			% TODO: do Q and x (with xref), and "Q" and yref
 			for k = 1:obj.Nhzn
-				objective = objective + (u{k}-ly_uref)'*obj.R*(u{k}-ly_uref) + u{k}'*obj.R2*(u{k}); % + (x{k}-ly_xref)'*obj.Q*(x{k}-lx_uref);
+				objective = objective + (u{k}-ly_uref)'*obj.R*(u{k}-ly_uref) + u{k}'*obj.R2*(u{k}) + x{k}'*obj.Q*x{k}; % + (x{k}-ly_xref)'*obj.Q*(x{k}-lx_uref);
 			end
 			
 			ops = sdpsettings('verbose',1,'solver','quadprog', 'usex0',1);
@@ -1289,8 +1299,219 @@ classdef hpc_system
 			%ops.quadprog.MaxPCGIter = max(1, ops.quadprog.MaxPCGIter * 3);
 			ops.quadprog.MaxIter = 50;
 			obj.Controller = optimizer(constraints,objective,ops,{x{1},ot,ly_uref,ly_usum},u{1});
+			obj.Controller
 			
-		end %lin_mpc_setup			
+		end %lin_mpc_setup	
+		function [k0, k1, k2] = createPsApprox(obj)
+			%creating the asdsad
+			Fint = [obj.F_min obj.F_Max];
+			Tint = [20 90];
+
+			%Fint = [2.8 obj.F_Max];
+			%Tint = [60 90];
+
+			a = Tint(1);
+			b = Tint(2);
+			c = Fint(1);
+			d = Fint(2);
+
+			Ke = -obj.exp_leak_coeff(3)/1000;
+			KT = obj.exp_leak_coeff(2)/1000;
+			KV = obj.exp_leak_coeff(1)/1000;
+			Ks = obj.leak_process / 1000;
+			Kw = obj.leak_vdd / 1000;
+
+			V0 = 0.9;
+			%V0 = 1.2;
+			KV1 = exp(KV*V0)*(1-KV*V0);
+			KV2 = KV / (1 - KV*V0);
+
+			alp = 0.2995; %0.15;
+
+			c1 = exp(Ke)*KV1*(exp(KT*b) - exp(KT*a)) / (KT*(d-c)*(b-a));
+			c2 = (d^(alp+1) - c^(alp+1))*(Ks*KV2 + Kw) / (alp+1);
+			c3 = KV2*Kw*(d^(2*alp+1) - c^(2*alp+1)) / (2*alp+1);
+			c4 = Ks*(d-c);
+
+			m0 = c1 * (c2 + c3 + c4);
+
+			c1 = 6*exp(Ke)*KV1*( KT*(b-a)*(exp(KT*b) + exp(KT*a)) - 2*(exp(KT*b) - exp(KT*a)) ) / (KT^2*(d-c)*(b-a)^3);
+			c2 = (d^(alp+1) - c^(alp+1))*(Ks*KV2 + Kw) / (alp+1);
+			c3 = KV2*Kw*(d^(2*alp+1) - c^(2*alp+1)) / (2*alp+1);
+			c4 = Ks*(d-c);
+
+			m1 = c1 * (c2 + c3 + c4);
+
+			c1 = 2*exp(Ke)*KV1*(exp(KT*b) - exp(KT*a)) / (KT*(b-a));
+			cd1 = (d-c)*(d+c)^2 - 2*(d^(2*alp+2) - c^(2*alp+2))*(d+c)*(alp+1)^(-1) + 4*(d^(4*alp+3) - c^(4*alp+3))*(4*alp+3)^(-1);
+			c2 = (d^(alp+1) - c^(alp+1))*(Ks*(d^(alp+1)+c^(alp+1))-(d+c)*(Ks*KV2+Kw))/(alp+1);
+			c3 = KV2*Kw*(d^(2*alp+1)-c^(2*alp+1))*((d^(2*alp+1)+c^(2*alp+1)) - (d+c)) / (2*alp+1);
+			c4 = 2*(d^(3*alp+2)-c^(3*alp+2))*(Ks*KV2 + Kw) / (3*alp+2);
+			c5 = Ks*(d^2 - c^2);
+
+			m2 = c1/cd1 * (c2 + c3 + c4 - c5);
+
+			k1 = m1;
+			k2 = m2;
+			k0 = m0 - (m1*(b+a) + m2*(d+c))/2;			
+		end
+		function obj = lin_mpc_setup2(obj)
+			
+			% It's good practice to start by clearing YALMIPs internal database 
+			% Every time you call sdpvar etc, an internal database grows larger
+			yalmip('clear')
+
+			x = sdpvar(repmat(obj.Ns,1,obj.Nhzn+1),repmat(1,1,obj.Nhzn+1));
+			u = sdpvar(repmat(obj.Ni_c,1,obj.Nhzn),repmat(1,1,obj.Nhzn));
+			
+			sdpvar ot; %TODO: decide if single or with horizon
+			if obj.separate_omega
+				w = sdpvar(obj.Ni_c,1); %TODO: decide if single or with horizon
+			end
+			h0v = sdpvar(obj.Ni_c,1);
+			%sdpvar ly_xref;
+			ly_uref = sdpvar(obj.Ni_c,1);
+			%sdpvar ly_yref;
+			ly_usum = sdpvar(obj.Nhzn,obj.vd+1);
+			%ly_Cty = dpvar(repmat(obj.Nout,1,obj.Nhzn),repmat(1,1,obj.Nhzn));
+
+			Adl_mpc = obj.Ad_mpc;
+			Bdl_mpc = obj.Bd_mpc;
+			
+			Bu = Bdl_mpc(:,1:obj.Ni_c);
+			Bd = Bdl_mpc(:,obj.Ni_c+1:end);
+			
+			[~, h1, h2] = obj.createPsApprox();
+			
+			
+			C2 = eye(obj.Ns);
+			C2([2:2:end]) = 0;
+			C2([end-4:end], :) = 0; %TODO parametrize
+			
+			C3 = obj.C(1:obj.Nc,:)';
+			
+			constraints = [];
+
+			for k = 1:obj.Nhzn
+					if obj.separate_omega
+						constraints = [constraints, x{k+1} == (Adl_mpc + C2*h1)*x{k}-(C2*h1*273.15*ones(obj.Ns,1))+(Bu+(obj.C(1:obj.Nc,:)'*h2))*(u{k}.*w)+Bd*ot + C3*h0v];
+						%[constraints, x{k+1} == (Adl_mpc + C2*h1)*x{k}-(C2*h1*273.15*ones(obj.Ns,1))+(Bu+h2)*(u{k}.*w)+Bd*ot + h0];
+
+						%TODO: Ct I did only for y, and only for max
+						if (~isinf(obj.umin))
+							%constraints = [constraints, u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k}-273.15)) + h0 >= obj.umin];
+						end
+						if (~isinf(obj.uMax))
+							%constraints = [constraints, u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k}-273.15)) + h0 <= obj.uMax - obj.Ctu(k,:)'];
+						end
+						if (~isinf(obj.xmin))
+							%constraints = [constraints, x{k+1} >= obj.xmin];
+						end
+						if (~isinf(obj.xMax))
+							%constraints = [constraints, x{k+1} <= obj.xMax];
+						end
+						if (~isinf(obj.ymin))
+							%constraints = [constraints, obj.C)*x{k+1} >= obj.ymin];
+						end
+						if (~isinf(obj.yMax))
+							constraints = [constraints, obj.C*x{k+1} <= obj.yMax - obj.Cty(k,:)'];
+						end
+						%if (~isinf(obj.usum(1)))
+							constraints = [constraints,sum(u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k+1}-273.15)) + h0v) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
+							%constraints = [constraints,sum(u{k}*(h2+1) + h1*(273.15) + h0) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
+						%end
+						%if (~isinf(obj.usum(2:end)))
+						%
+							%constraints = [constraints, obj.VDom'*(u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k}-273.15)) + h0) <= ly_usum(k,2:end)' - (obj.Ctu(k,:)*obj.VDom)'];
+						%
+						%end
+						
+					else
+						constraints = [constraints, x{k+1} == (Adl_mpc + C2*h1)*x{k}-(C2*h1*273.15*ones(obj.Ns,1))+(Bu+(obj.C(1:obj.Nc,:)'*h2))*(u{k})+Bd*ot + C3*h0v];
+						%[constraints, x{k+1} == (Adl_mpc + C2*h1)*x{k}-(C2*h1*273.15*ones(obj.Ns,1))+(Bu+h2)*(u{k}.*w)+Bd*ot + h0];
+
+						%TODO: Ct I did only for y, and only for max
+						if (~isinf(obj.umin))
+							%constraints = [constraints, u{k}*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k}-273.15)) + h0 >= obj.umin];
+						end
+						if (~isinf(obj.uMax))
+							%constraints = [constraints, u{k}*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k}-273.15)) + h0 <= obj.uMax - obj.Ctu(k,:)'];
+						end
+						if (~isinf(obj.xmin))
+							%constraints = [constraints, x{k+1} >= obj.xmin];
+						end
+						if (~isinf(obj.xMax))
+							%constraints = [constraints, x{k+1} <= obj.xMax];
+						end
+						if (~isinf(obj.ymin))
+							%constraints = [constraints, obj.C)*x{k+1} >= obj.ymin];
+						end
+						if (~isinf(obj.yMax))
+							constraints = [constraints, obj.C*x{k+1} <= obj.yMax - obj.Cty(k,:)'];
+						end
+						%if (~isinf(obj.usum(1)))
+							constraints = [constraints,sum(u{k}*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k+1}-273.15)) + h0v) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
+							%constraints = [constraints,sum(u{k}*(h2+1) + h1*(273.15) + h0) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
+						%end
+						%if (~isinf(obj.usum(2:end)))
+						%
+							%constraints = [constraints, obj.VDom'*(u{k}*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k}-273.15)) + h0) <= ly_usum(k,2:end)' - (obj.Ctu(k,:)*obj.VDom)'];
+						%
+						%end
+					end
+			end
+			
+			objective = 0;
+
+			% TODO: do Q and x (with xref), and "Q" and yref
+			for k = 1:obj.Nhzn
+				objective = objective + (u{k}-ly_uref)'*obj.R*(u{k}-ly_uref) + u{k}'*obj.R2*(u{k}) + x{k}'*obj.Q*x{k}; % + (x{k}-ly_xref)'*obj.Q*(x{k}-lx_uref);
+			end
+			
+			ops = sdpsettings('verbose',1,'solver','quadprog', 'usex0',1);
+			ops = sdpsettings('verbose',1,'solver','osqp', 'usex0',0); %You have specified an initial point, but the selected solver (OSQP) does not support warm-starts through YALMIP
+			ops.quadprog.TolCon = 1e-2;
+			ops.quadprog.TolX = 1e-5;
+			ops.quadprog.TolFun = 1e-3;
+			ops.convertconvexquad = 0;
+			%ops.quadprog.MaxPCGIter = max(1, ops.quadprog.MaxPCGIter * 3);
+			ops.quadprog.MaxIter = 50;
+			if obj.separate_omega
+				obj.Controller = optimizer(constraints,objective,ops,{x{1},w,ot, h0v, ly_uref,ly_usum},{u{1}, x{2}});
+			else
+				obj.Controller = optimizer(constraints,objective,ops,{x{1},ot, h0v, ly_uref,ly_usum},{u{1}, x{2}});
+			end
+			obj.Controller
+			
+		end %lin_mpc_setup
+		function uout = lin_mpc2(obj, currentx, w, ot, h0v, uref, usum)
+			
+			if nargin < 4
+				error("Needs current x, w and d");
+			end
+			if nargin < 6
+				usum = obj.usum;
+			end
+			if nargin < 5
+				uref = obj.uref;
+			end
+			
+			if size(usum,1) < obj.Nhzn
+				usum(size(usum,1)+1:obj.Nhzn,:) = repmat(usum(size(usum,1),:), obj.Nhzn - size(usum,1),1);
+			end
+			
+			if obj.separate_omega
+				[uout, problem,~,~,optimizer_object] = obj.Controller({currentx, w, ot, h0v, uref, usum});
+			else
+				[uout, problem,~,~,optimizer_object] = obj.Controller({currentx, ot, h0v, uref, usum});
+			end
+
+			% Analyze error flags
+			if problem
+				warning(yalmiperror(problem))
+			end
+			
+		end %lin_mpc
 		function uout = lin_mpc(obj, currentx, ot, uref, usum)
 			
 			if nargin < 3
@@ -1304,7 +1525,7 @@ classdef hpc_system
 			end
 			
 			if size(usum,1) < obj.Nhzn
-				usum(size(usum,1)+1:obj.Nhzn,:) = usum(size(usum,1),:);
+				usum(size(usum,1)+1:obj.Nhzn,:) = repmat(usum(size(usum,1),:), obj.Nhzn - size(usum,1),1);
 			end
 
 			[uout, problem,~,~,optimizer_object] = obj.Controller({currentx, ot, uref, usum});
@@ -1541,6 +1762,7 @@ classdef hpc_system
 			Ct = Ct * (perc/100);
 		end
 		function [voltage_choice] = cp_voltage_choice(obj, Ft)
+			%TODO issue when dimension of domains are not equal!!!
 			for v=1:obj.vd
 				extrV = sum( Ft(:,v) > (obj.FV_table(:,3) + [zeros(obj.FV_levels-1,1); inf])', 2);
 				vote_cast(:,v) = extrV(nonzeros(obj.VDom(:,v).*[1:obj.Nc]')) + 1;
@@ -2648,6 +2870,7 @@ classdef hpc_system
 				end
 			end
 		end
+		
 	end %methods
 	
 	% ==============
@@ -2665,6 +2888,7 @@ classdef hpc_system
 		[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = launch_ncp_sim(obj, robust, show)
 		[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = launch_occ_sim(obj, Tall, Ttick, robust, show)
 		[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = launch_arm_sim(obj, robust, mode, show)
+		[cpxplot,cpuplot, cpfplot, cpvplot, xlplot, wlop] = launch_nmpc_sim(obj, obs)
 	end %methods
 
 	%% Setup
@@ -2852,6 +3076,7 @@ classdef hpc_system
 		end
 		function value = get.quantum_instr(obj)
 			value = obj.F_Max * 1e9 * (obj.quantum_us * 1e-6);
+			%value = 3 * 1e9 * (obj.quantum_us * 1e-6);
 		end
 		
 		% Matrices
@@ -2900,15 +3125,15 @@ classdef hpc_system
 		%% SET
 		function obj = set.model_variation(obj, val)
 			%check modifications
-			if val 
-				if val ~= obj.model_variation 
+			if val ~= obj.model_variation 
+				if val
 					obj = obj.create_core_pw_noise();
 					obj = obj.create_thermal_model_noise();
+				else
+					%reset: 
+					obj.core_pw_noise_char = ones(obj.Nc,1);
+					obj.ThMoNoise = ones(obj.Nc, 8);					
 				end
-			else
-				%reset: 
-				obj.core_pw_noise_char = ones(obj.Nc,1);
-				obj.ThMoNoise = ones(obj.Nc, 8);					
 			end
 			obj.model_variation = val;
 		end

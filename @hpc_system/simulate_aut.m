@@ -11,7 +11,7 @@ function [] = simulate_aut(obj, ts, Nsample, exp_gamma)
 	end
 	
 	show = 1;
-	save = 1;
+	save = 0;
 	
 	x_init = obj.x_init;
 

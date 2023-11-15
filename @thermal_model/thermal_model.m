@@ -355,13 +355,13 @@ end
 		%{
 		function obj = set.model_deviations(obj, val)
 			%check modifications
-			if val
-				if val ~= obj.model_deviations 
+			if val ~= obj.model_deviations 
+				if val				
 					obj = obj.create_model_deviation();
+				else
+					%reset: 
+					obj.param_dev_per = ones(obj.Nc, obj.param_dev_dim2);					
 				end
-			else
-				%reset: 
-				obj.param_dev_per = ones(obj.Nc, obj.param_dev_dim2);					
 			end
 			obj.model_deviations = val;
 		end
