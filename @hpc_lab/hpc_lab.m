@@ -67,6 +67,8 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 
 	 	A_s;
 	 	B_s;
+
+		osunix;
 	end
 
 
@@ -94,6 +96,12 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			% Any code, including access to object
 			load('-mat', "CustomColorMap.mat");
 			obj.customColormap = CustomColormap;
+
+			if isunix
+				obj.osunix = 1;
+			else
+				obj.osunix = 0;
+			end
 		end
 		
 	end

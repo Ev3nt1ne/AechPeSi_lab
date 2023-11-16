@@ -15,12 +15,21 @@ classdef controller
 		Bd_ctrl;
 
 	end
+
+	properties(SetAccess=protected, GetAccess=public)	
+		osunix;
+	end
 	
 	methods
 		function obj = controller()
 			%CONTROLLERS Construct an instance of this class
 			%   Detailed explanation goes here
 			%obj.Property1 = inputArg1 + inputArg2;
+			if isunix
+				obj.osunix = 1;
+			else
+				obj.osunix = 0;
+			end
 		end
 		
 	end

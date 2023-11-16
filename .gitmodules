@@ -1,3 +1,6 @@
 [submodule "YALMIP"]
 	path = YALMIP
 	url = git@github.com:yalmip/YALMIP.git
+[submodule "osqp-matlab"]
+	path = osqp-matlab
+	url = git@github.com:osqp/osqp-matlab.git

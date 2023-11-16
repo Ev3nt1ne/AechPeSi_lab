@@ -62,6 +62,12 @@ hpc.t_init = hpc.temp_amb*ones(hpc.Ns,1);
 hpc.wltrc = hpc.generate_wl_trace(hpc.Nc, hpc.tsim, 0);
 %hpc.sim_tm_autonomous()
 wl_bkp = hpc.wltrc;
+
+%%
+ctrl = Fuzzy;
+%%
+ctrl = black_wolf;
+
 %%
 hpc.x_init = hpc.temp_amb * ones(hpc.Ns,1);
 hpc.frtrc = 3.45 * ones(min(ceil(hpc.tsim / hpc.Ts_target)+1,(hpc.tsim/ctrl.Ts_ctrl+1)), hpc.Nc);
@@ -75,10 +81,6 @@ hpc.tot_pw_budget(3*ts+ceil(ts/2)+1:end) = 8*hpc.Nc;
 hpc.quad_pw_budget = 450/36*hpc.Nc*ones(2,hpc.vd);
 
 hpc.min_pw_red = 0.6;
-%%
-ctrl = Fuzzy;
-%%
-ctrl = black_wolf;
 %%
 hpc.simulation(ctrl,1);
 

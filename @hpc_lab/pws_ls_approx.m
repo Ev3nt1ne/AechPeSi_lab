@@ -1,6 +1,6 @@
 function [k0, k1, k2] = pws_ls_approx(obj)
 
-	Fint = [obj.F_min obj.F_Max];
+	Fint = [obj.F_min obj.F_max];
 	Tint = [20 90];
 
 	%Fint = [2.8 obj.F_Max];

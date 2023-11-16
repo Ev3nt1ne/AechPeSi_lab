@@ -3,14 +3,13 @@ classdef black_wolf < mpc
 	%   Detailed explanation goes here
 	
 	properties
-
+		psac;
 	end
 	
 	methods
 		function obj = black_wolf()
 			%UNTITLED Construct an instance of this class
 			%   Detailed explanation goes here
-
 		end		
 	end
 
@@ -21,14 +20,12 @@ classdef black_wolf < mpc
 			% Every time you call sdpvar etc, an internal database grows larger
 			yalmip('clear')
 
-			x = sdpvar(repmat(obj.Ns,1,obj.Nhzn+2),repmat(1,1,obj.Nhzn+2));
+			x = sdpvar(repmat(obj.Ns,1,obj.Nhzn+1),repmat(1,1,obj.Nhzn+1));
 			u = sdpvar(repmat(obj.Nc,1,obj.Nhzn),repmat(1,1,obj.Nhzn));
 			
 			ot = sdpvar(obj.Nc,1); %TODO: decide if single or with horizon
 			w = sdpvar(obj.Nc,1); %TODO: decide if single or with horizon
 			h0v = sdpvar(obj.Nc,1);
-
-			uo = sdpvar(obj.Nc,1);
 
 			%sdpvar ly_xref;
 			ly_uref = sdpvar(obj.Ni_c,1);
@@ -51,45 +48,45 @@ classdef black_wolf < mpc
 			C2([end-hc.add_states+1:end], :) = 0;
 			
 			constraints = [];
-			constraints = [x{2} == (Adl_mpc + C2*h1)*x{1}-(C2*h1*273.15*ones(hc.Ns,1))+(Bu+(hc.Cc'*h2))*(u0*w)+Bd*ot + hc.Cc*(h0 + h0v)];
+			%constraints = [x{2} == (Adl_mpc + C2*h1)*x{1}-(C2*h1*273.15*ones(hc.Ns,1))+(Bu+(hc.Cc'*h2))*(u0*w)+Bd*ot + hc.Cc*(h0 + h0v)];
 
 			for k = 1 : obj.Nhzn
-					constraints = [constraints, x{k+2} == (Adl_mpc + C2*h1)*x{k+1}-(C2*h1*273.15*ones(hc.Ns,1))+(Bu+(hc.Cc'*h2))*(u{k}.*w)+Bd*ot + hc.Cc*(h0 + h0v)];
+					constraints = [constraints, x{k+1} == (Adl_mpc + C2*h1)*x{k}-(C2*h1*273.15*ones(hc.Ns,1))+(Bu+(hc.Cc'*h2))*(u{k}.*w)+Bd*ot + hc.Cc*(h0 + h0v)];
 
 					%TODO: Ct I did only for y, and only for max
 					if (~isinf(obj.umin))
-						%constraints = [constraints, u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k+1}-273.15)) + h0 >= obj.umin];
+						%constraints = [constraints, u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k}-273.15)) + h0 >= obj.umin];
 					end
 					if (~isinf(obj.uMax))
-						%constraints = [constraints, u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k+1}-273.15)) + h0 <= obj.uMax - obj.Ctu(k,:)'];
+						%constraints = [constraints, u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k}-273.15)) + h0 <= obj.uMax - obj.Ctu(k,:)'];
 					end
 					if (~isinf(obj.xmin))
-						%constraints = [constraints, x{k+2} >= obj.xmin];
+						%constraints = [constraints, x{k+1} >= obj.xmin];
 					end
 					if (~isinf(obj.xMax))
-						%constraints = [constraints, x{k+2} <= obj.xMax];
+						%constraints = [constraints, x{k+1} <= obj.xMax];
 					end
 					if (~isinf(obj.ymin))
-						%constraints = [constraints, obj.C)*x{k+2} >= obj.ymin];
+						%constraints = [constraints, obj.C)*x{k+} >= obj.ymin];
 					end
 					if (~isinf(obj.yMax))
-						constraints = [constraints, hc.C*x{k+2} <= obj.yMax - obj.Cty(k,:)'];
+						constraints = [constraints, hc.C*x{k+1} <= obj.yMax - obj.Cty(k,:)'];
 					end
 					%if (~isinf(obj.usum(1)))
-						constraints = [constraints,sum(u{k}.*w*(h2+1) + h1*(hc.Cc*(x{k+1}-273.15)) + h0v) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
+						constraints = [constraints,sum(u{k}.*w*(h2+1) + h1*(hc.Cc*(x{k}-273.15)) + h0v) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
 						%TODO should I also add the "resulting" thing. i.e.
-						%	the above formula with x{k+2}?
+						%	the above formula with x{k+1}?
 						%	maybe no, because I use horizon for this
 					%end
 					%if (~isinf(obj.usum(2:end)))
-						%constraints = [constraints, obj.VDom'*(u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k+1}-273.15)) + h0) <= ly_usum(k,2:end)' - (obj.Ctu(k,:)*obj.VDom)'];
+						%constraints = [constraints, obj.VDom'*(u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k}-273.15)) + h0) <= ly_usum(k,2:end)' - (obj.Ctu(k,:)*obj.VDom)'];
 					%end
 				end
 			
 			objective = 0;
 
 			for k = 1:obj.Nhzn
-				objective = objective + (u{k}-ly_uref)'*obj.R*(u{k}-ly_uref) + u{k}'*obj.R2*(u{k}) + x{k+2}'*obj.Q*x{k+2};
+				objective = objective + (u{k}-ly_uref)'*obj.R*(u{k}-ly_uref) + u{k}'*obj.R2*(u{k}) + x{k+1}'*obj.Q*x{k+1};
 			end
 			
 			%ops = sdpsettings('verbose',1,'solver','quadprog', 'usex0',1);
@@ -100,10 +97,10 @@ classdef black_wolf < mpc
 			ops.convertconvexquad = 0;
 			%ops.quadprog.MaxPCGIter = max(1, ops.quadprog.MaxPCGIter * 3);
 			ops.quadprog.MaxIter = 50;
-			obj.Controller = optimizer(constraints,objective,ops,{x{1},u0,w,ot,h0v,ly_uref,ly_usum},{u{1}, x{3}})
+			obj.Controller = optimizer(constraints,objective,ops,{x{1},w,ot,h0v,ly_uref,ly_usum},{u{1}, x{2}})
 			
 		end %lin_mpc_setup
-		function uout = call_mpc(obj, x, u0, w, ot, h0v, uref, usum)
+		function uout = call_mpc(obj, x, w, ot, h0v, uref, usum)
 			
 			%{
 			if nargin < 5 || ...
@@ -121,7 +118,7 @@ classdef black_wolf < mpc
 			end
 			%}
 			
-			[uout, problem,~,~,optimizer_object] = obj.Controller({x, u0, w, ot, h0v, uref, usum});
+			[uout, problem,~,~,optimizer_object] = obj.Controller({x, w, ot, h0v, uref, usum});
 
 			% Analyze error flags
 			if problem
@@ -133,8 +130,14 @@ classdef black_wolf < mpc
 	%TODO don't know if these go here!!! or inside MPC!
 	methods
 		function [obj] = init_fnc(obj, hpc_class)
+			[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc.pws_ls_approx(hpc_class);
+			obj = obj.setup_mpc(hpc_class);
 		end
 		function [F,V,obj] = ctrl_fnc(obj, hpc_class, target_index, pvt, i_pwm, i_wl)
+			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
+			p_budget = hc.tot_pw_budget(min(target_index, length(hc.tot_pw_budget)));
+			T = pvt{hc.PVT_T};
+			process = pvt{hc.PVT_P};
 		end
 		function [obj] = cleanup_fnc(obj, hpc_class)
 		end

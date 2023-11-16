@@ -48,14 +48,31 @@ classdef mpc < controller
 			%MPC Construct an instance of this class
 			%   Detailed explanation goes here
 
-			%% TODO
 			% check Yalmip
-			% check OSQP
 			try 
 				yalmip('clear')
 			catch
 				addpath(genpath([pwd filesep 'YALMIP']));
 				savepath
+			end
+			% check OSQP
+			try
+				osqp;
+			catch
+				if obj.osunix
+					LIBCURL_PATH = "/lib/x86_64-linux-gnu/";
+					path1 = getenv('LD_LIBRARY_PATH');			  % Store existing path
+					path = strcat(LIBCURL_PATH, ':', path1);      % Add compatible libcurl to path
+					setenv('LD_LIBRARY_PATH', path);              % Set the path
+					cd osqp-matlab
+					!git submodule update --init --recursive
+					make_osqp
+					addpath(pwd)
+					savepath
+					cd ../
+				else
+					%TODO Windows
+				end
 			end
 			
 		end
