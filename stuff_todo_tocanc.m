@@ -65,9 +65,17 @@ wl_bkp = hpc.wltrc;
 
 %%
 ctrl = Fuzzy;
+ctrl.C = hpc.C;
 %%
 ctrl = black_wolf;
-
+ctrl.Ts_ctrl = 5e-3;
+ctrl.C = eye(hpc.Ns);
+%TODO
+ctrl.Cty = zeros(ctrl.Nhzn, hpc.Nout);
+ctrl.Ctu = zeros(ctrl.Nhzn, hpc.Nc);
+ctrl.R = eye(hpc.Nc);
+ctrl.R2 = zeros(hpc.Nc);
+ctrl.Q = zeros(hpc.Ns);
 %%
 hpc.x_init = hpc.temp_amb * ones(hpc.Ns,1);
 hpc.frtrc = 3.45 * ones(min(ceil(hpc.tsim / hpc.Ts_target)+1,(hpc.tsim/ctrl.Ts_ctrl+1)), hpc.Nc);
@@ -144,6 +152,52 @@ pw.power_compute(1,[1;1;1],[300;300;300],ones(3,1)*[0 0.5 0.5 0 0], 1, 1)
 %}
 
 
+%% MUL and DIV simulations
+clc;
+
+Ts_target = 5.99;
+Ts_ctrl = 1;
+N = 10060;
+
+% Inputs
+% initial offset:
+target_ts_offset = 0;
+% frequency
+ts_div = Ts_target / Ts_ctrl;
+target_mul = floor(ts_div);
+ctrl_mul = floor(1/ts_div) - 1;
+ctrl_mul = (ctrl_mul<0)*0 + (ctrl_mul>=0)*ctrl_mul;
+target_counter = target_mul + target_ts_offset;
+target_index = 0;
+% Manage non-integer part:
+if target_mul>ctrl_mul
+	ntd = (ts_div-target_mul)/target_mul/target_mul;
+	nip_sign = -1;
+else
+	ntd = (1/ts_div)-(ctrl_mul+1);
+	nip_sign = +1;
+end
+nip_mul = ceil(1/ntd);
+nip_counter = nip_mul + target_ts_offset;
+
+for s=1:N
+
+	% Input step managing
+	target_counter = (target_counter-1)*(target_counter>0) + (target_counter<=0)*(target_mul-1);
+	nip_counter = (nip_counter-1)*(nip_counter>0) + (nip_counter<=0)*(nip_mul-1);
+	target_index = target_index + (target_counter==target_mul-1) + nip_sign*(nip_counter==nip_mul-1) + ctrl_mul;
+
+	%disp(strcat("s: ",int2str(s),", cnt: ",int2str(target_counter)," / ", int2str(nip_counter), ", idx: ",int2str(target_index)));
+
+end
+disp(strcat("s: ",int2str(s),", cnt: ",int2str(target_counter)," / ", int2str(nip_counter), ", idx: ",int2str(target_index)));
+
+disp(num2str(N/ts_div))
+
+disp(strcat("ts_div: ",num2str(ts_div), ", target_mul: ",int2str(target_mul), ", ctrl_mul: ", int2str(ctrl_mul)))
+disp(strcat("nip_mul: ", num2str(nip_mul), ", ntd: ", num2str(ntd)))
+
+
 %%
 %Taking a big sample for proper testing
 A = rand(2500,500,100);
@@ -182,8 +236,3 @@ F = (A(idx));
 F = reshape(F,[],m).';
 toc
 end
-
-
-
-
-

@@ -1,8 +1,20 @@
 classdef Fuzzy < CP
 	%FUZZY Summary of this class goes here
 	%   Detailed explanation goes here
-	
+		
 	properties
+		%parameters
+		Tper=8;
+		pw_ad_aup = 0.015; %0.05; %0.025;
+		pw_ad_adown = 0.02; %0.075; %0.025; %0.1;
+		pw_ad_achange = 0.5; %0.5;
+		pw_ad_steps = 20;
+		v_inc_steps; %Tper+3; %TODO:
+		v_dec_steps = 20;
+		v_hys_steps = 5; %15
+		end
+
+	properties(SetAccess=protected, GetAccess=public)	
 		%global var
 		pw_storage = 0;
 		pw_adapt = 0;
@@ -20,19 +32,8 @@ classdef Fuzzy < CP
 		hys_p_count = 0;
 		pbold = 0;
 		pbc = 0;
-		ex_count = 0;
 		derT = 0;
 		T_old = 0;
-
-		%parameters
-		Tper=8;
-		pw_ad_aup = 0.015; %0.05; %0.025;
-		pw_ad_adown = 0.02; %0.075; %0.025; %0.1;
-		pw_ad_achange = 0.5; %0.5;
-		pw_ad_steps = 20;
-		v_inc_steps; %Tper+3; %TODO:
-		v_dec_steps = 20;
-		v_hys_steps = 5; %15
 	end
 	
 	methods
@@ -44,8 +45,9 @@ classdef Fuzzy < CP
 			% 
 		end
 
-		function [obj] = init_fnc(obj, hc)
+		function [obj] = init_fnc(obj, hc, Nsim)
 			%TODO understand which one I actually really need
+			%TODO understand which needs to go out and which in
 			obj.v_inc_st = 0;
 			obj.v_dec_st = 0;
 			obj.pw_storage = 0;
@@ -304,7 +306,7 @@ classdef Fuzzy < CP
 		end
 		function [obj] = cleanup_fnc(obj, hc)
 		end
-		function [obj] = plot_fnc(obj, hc)
+		function [obj] = plot_fnc(obj, hc, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
 		end
 
 		function [pu, pw_storage] = cp_pw_dispatcher_c(obj, Ceff, delta_p, ipu, min_pw_red)

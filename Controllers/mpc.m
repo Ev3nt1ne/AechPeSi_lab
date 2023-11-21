@@ -4,10 +4,6 @@ classdef mpc < controller
 	
 	properties
 		%% MPC Controller
-		xref;
-		uref;
-		yref;
-		usum;
 		Q;
 		R;
 		R2;
@@ -16,8 +12,6 @@ classdef mpc < controller
 		Ctu;
 		Cty;
 		
-		mpc_robustness = 1;
-		
 		umin;
 		uMax;
 		xmin;
@@ -25,12 +19,10 @@ classdef mpc < controller
 		ymin;
 		yMax;
 
-
 		Ts_obs (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
 			= 1e-3;			% Observer Ts
 
 		Obs_poles = [0.8 0.1];		% Poles of the Luemberg Observer
-
 
 	end
 
@@ -41,6 +33,7 @@ classdef mpc < controller
 
 	properties(SetAccess=protected, GetAccess=public)		
 		mpc_ctrl;					% Persistent variable to optimize controller (prev: Controller)
+		failed;
 	end
 	
 	methods
