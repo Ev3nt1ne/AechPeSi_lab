@@ -82,7 +82,8 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		% Sim output managing
 		T = ctrl.C*cpxplot(index,:)';
 		% Noise:
-		T = T + (obj.sensor_noise)*( (rand(size(T)) - 0.5)*2 * obj.sensor_noise_amplitude(obj.PVT_T) );	
+		dim = min(length(T), obj.Nc);
+		T = T + [(obj.sensor_noise)*( (rand(dim,1) - 0.5)*2 * obj.sensor_noise_amplitude(obj.PVT_T) ); zeros(length(T)-dim,1)];	
 
 		%if (mod(s-1 + ctrl_ts_offset, ctrl_mul) == 0)
 			pvt{obj.PVT_P} = process;

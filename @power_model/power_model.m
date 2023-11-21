@@ -93,11 +93,7 @@ classdef power_model
 	end
 
 	methods
-		function pu = power_compute(obj, F, V, T, instr, process, noise)
-
-			if nargin < 7 || isempty(noise)
-				noise = 0;
-			end
+		function ps = ps_compute(obj, V,T,process, noise)
 
 			% F,V,d_i,d_p can be any dim
 			% T has to be dim = #cores
@@ -106,20 +102,36 @@ classdef power_model
 			kps = [obj.leak_vdd_k, obj.leak_temp_k, obj.leak_process_k, ...
 					obj.leak_exp_vdd_k, obj.leak_exp_t_k, obj.leak_exp_k];
 
-			Power_static = V*kps(1) + process*kps(3);
+			ps = V*kps(1) + process*kps(3);
 			%TODO: is this better as an if, or as a "vectorized if"
 			%computation?
 			if obj.leak_exp
 				maxT = 125+273.15;
-				Power_static = Power_static .* ...
+				ps = ps .* ...
 					exp(V*kps(4) + (min(T,ones(dim,1)*maxT)-273.15)*kps(5) + kps(6));
 			end
-			
+		end
+		function pd = pd_compute(obj, F,V,instr,noise)
+
+			%TODO 
+			% F,V,d_i,d_p can be any dim
+			% T has to be dim = #cores
+			dim = length(F);
+
 			tt = dim > 1;
 			npw = obj.pw_dev_per(1:dim) * (tt && noise) + ~(tt && noise);
 			
 			Ceff = instr * obj.dyn_ceff_k' .* npw;
-			Power_dyn = Ceff .* F .* (V .* V);
+			pd = Ceff .* F .* (V .* V);
+		end
+		function pu = power_compute(obj, F, V, T, instr, process, noise)
+
+			if nargin < 7 || isempty(noise)
+				noise = 0;
+			end
+
+			Power_static = obj.ps_compute(V,T,process, noise);
+			Power_dyn = obj.pd_compute(F,V,instr,noise);			
 
 			pu = Power_static + Power_dyn;		
 		end

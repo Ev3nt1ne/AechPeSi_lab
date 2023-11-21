@@ -56,9 +56,11 @@ function [dxdt, power] = nl_model_dyn(obj,A,B,x,u,d_i,d_p, ot) %, pw, ceff, pw_l
 
 %%
 hpc = hpc_lab;
+hpc.tsim = 2;
 addpath Controllers/
 
 hpc.t_init = hpc.temp_amb*ones(hpc.Ns,1);
+%%
 hpc.wltrc = hpc.generate_wl_trace(hpc.Nc, hpc.tsim, 0);
 %hpc.sim_tm_autonomous()
 wl_bkp = hpc.wltrc;
@@ -69,12 +71,29 @@ ctrl.C = hpc.C;
 %%
 ctrl = black_wolf;
 ctrl.Ts_ctrl = 5e-3;
+
 ctrl.C = eye(hpc.Ns);
+hpc.sensor_noise = 1;
 %TODO
 ctrl.Cty = zeros(ctrl.Nhzn, hpc.Nout);
 ctrl.Ctu = zeros(ctrl.Nhzn, hpc.Nc);
-ctrl.R = eye(hpc.Nc);
+R_coeff = 10; %10;
+R2_coeff = R_coeff/1; %100; %30; %10
+
+ctrl.R = R_coeff*eye(hpc.Nc);
 ctrl.R2 = zeros(hpc.Nc);
+
+for v=1:hpc.vd
+	%Here I could create an accumulation thing that need to be
+	%optimized (e.g. reduced) that contains the deltaF among quadrant 
+	ctrl.R2 = ctrl.R2 + hpc.VDom(:,v)*hpc.VDom(:,v)' / sum(hpc.VDom(:,v))^2 * R2_coeff;
+end
+%TODO: Assuming that the diagonal is full
+ctrl.R2(~eye(size(ctrl.R2))) = ctrl.R2(~eye(size(ctrl.R2))) * (-1);
+cores_per_dom = sum(hpc.VDom);
+ctrl.R2(logical(eye(size(ctrl.R2)))) = ctrl.R2(~~eye(size(ctrl.R2))) .* hpc.VDom*cores_per_dom'; %here I need ~~ to converto to logical values
+
+%hpc.R2 = hpc.R2 + (R_coeff/10)*eye(size(hpc.R2));
 ctrl.Q = zeros(hpc.Ns);
 %%
 hpc.x_init = hpc.temp_amb * ones(hpc.Ns,1);
@@ -151,6 +170,32 @@ pw.power_compute([1;1;1],[1;1;1],[300;300;300],[0 0.5 0.5 0 0], 1, 1)
 pw.power_compute(1,[1;1;1],[300;300;300],ones(3,1)*[0 0.5 0.5 0 0], 1, 1)
 %}
 
+%{
+obj.psoff_lut = [
+	1.0924    0.7147    0.1889   -0.4509   -1.1900   -1.9638   -2.5989
+	0.8312    0.4534   -0.0710   -0.7070   -1.4400   -2.1963   -2.7762
+	0.5706    0.1929   -0.3301   -0.9616   -1.6873   -2.4235   -2.9392
+	0.3110   -0.0668   -0.5880   -1.2144   -1.9317   -2.6445   -3.0856
+	0.0523   -0.3254   -0.8446   -1.4651   -2.1727   -2.8582   -3.2127
+		-0.2052   -0.5829   -1.0997   -1.7133   -2.4096   -3.0635   -3.3175
+		-0.4613   -0.8391   -1.3531   -1.9586   -2.6418   -3.2590   -3.3963
+		-0.7159   -1.0936   -1.6044   -2.2007   -2.8686   -3.4431   -3.4449
+		-0.9686   -1.3464   -1.8535   -2.4388   -3.0891   -3.6141   -3.4584
+		-1.2192   -1.5970   -2.0997   -2.6726   -3.3022   -3.7698   -3.4313
+		-1.4674   -1.8451   -2.3429   -2.9011   -3.5069   -3.9077   -3.3569
+		-1.7127   -2.0904   -2.5823   -3.1236   -3.7017   -4.0249   -3.2276
+		-1.9546   -2.3324   -2.8175   -3.3391   -3.8850   -4.1182   -3.0346
+		-2.1927   -2.5704   -3.0478   -3.5464   -4.0550   -4.1836   -2.7676
+		-2.4263   -2.8041   -3.2723   -3.7444   -4.2095   -4.2167   -2.4146
+];
+
+Fv = [0.4000    0.9000    1.4000    1.9000    2.4000    2.9000    3.4000]';
+Tv = [20    25    30    35    40    45    50    55    60    65    70    75    80    85    90]';
+obj.F0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
+obj.T0v = ones(hpc_class.Nc, length(Tv))*diag(Tv);
+%}			
+
+
 
 %% MUL and DIV simulations
 clc;
@@ -196,6 +241,11 @@ disp(num2str(N/ts_div))
 
 disp(strcat("ts_div: ",num2str(ts_div), ", target_mul: ",int2str(target_mul), ", ctrl_mul: ", int2str(ctrl_mul)))
 disp(strcat("nip_mul: ", num2str(nip_mul), ", ntd: ", num2str(ntd)))
+
+
+%%
+
+hpc.pws_ls_offset(4, 11, 10)
 
 
 %%

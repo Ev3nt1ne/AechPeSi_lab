@@ -6,7 +6,12 @@ classdef black_wolf < mpc & CP
 	end
 	properties(SetAccess=protected, GetAccess=public)	
 		psac;
+		psoff_lut;
+		F0v;
+		T0v;
+
 		output_mpc;
+		prevF;
 		C2;
 
 		xlplot;
@@ -76,7 +81,7 @@ classdef black_wolf < mpc & CP
 						constraints = [constraints, hc.C*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
 					%end
 					%if (~isinf(obj.usum(1)))
-						constraints = [constraints,sum(u{k}.*w*(h2+1) + h1*(hc.Cc*(x{k}-273.15)) + h0v) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
+						constraints = [constraints,sum(u{k}.*w*(h2+1) + h1*(hc.Cc*(x{k}-273.15)) + h0v+h0) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
 						%TODO should I also add the "resulting" thing. i.e.
 						%	the above formula with x{k+1}?
 						%	maybe no, because I use horizon for this
@@ -146,6 +151,12 @@ classdef black_wolf < mpc & CP
 			obj.C2([end-hpc_class.add_states+1:end], :) = 0;
 
 			[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx();
+			%TODO parametrize
+			[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(8, 8, 10);
+			%[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(8, 16, 10);
+			obj.F0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
+			obj.T0v = ones(hpc_class.Nc, length(Tv))*diag(Tv);
+
 			obj = obj.setup_mpc(hpc_class);
 
 			obj.xlplot = zeros(Nsim+1, hpc_class.Ns);
@@ -157,16 +168,18 @@ classdef black_wolf < mpc & CP
 			obj.failed = 0;
 			obj.wl = [ones(hpc_class.Nc,1) zeros(hpc_class.Nc, hpc_class.ipl -1)];
 			obj.lNsim = Nsim;
+			obj.prevF = hpc_class.F_min*ones(hpc_class.Nc,1);
 			%TODO
 			obj.output_mpc = 1*ones(hpc_class.Nc,1);
+			
 
 		end
 		function [F,V,obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
 
 			obj.ex_count = obj.ex_count + 1;
 
-			if obj.ex_count == 70
-				disp("ciao")
+			if obj.ex_count ==40
+				disp("ff")
 			end
 
 			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
@@ -178,14 +191,15 @@ classdef black_wolf < mpc & CP
 			obj.wl = obj.wl*(1-obj.alpha_wl) + i_wl*obj.alpha_wl;
 			Ceff = obj.wl * (hc.dyn_ceff_k)';
 
-			%[~, Tidx] = min(abs(T0v - (T-273.15)),[],2);
+			%TODO here hc.Cc
+			[~, Tidx] = min(abs(obj.T0v - hc.Cc*T),[],2);
 			% before overwriting F
-			%[~, Fidx] = min(abs(F0v - obj.prevF),[],2);
+			[~, Fidx] = min(abs(obj.F0v - obj.prevF),[],2);
 			
 			h0v = zeros(hc.Nc, 1);
-			%for i=1:hc.Nc
-			%	h0v(i,1) = obj.mpc_h0_app(Tidx(i), Fidx(i));
-			%end
+			for i=1:hc.Nc
+				h0v(i,1) = obj.psoff_lut(Tidx(i), Fidx(i));
+			end
 			
 			% Choose Voltage
 			FD = diag(f_ref)*hc.VDom;
@@ -203,8 +217,19 @@ classdef black_wolf < mpc & CP
 			%	identification atm, I will use this to not use the real
 			%	model which seems to me as too simplicistic
 			% power_mpc = output_mpc*Ceff + hc.VDom*obj.prevV*k1*exp() + k2
+			%{
 			state_MPC = (obj.Ad_ctrl + obj.C2*obj.psac(2))*Tobs-(obj.C2*obj.psac(2)*273.15*ones(hc.Ns,1)) + ...
 				(obj.Bd_ctrl(:,1:hc.Nc)+(hc.Cc'*obj.psac(3)))*(obj.output_mpc.*Ceff)+obj.Bd_ctrl(:,hc.Nc+1:end)*(1000*hc.temp_amb) + hc.Cc'*(obj.psac(1) + h0v);
+
+			%TBD is it needed?
+			%Update T0v
+			%TODO here hc.Cc
+			[~, Tidx] = min(abs(obj.T0v - hc.Cc*state_MPC),[],2);
+			for i=1:hc.Nc
+				h0v(i,1) = obj.psoff_lut(Tidx(i), Fidx(i));
+			end
+			%}
+			state_MPC = Tobs;
 
 			% MPC
 			obj.xlplot(obj.ex_count+1,:) = 0;
@@ -244,6 +269,8 @@ classdef black_wolf < mpc & CP
 				V(vi) = hc.FV_table(sum(max(res) > hc.FV_table(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue
 			end
 
+			obj.prevF = F;
+
 		end
 
 		function [obj] = cleanup_fnc(obj, hpc_class)
@@ -254,7 +281,7 @@ classdef black_wolf < mpc & CP
 			figure();
 			%plot(obj.Ts*sim_mul*[1:Nsim]', pceff(2:end,:)*20+293, 'g'); hold on;
 			plot(t1, cpxplot(2:end,:) - 273, 'b'); hold on; grid on;
-			plot(t2, obj.tmpc(2:end,:) - 273, 'm'); hold on;
+			plot(t2(1:end), obj.tmpc(2:end,:) - 273, 'm'); hold on;
 			xlabel("Time [s]");
 			ylabel("Temperature [T]");
 		end
