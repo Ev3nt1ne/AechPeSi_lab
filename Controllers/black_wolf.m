@@ -78,7 +78,7 @@ classdef black_wolf < mpc & CP
 						%constraints = [constraints, obj.C)*x{k+} >= obj.ymin];
 					end
 					%if (~isinf(obj.yMax))
-						constraints = [constraints, hc.C*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
+						constraints = [constraints, hc.Cc*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
 					%end
 					%if (~isinf(obj.usum(1)))
 						constraints = [constraints,sum(u{k}.*w*(h2+1) + h1*(hc.Cc*(x{k}-273.15)) + h0v+h0) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
@@ -182,6 +182,8 @@ classdef black_wolf < mpc & CP
 				disp("ff")
 			end
 
+			pp = obj.output_mpc;
+
 			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
 			p_budget = hc.tot_pw_budget(min(target_index, length(hc.tot_pw_budget)));
 			T = pvt{hc.PVT_T};
@@ -217,7 +219,7 @@ classdef black_wolf < mpc & CP
 			%	identification atm, I will use this to not use the real
 			%	model which seems to me as too simplicistic
 			% power_mpc = output_mpc*Ceff + hc.VDom*obj.prevV*k1*exp() + k2
-			%{
+			
 			state_MPC = (obj.Ad_ctrl + obj.C2*obj.psac(2))*Tobs-(obj.C2*obj.psac(2)*273.15*ones(hc.Ns,1)) + ...
 				(obj.Bd_ctrl(:,1:hc.Nc)+(hc.Cc'*obj.psac(3)))*(obj.output_mpc.*Ceff)+obj.Bd_ctrl(:,hc.Nc+1:end)*(1000*hc.temp_amb) + hc.Cc'*(obj.psac(1) + h0v);
 
@@ -228,21 +230,28 @@ classdef black_wolf < mpc & CP
 			for i=1:hc.Nc
 				h0v(i,1) = obj.psoff_lut(Tidx(i), Fidx(i));
 			end
-			%}
-			state_MPC = Tobs;
+			
+			%state_MPC = Tobs;
 
 			% MPC
 			obj.xlplot(obj.ex_count+1,:) = 0;
 			mpc_pw_target = repmat(p_budget, obj.Nhzn,1+hc.vd);
 			res = obj.call_mpc(state_MPC, Ceff, hc.temp_amb*1000, h0v, input_mpc, mpc_pw_target);
 			tt = isnan(res{1});
-			obj.output_mpc = res{1}.*(~tt) + tt.*obj.output_mpc;
+			% too complex to make it vectorial
+			%dp = res{1}(~tt);
+			%obj.output_mpc = repmat(tt, length(tt), length(dp))*dp + ...tt.*obj.output_mpc;
+			if ~tt
+				obj.output_mpc = res{1};
+				%TODO
+				%else
+			end
 			obj.tmpc(obj.ex_count+1, :) = res{2}';
 
 			%TODO outmpc_min
 			outmpc_min = 0.1;
 			obj.output_mpc(obj.output_mpc<outmpc_min) = outmpc_min;
-			obj.failed = obj.failed + (tt | (sum(obj.output_mpc<outmpc_min)>0));
+			obj.failed = obj.failed + ((sum(tt)>0) | (sum(obj.output_mpc<outmpc_min)>0));
 
 			% Bisection
 			for vi=1:hc.vd
@@ -254,20 +263,24 @@ classdef black_wolf < mpc & CP
 				in_bis = obj.output_mpc.*hc.VDom(:,vi);	
 				in_bis = in_bis(in_bis>0);
 
-				res = obj.bisection(lim_inf, lim_sup, @obj.intl_bis_fnc, in_bis, ...
+				Fc = obj.bisection(lim_inf, lim_sup, @obj.intl_bis_fnc, in_bis, ...
 							16, 1e-3*length(in_bis), hc.F_discretization_step*length(in_bis));
 
 				%discretize
 				if hc.F_discretization_step > 0
-					res = round(res/hc.F_discretization_step) * hc.F_discretization_step;
+					Fc = round(Fc/hc.F_discretization_step) * hc.F_discretization_step;
 				end
 
 				% output
-				F(cidx) = res;
+				F(cidx) = Fc;
 
 				% TODO: Reverse Voltage choice, here again I use max.
-				V(vi) = hc.FV_table(sum(max(res) > hc.FV_table(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue
+				V(vi) = hc.FV_table(sum(max(Fc) > hc.FV_table(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue
 			end
+
+			disp(obj.ex_count)
+			toto = [hc.Cc*Tobs - 273.15, hc.Cc*state_MPC- 273.15, hc.Cc*res{2} - 273.15, pp, obj.output_mpc, obj.prevF, F, hc.VDom*V,  i_wl*(hc.dyn_ceff_k)'];
+			toto = ["T0", "T1", "T2-mpc", "prevMPC T0-T1", "mpc T1-T2", "prev F T0-T1", "F T1-T2", "V T1-T2", "wl T-1 - T0"; toto]
 
 			obj.prevF = F;
 
@@ -281,7 +294,9 @@ classdef black_wolf < mpc & CP
 			figure();
 			%plot(obj.Ts*sim_mul*[1:Nsim]', pceff(2:end,:)*20+293, 'g'); hold on;
 			plot(t1, cpxplot(2:end,:) - 273, 'b'); hold on; grid on;
-			plot(t2(1:end), obj.tmpc(2:end,:) - 273, 'm'); hold on;
+			plot(t2, [NaN*ones(2,size(obj.tmpc,2)); (obj.tmpc(2:end-2,:) - 273)], 'm'); hold on;
+			%plot(t2, [(obj.tmpc(2+2:end,:) - 273); NaN*ones(2,size(obj.tmpc,2))], 'm'); hold on;
+			%plot(t2, obj.tmpc(2:end,:) - 273.15, 'm'); hold on;
 			xlabel("Time [s]");
 			ylabel("Temperature [T]");
 		end

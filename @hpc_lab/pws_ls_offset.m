@@ -30,7 +30,7 @@ function [lut, F, T] = pws_ls_offset(obj, Fslot, Tslot, add_temp )
 	T = T2 + 273.15;
 	T = [tmin T(T>tmin)];
 
-	%This is actually worse! it is better to make it even. Problably
+	%This is actually worse! it is better to make the intevarl even. Problably
 	%	because in the middle the difference is greater. So I should make
 	%	the non-linear interval in the inverse way, with more at the center
 	%	or, even better, depending on the abs(diff)
@@ -52,8 +52,8 @@ function [lut, F, T] = pws_ls_offset(obj, Fslot, Tslot, add_temp )
 		for j=1:length(F)
 			ps = obj.ps_compute(V(j), T(i),1,0);
 			%TODO: evaluate WHY is the one below, and not above!
-			%linps = h1*(T(i)-273.15) + h2*F(j)*V(j)^2 + h0;
-			linps = h1*(T(i)-273.15) + h2*F(j)^(2*alp+1) + h0;
+			linps = h1*(T(i)-273.15) + h2*F(j)*V(j)^2 + h0;
+			%linps = h1*(T(i)-273.15) + h2*F(j)^(2*alp+1) + h0;
 			lut(i,j) = ps - linps;
 		end
 	end

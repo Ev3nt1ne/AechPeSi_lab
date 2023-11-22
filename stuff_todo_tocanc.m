@@ -56,6 +56,7 @@ function [dxdt, power] = nl_model_dyn(obj,A,B,x,u,d_i,d_p, ot) %, pw, ceff, pw_l
 
 %%
 hpc = hpc_lab;
+hpc.Ts = 1e-5;
 hpc.tsim = 2;
 addpath Controllers/
 
@@ -75,7 +76,7 @@ ctrl.Ts_ctrl = 5e-3;
 ctrl.C = eye(hpc.Ns);
 hpc.sensor_noise = 1;
 %TODO
-ctrl.Cty = zeros(ctrl.Nhzn, hpc.Nout);
+ctrl.Cty = zeros(ctrl.Nhzn, hpc.Nc);
 ctrl.Ctu = zeros(ctrl.Nhzn, hpc.Nc);
 R_coeff = 10; %10;
 R2_coeff = R_coeff/1; %100; %30; %10
@@ -109,8 +110,9 @@ hpc.quad_pw_budget = 450/36*hpc.Nc*ones(2,hpc.vd);
 
 hpc.min_pw_red = 0.6;
 %%
+tic;
 hpc.simulation(ctrl,1);
-
+toc;
 %%
 ll = ceil(hpc.tsim*1e6/hpc.quantum_us);
 hpc.wltrc = zeros(hpc.Nc, hpc.ipl, ll);
