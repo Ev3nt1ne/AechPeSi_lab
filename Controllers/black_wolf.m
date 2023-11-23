@@ -9,7 +9,7 @@ classdef black_wolf < mpc & CP
 		psoff_lut;
 		F0v;
 		T0v;
-		
+
 		prevF;
 		C2;
 
@@ -154,7 +154,7 @@ classdef black_wolf < mpc & CP
 			obj = obj.setup_mpc(hpc_class);
 
 			obj.xlplot = zeros(Nsim+1, hpc_class.Ns);
-			obj.xlplot(1,:) = hpc_class.x_init;
+			obj.xlplot(1,:) = hpc_class.t_init;
 
 			obj.tmpc = zeros(Nsim+1, hpc_class.Ns);
 
@@ -172,7 +172,7 @@ classdef black_wolf < mpc & CP
 
 			obj.ex_count = obj.ex_count + 1;
 
-			pp = obj.output_mpc;
+			%pp = obj.output_mpc;
 
 			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
 			p_budget = hc.tot_pw_budget(min(target_index, length(hc.tot_pw_budget)));
@@ -268,9 +268,9 @@ classdef black_wolf < mpc & CP
 				V(vi) = hc.FV_table(sum(max(Fc) > hc.FV_table(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue
 			end
 
-			disp(obj.ex_count)
-			toto = [hc.Cc*Tobs - 273.15, hc.Cc*state_MPC- 273.15, hc.Cc*res{2} - 273.15, pp, obj.output_mpc, obj.prevF, F, hc.VDom*V,  i_wl*(hc.dyn_ceff_k)'];
-			toto = ["T0", "T1", "T2-mpc", "prevMPC T0-T1", "mpc T1-T2", "prev F T0-T1", "F T1-T2", "V T1-T2", "wl T-1 - T0"; toto]
+			%disp(obj.ex_count)
+			%toto = [hc.Cc*Tobs - 273.15, hc.Cc*state_MPC- 273.15, hc.Cc*res{2} - 273.15, pp, obj.output_mpc, obj.prevF, F, hc.VDom*V,  i_wl*(hc.dyn_ceff_k)'];
+			%toto = ["T0", "T1", "T2-mpc", "prevMPC T0-T1", "mpc T1-T2", "prev F T0-T1", "F T1-T2", "V T1-T2", "wl T-1 - T0"; toto]
 
 			obj.prevF = F;
 

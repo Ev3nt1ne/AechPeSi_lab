@@ -124,7 +124,7 @@ classdef cp_mpc < mpc & CP
 			obj = obj.setup_mpc(hpc_class);
 
 			obj.xlplot = zeros(Nsim+1, hpc_class.Ns);
-			obj.xlplot(1,:) = hpc_class.x_init;
+			obj.xlplot(1,:) = hpc_class.t_init;
 
 			obj.tmpc = zeros(Nsim+1, hpc_class.Ns);
 

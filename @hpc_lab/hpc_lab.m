@@ -24,7 +24,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 
 		core_pm;
 
-		x_init;						% Initial Conditions 
+		%x_init;						% Initial Conditions 
 		%urplot;						% Input Reference Plot
 		frtrc;						% Freq Reference Trace
 		%zrplot;						% Power Noise Plot
@@ -480,7 +480,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			
 			b = bar(1:obj.Nc, BAR1);
 			yl = ylim;
-			ylim([min(min(obj.x_init), ymlj)-273.15, yl(2)]);
+			ylim([min(min(obj.t_init), ymlj)-273.15, yl(2)]);
 			ylabel('T_{Max} [°C]'),xlabel('Core'),grid on;
 			hold on;
 			plot(xlim, [obj.core_crit_temp obj.core_crit_temp]-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');

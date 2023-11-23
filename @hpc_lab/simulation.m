@@ -44,7 +44,7 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	obj = obj.init_compute_model(obj.Ad_true, obj.Bd_true);
 
 	%TODO
-	x = obj.x_init + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
+	x = obj.t_init + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
 	F = obj.F_min*ones(obj.Nc,1);
 	V = obj.V_min*ones(obj.vd,1);
 	process = ones(obj.Nc,1);

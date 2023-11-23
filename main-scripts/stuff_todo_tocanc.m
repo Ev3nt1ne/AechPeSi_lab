@@ -56,7 +56,7 @@ function [dxdt, power] = nl_model_dyn(obj,A,B,x,u,d_i,d_p, ot) %, pw, ceff, pw_l
 
 %%
 hpc = hpc_lab;
-hpc.Ts = 1e-5;
+hpc.Ts = 5e-5;
 hpc.tsim = 2;
 addpath Controllers/
 
@@ -71,7 +71,7 @@ ctrl = Fuzzy;
 ctrl.C = hpc.C;
 %%
 ctrl = black_wolf;
-ctrl.Ts_ctrl = 5e-3;
+ctrl.Ts_ctrl = 5e-4;
 
 ctrl.C = eye(hpc.Ns);
 hpc.sensor_noise = 1;
