@@ -10,8 +10,6 @@ classdef controller
 		C {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
 			= [1];
 
-		ex_count = 0;
-
 	end
 
 	properties(Dependent)
@@ -23,6 +21,8 @@ classdef controller
 		osunix;
 		Ad_ctrl;
 		Bd_ctrl;
+		ex_count = 0;
+		lNsim;
 	end
 	
 	methods

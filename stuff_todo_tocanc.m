@@ -97,6 +97,21 @@ ctrl.R2(logical(eye(size(ctrl.R2)))) = ctrl.R2(~~eye(size(ctrl.R2))) .* hpc.VDom
 %hpc.R2 = hpc.R2 + (R_coeff/10)*eye(size(hpc.R2));
 ctrl.Q = zeros(hpc.Ns);
 %%
+ctrl = cp_mpc;
+ctrl.Ts_ctrl = 5e-3;
+
+ctrl.C = eye(hpc.Ns);
+hpc.sensor_noise = 1;
+%TODO
+ctrl.Cty = zeros(ctrl.Nhzn, hpc.Nc);
+ctrl.Ctu = zeros(ctrl.Nhzn, hpc.Nc);
+R_coeff = 10; %10;
+
+ctrl.R = R_coeff*eye(hpc.Nc);
+ctrl.R2 = zeros(hpc.Nc);
+ctrl.Q = zeros(hpc.Ns);
+
+%%
 hpc.x_init = hpc.temp_amb * ones(hpc.Ns,1);
 hpc.frtrc = 3.45 * ones(min(ceil(hpc.tsim / hpc.Ts_target)+1,(hpc.tsim/ctrl.Ts_ctrl+1)), hpc.Nc);
 ts = ceil(hpc.tsim / hpc.Ts_target)+1;

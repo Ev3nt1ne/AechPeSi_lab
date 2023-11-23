@@ -25,9 +25,20 @@ classdef CP < controller
 		pw_inverse = 0;				% use Inverse pw reduction wrt temp
 		
 		alpha_wl = 0.4;				% Moving Average filter parameter for Workload
+		alpha_ma = 0.1;
 		
 		dummy_pw = 0;
 		
+	end
+
+	properties(SetAccess=protected, GetAccess=public)	
+		pw_storage = 0;
+		pw_adapt = 0;
+		pw_old;
+		wl;
+		pbold = 0;
+		pbc = 0;
+		f_ma;
 	end
 	
 	methods

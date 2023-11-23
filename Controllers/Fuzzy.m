@@ -16,11 +16,7 @@ classdef Fuzzy < CP
 
 	properties(SetAccess=protected, GetAccess=public)	
 		%global var
-		pw_storage = 0;
-		pw_adapt = 0;
-		pw_old;
 		pw_ad_step_count = 0;
-		wl;
 		VCred;
 		Vn;
 		v_inc_st = 0;
@@ -30,8 +26,6 @@ classdef Fuzzy < CP
 		v_hys_act = 0;
 		v_hys_step_count = 0; %v_hys_steps;
 		hys_p_count = 0;
-		pbold = 0;
-		pbc = 0;
 		derT = 0;
 		T_old = 0;
 	end
