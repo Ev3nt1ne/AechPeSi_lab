@@ -53,7 +53,7 @@ function [p,n]=numSubplots(n)
 % Rob Campbell - January 2010
    
     
-while isprime(n) & n>4 
+while isprime(n) & n>4, 
     n=n+1;
 end
 

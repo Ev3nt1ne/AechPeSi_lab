@@ -217,6 +217,8 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = launch_ncp_sim(obj, robust
 		end
 		
 		if sum(isempty(pu)) || sum(pu<=0)
+			disp("error, something wrong");
+			[cpuplot(index+1:index+sim_mul,:), cpxplot(index+1:index+sim_mul,:), d_is, pw_ms, obj] = obj.compute_model(sim_mul, cpxplot(index,:)', V, F, d_p);	
 			break;
 		end
 		

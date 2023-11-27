@@ -71,14 +71,13 @@ hpc = hpc.create_core_pw_noise();
 hpc.core_crit_temp = 85 + 273.15;
 % Max Power
 ts = ceil(hpc.tsim / hpc.Ts_input)+1;
-hpc.tot_pw_budget = 450*ones(ts,1);
+hpc.tot_pw_budget = 450/36*hpc.Nc*ones(ts,1);
 ts = ceil(ts/4);
 hpc.tot_pw_budget(ts+1:2*ts) = 2*hpc.Nc;
 hpc.tot_pw_budget(2*ts+1:3*ts) = 5*hpc.Nc;
 hpc.tot_pw_budget(3*ts+1:3*ts+ceil(ts/2)) = 3*hpc.Nc;
 hpc.tot_pw_budget(3*ts+ceil(ts/2)+1:end) = 8*hpc.Nc;
 
-hpc.tot_pw_budget = hpc.tot_pw_budget/36*hpc.Nc;
 % Delays
 hpc.delay_F_mean = 1e-5;		% Mean Frequency application Delay
 hpc.delay_V_mean = 1e-5;		% Mean Voltage application Delay
