@@ -212,6 +212,13 @@ obj.F0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
 obj.T0v = ones(hpc_class.Nc, length(Tv))*diag(Tv);
 %}			
 
+%%
+hpc.Nc = 15;
+hpc.Nh = 5;
+hpc.Nv = 3;
+hpc = hpc.default_floorplan_config();
+hpc = hpc.create_model_deviation();
+hpc = hpc.anteSimCheck;
 
 
 %% MUL and DIV simulations

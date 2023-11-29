@@ -17,6 +17,8 @@ function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma, show, save)
 	if (nargin < 6) || isempty(save)
 		save = obj.graph_save;
 	end
+
+	obj.anteSimCheckTM();
 	
 	% Init the Simulation
 	x_init = obj.t_init;
@@ -100,6 +102,8 @@ function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma, show, save)
 		
 		pwp(1,:) = pwp(2,:);
 		if show
+			% Pause because it is bugged on Linux
+			pause(0.5);
 			fig = obj.xutplot(xp, pwp);
 			%fig.Position = [1         865        1920        1080];
 		end
@@ -118,7 +122,9 @@ function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma, show, save)
 		mt = round( (obj.core_crit_temp - 273.15)*1.5 /5) * 5;
 		hclrlim = [ max(min(xfp,[],'All'), min(x_init)-273.15) min(max(xfp,[],'All'), mt) ];	
 
-		for tst=1:length(figname)		
+		for tst=1:length(figname)	
+			% Pause because it is bugged on Linux
+			pause(0.5);
 			fig = figure('Name', figname(tst)); %, 'Position', get(0, 'Screensize'));
 			tcl = tiledlayout(fig,spnum(1),spnum(2));
 			n = size(xfp,1);

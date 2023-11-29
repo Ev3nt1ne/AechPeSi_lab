@@ -1,4 +1,4 @@
-classdef hpc_lab < thermal_model & power_model & perf_model
+classdef hpc_lab < thermal_model & power_model & perf_model & handle
 	%HPC_LAB Summary of this class goes here
 	%   Detailed explanation goes here
 	
@@ -102,8 +102,23 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			else
 				obj.osunix = 0;
 			end
+
+			obj.get_size(obj);
+		end		
+	end
+	methods(Static)
+		function totSize = get_size(class) 
+			props = properties(class); 
+			totSize = 0;
+			
+			for ii=1:length(props) 
+  			currentProperty = getfield(class, char(props(ii))); 
+  			s = whos('currentProperty'); 
+  			totSize = totSize + s.bytes; 
+			end
+			
+			disp(strcat("Size: ", num2str(totSize), " bytes")); 
 		end
-		
 	end
 
 	%% Simulations

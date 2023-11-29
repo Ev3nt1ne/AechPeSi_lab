@@ -1,4 +1,4 @@
-classdef power_model
+classdef power_model < handle
 	%POWER_MODEL Summary of this class goes here
 	%   Detailed explanation goes here
 	
@@ -88,7 +88,7 @@ classdef power_model
 			%POWER_MODEL Construct an instance of this class
 			%   Detailed explanation goes here
 			%obj.Property1 = inputArg1 + inputArg2;
-			obj = obj.create_core_pw_noise();
+			obj.create_core_pw_noise();
 		end
 	end
 
