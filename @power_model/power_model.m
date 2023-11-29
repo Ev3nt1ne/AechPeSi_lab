@@ -90,6 +90,15 @@ classdef power_model < handle
 			%obj.Property1 = inputArg1 + inputArg2;
 			obj.create_core_pw_noise();
 		end
+		function obj = anteSimCheckPM(obj)
+			%TODO here obj.Nc is wrong
+			if length(obj.pw_dev_per) ~= obj.Nc
+				disp("recreating");
+				% TODO here instead of recreating, add missing ones or
+				%	reduce it
+				obj.create_core_pw_noise();
+			end
+		end
 	end
 
 	methods
@@ -135,6 +144,7 @@ classdef power_model < handle
 
 			pu = Power_static + Power_dyn;		
 		end
+		%TODO: here I use obj.Nc!!! FIX!
 		function obj = create_core_pw_noise(obj)
 			Covr = chol(obj.pw_gvar);
 			obj.pw_dev_per = ones(obj.Nc, 1);

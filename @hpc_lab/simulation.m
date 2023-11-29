@@ -5,6 +5,7 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 
 	obj.anteSimCheckTM();
 	obj.anteSimCheckLab();
+	obj.anteSimCheckPM();
 
 	% To Optimize execution, istead of having several functions called and
 	%	several ifs statement, we use ctrl.Ts_ctrl as the main time step of

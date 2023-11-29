@@ -120,6 +120,45 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 				error("[LAB] VDom has not the correct dimension");
 			end
 		end
+		function obj = default_VDom_config(obj)			
+			vddone = 0;
+			vNh = obj.Nh;
+			vNv = obj.Nv;
+			cuts = [1 1];
+			while (vddone < obj.vd)
+			
+				fr = vNh>vNv;
+				cuts = cuts + [fr, ~fr];
+				vNh = obj.Nh/cuts(1);
+				vNv = obj.Nv/cuts(2);
+			
+				tt = cuts>[obj.Nh, obj.Nv];
+				cuts = tt.*[obj.Nh, obj.Nv] + ~tt.*cuts;
+				vNh = vNh*(vNh>1) + (vNh<=1);
+				vNv = vNv*(vNv>1) + (vNv<=1);
+			
+				if (cuts(2)==obj.Nv) && (cuts(1)==obj.Nh)
+					break;
+				end
+			
+				vddone = (cuts(1))*(cuts(2));
+			end
+			
+			steps = floor([obj.Nh, obj.Nv] ./ cuts);
+			tbfd = vddone > obj.vd;
+			
+			obj.VDom = zeros(obj.Nc, obj.vd);
+			for i=1:obj.Nh
+				for j=1:obj.Nv
+					dom = floor((i-1)/steps(1)) + floor((j-1)/steps(2))*cuts(1) + 1;
+					%fixing odd vd
+					dom = dom + (dom>1)*tbfd*(-1);
+					dom = dom*(dom<=obj.vd) + obj.vd*(dom>obj.vd);
+					idx = (i + (j-1)*obj.Nh);
+					obj.VDom(idx, dom) = 1;
+				end
+			end
+		end
 	end
 	methods(Static)
 		function totSize = get_size(class) 
@@ -700,7 +739,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 		function obj = set.VDom(obj, val)
 			cmp = [obj.Nc obj.vd];
 			if all(size(val) == cmp) && ~isempty(val)
-				obj.len_comp = val;
+				obj.VDom = val;
 			else
 				warning("[LAB Error]: VDom wrong input size.");
 				disp(strcat("[LAB] VDom required size:", num2str(cmp(2))));
