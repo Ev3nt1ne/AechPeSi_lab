@@ -12,6 +12,12 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 		Ts_target (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
 			= 1e-3;			% Commands min Ts, old Ts_input
 
+		vd (1,1) {mustBePositive, mustBeInteger} ...
+			= 3;		% Voltage/Power Domains
+		VDom {mustBeNonnegative, mustBeNumericOrLogical, mustBeNonempty, mustBeLessThanOrEqual(VDom,1)} ...
+			= [1 0 0; 1 0 0; 0 1 0; 0 1 0; 1 0 0; 1 0 0; 0 1 0; 0 1 0; 0 0 1; 0 0 1; 0 0 1; 0 0 1];		% Structure of the Voltage Domains Nc x vd
+		
+
 		%measure_noise = 1;
 		sensor_noise (1,1) {mustBeNonnegative, mustBeNumericOrLogical} ...
 			= 1;
@@ -105,6 +111,15 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 
 			obj.get_size(obj);
 		end		
+		function obj = anteSimCheckLab(obj)
+			% Check if the floorplan has been updated
+			lastwarn('');
+			obj.VDom = obj.VDom;
+			[msgstr, ~] = lastwarn;
+			if ~isempty(msgstr)
+				error("[LAB] VDom has not the correct dimension");
+			end
+		end
 	end
 	methods(Static)
 		function totSize = get_size(class) 
@@ -682,7 +697,15 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 
 	%% Dependent Variables
 	methods
-
+		function obj = set.VDom(obj, val)
+			cmp = [obj.Nc obj.vd];
+			if all(size(val) == cmp) && ~isempty(val)
+				obj.len_comp = val;
+			else
+				warning("[LAB Error]: VDom wrong input size.");
+				disp(strcat("[LAB] VDom required size:", num2str(cmp(2))));
+			end
+		end
 	end
 end
 

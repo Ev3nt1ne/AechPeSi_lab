@@ -1,7 +1,10 @@
 function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	simulation(obj, ctrl, show)
 %SIMULATION Summary of this function goes here
-%   Detailed explanation goes here
+%   Detailed explanation goes here	
+
+	obj.anteSimCheckTM();
+	obj.anteSimCheckLab();
 
 	% To Optimize execution, istead of having several functions called and
 	%	several ifs statement, we use ctrl.Ts_ctrl as the main time step of

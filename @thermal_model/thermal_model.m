@@ -10,11 +10,6 @@ classdef thermal_model < handle
 			= 3;		% Number of rows
 		Nv (1,1) {mustBePositive, mustBeInteger} ...
 			= 4;		% Number of cols
-		% TODO: Maybe move vd and VDom out?
-		vd (1,1) {mustBePositive, mustBeInteger} ...
-			= 3;		% Voltage/Power Domains
-		VDom {mustBeNonnegative, mustBeNumericOrLogical, mustBeNonempty, mustBeLessThanOrEqual(VDom,1)} ...
-			= [1 0 0; 1 0 0; 0 1 0; 0 1 0; 1 0 0; 1 0 0; 0 1 0; 0 1 0; 0 0 1; 0 0 1; 0 0 1; 0 0 1];		% Structure of the Voltage Domains Nc x vd
 		epos {mustBeNonnegative, mustBeNumeric, mustBeFinite} ... %empty positions
 			= [];
 

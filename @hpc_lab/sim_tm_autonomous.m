@@ -104,6 +104,7 @@ function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma, show, save)
 		if show
 			% Pause because it is bugged on Linux
 			pause(0.5);
+			fig = [];
 			fig = obj.xutplot(xp, pwp);
 			%fig.Position = [1         865        1920        1080];
 		end
@@ -125,6 +126,7 @@ function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma, show, save)
 		for tst=1:length(figname)	
 			% Pause because it is bugged on Linux
 			pause(0.5);
+			fig = [];
 			fig = figure('Name', figname(tst)); %, 'Position', get(0, 'Screensize'));
 			tcl = tiledlayout(fig,spnum(1),spnum(2));
 			n = size(xfp,1);
