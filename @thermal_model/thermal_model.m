@@ -255,12 +255,40 @@ end
 					obj.C_fp_material = obj.C_fp_material;
 					[msgstr, ~] = lastwarn;
 					if ~isempty(msgstr)
-						error("[TM] The floorplan was not updated correctly. Please update RC_fp_dim, CPw_fp_dim, R_fp_material, C_fp_material or launch 'default_floorplan_config()'.");
+						warning("[TM] The floorplan was not updated correctly. Please update RC_fp_dim, CPw_fp_dim, R_fp_material, C_fp_material or launch 'default_floorplan_config()'.");
+
+						prompt = {['Do you want to run default_floorplan_config()? (1=yes, 0=no)' newline 'ATTENTION! This will OVERWRITE previous values.']};
+						dlgtitle = '[TM] Thermal Model';
+						fieldsize = [1 45];
+						definput = {'1'};
+						usrin = inputdlg(prompt,dlgtitle,fieldsize,definput);
+						%usrin = input(['[TM] Do you want to run default_floorplan_config()? (1=yes, 0=no)' newline 'ATTENTION! This will overwrite previous values.']);
+						if usrin{1}=='1'
+							obj.default_floorplan_config();
+						end
 					end
 					if size(obj.param_dev_per,1) ~= obj.Nc
-						error("[TM] The parameter deviation vector 'param_dev_per' was not updated after Nc was changed. Fix it or call 'create_model_deviation'.");
+						warning("[TM] The parameter deviation vector 'param_dev_per' was not updated after Nc was changed. Fix it or call 'create_model_deviation'.");
+						
+						prompt = {['Do you want to run create_model_deviation()? (1=yes, 0=no)' newline 'ATTENTION! This will OVERWRITE previous values.']};
+						dlgtitle = '[TM] Thermal Model';
+						fieldsize = [1 45];
+						definput = {'1'};
+						usrin = inputdlg(prompt,dlgtitle,fieldsize,definput);
+						if usrin{1}=='1'
+							obj.create_model_deviation();
+						end
 					end
-					obj.model_init();
+
+					warning("[TM] Some parametric values of the Thermal model changed without running model_init()!")
+					prompt = {['Do you want to run model_init()? (1=yes, 0=no)' newline 'ATTENTION! This will OVERWRITE previous values.']};
+					dlgtitle = '[TM] Thermal Model';
+					fieldsize = [1 45];
+					definput = {'1'};
+					usrin = inputdlg(prompt,dlgtitle,fieldsize,definput);
+					if usrin{1} == '1'
+						obj.model_init();
+					end
 				end
 			end			
 		end
