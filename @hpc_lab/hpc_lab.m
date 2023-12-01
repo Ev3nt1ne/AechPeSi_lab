@@ -117,7 +117,17 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			obj.VDom = obj.VDom;
 			[msgstr, ~] = lastwarn;
 			if ~isempty(msgstr)
-				error("[LAB] VDom has not the correct dimension");
+				warning("[LAB] Incorrect dimension of VDom (voltage domains configuration)!")
+				prompt = {['Do you want to run default_VDom_config() to create a default domain config? (1=yes, 0=no)' newline 'ATTENTION! This will OVERWRITE previous values.']};
+				dlgtitle = '[LAB] HPC Lab Simulation';
+				fieldsize = [1 45];
+				definput = {'1'};
+				usrin = inputdlg(prompt,dlgtitle,fieldsize,definput);
+				if usrin{1} == '1'
+					obj.default_VDom_config();
+				else
+					error("[LAB] VDom has not the correct dimension");
+				end				
 			end
 		end
 		function obj = default_VDom_config(obj)			

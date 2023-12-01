@@ -93,10 +93,19 @@ classdef power_model < handle
 		function obj = anteSimCheckPM(obj)
 			%TODO here obj.Nc is wrong
 			if length(obj.pw_dev_per) ~= obj.Nc
-				disp("recreating");
+				warning("[PM] Some parametric values of the Thermal model changed!")
+				prompt = {['Do you want to recreate power model noise by running create_core_pw_noise()? (1=yes, 0=no)' newline 'ATTENTION! This will OVERWRITE previous values.']};
+				dlgtitle = '[PM] Power Model';
+				fieldsize = [1 45];
+				definput = {'1'};
+				usrin = inputdlg(prompt,dlgtitle,fieldsize,definput);
 				% TODO here instead of recreating, add missing ones or
 				%	reduce it
-				obj.create_core_pw_noise();
+				if usrin{1} == '1'
+					obj.create_core_pw_noise();
+				else
+					error("[PM] Dimension missmatch in power model noise and number of cores.")
+				end				
 			end
 		end
 	end

@@ -288,6 +288,8 @@ end
 					usrin = inputdlg(prompt,dlgtitle,fieldsize,definput);
 					if usrin{1} == '1'
 						obj.model_init();
+					else
+						obj.var_changed = 0;
 					end
 				end
 			end			
