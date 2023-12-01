@@ -1,4 +1,4 @@
-classdef thermal_model
+classdef thermal_model < handle
 	%THERMAL_MODEL Summary of this class goes here
 	%   Detailed explanation goes here
 	
@@ -10,12 +10,9 @@ classdef thermal_model
 			= 3;		% Number of rows
 		Nv (1,1) {mustBePositive, mustBeInteger} ...
 			= 4;		% Number of cols
-		% TODO: Maybe move vd and VDom out?
-		vd (1,1) {mustBePositive, mustBeInteger} ...
-			= 3;		% Voltage/Power Domains
-		VDom {mustBeNonnegative, mustBeNumericOrLogical, mustBeNonempty, mustBeLessThanOrEqual(VDom,1)} ...
-			= [1 0 0; 1 0 0; 0 1 0; 0 1 0; 1 0 0; 1 0 0; 0 1 0; 0 1 0; 0 0 1; 0 0 1; 0 0 1; 0 0 1];		% Structure of the Voltage Domains Nc x vd
-		
+		epos {mustBeNonnegative, mustBeNumeric, mustBeFinite} ... %empty positions
+			= [];
+
 		%% Matlab/Simulation
 		model_ver (1,1) {mustBeNonnegative, mustBeInteger} ...
 			= 0;				% Version of the Thermal Model
@@ -130,6 +127,8 @@ end
 		
 		Cc {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
 			= [1];
+
+		var_changed = 1;
 	end
 	
 	properties(SetAccess=immutable, GetAccess=public)
@@ -211,29 +210,12 @@ end
 			% You cannot conditionalize this statement
 			%obj = obj@BaseClass1(args{:});
 			obj.sensors_active = zeros(obj.add_states,1);
-			obj = obj.default_floorplan_config();
+			obj.default_floorplan_config();
 
 			% Post Initialization %%
 			% Any code, including access to object
-			obj = obj.create_model_deviation();
-			obj = obj.model_init();
-
-
-			obj.get_size(obj);
-		end
-	end
-	methods(Static)
-		function totSize = get_size(class) 
-			props = properties(class); 
-			totSize = 0;
-			
-			for ii=1:length(props) 
-  			currentProperty = getfield(class, char(props(ii))); 
-  			s = whos('currentProperty'); 
-  			totSize = totSize + s.bytes; 
-			end
-			
-			disp(strcat("Size: ", num2str(totSize), " bytes")); 
+			obj.create_model_deviation();
+			obj.model_init();
 		end
 	end
 
@@ -259,11 +241,66 @@ end
 	end
 
 	methods
+		function obj = anteSimCheckTM(obj)
+			if obj.var_changed
+				% Check if the dimensions are consistent
+				if obj.Nc ~= (obj.Nh*obj.Nv - length(obj.epos))
+					error("[TM] The dimensions of Nc, Nh, Nv, epos are not consistent for a model");
+				else
+					% Check if the floorplan has been updated
+					lastwarn('');
+					obj.RC_fp_dim = obj.RC_fp_dim;
+					obj.CPw_fp_dim = obj.CPw_fp_dim;
+					obj.R_fp_material = obj.R_fp_material;
+					obj.C_fp_material = obj.C_fp_material;
+					[msgstr, ~] = lastwarn;
+					if ~isempty(msgstr)
+						warning("[TM] The floorplan was not updated correctly. Please update RC_fp_dim, CPw_fp_dim, R_fp_material, C_fp_material or launch 'default_floorplan_config()'.");
+
+						prompt = {['Do you want to run default_floorplan_config()? (1=yes, 0=no)' newline 'ATTENTION! This will OVERWRITE previous values.']};
+						dlgtitle = '[TM] Thermal Model';
+						fieldsize = [1 45];
+						definput = {'1'};
+						usrin = inputdlg(prompt,dlgtitle,fieldsize,definput);
+						%usrin = input(['[TM] Do you want to run default_floorplan_config()? (1=yes, 0=no)' newline 'ATTENTION! This will overwrite previous values.']);
+						if usrin{1}=='1'
+							obj.default_floorplan_config();
+						end
+					end
+					if size(obj.param_dev_per,1) ~= obj.Nc
+						warning("[TM] The parameter deviation vector 'param_dev_per' was not updated after Nc was changed. Fix it or call 'create_model_deviation'.");
+						
+						prompt = {['Do you want to run create_model_deviation()? (1=yes, 0=no)' newline 'ATTENTION! This will OVERWRITE previous values.']};
+						dlgtitle = '[TM] Thermal Model';
+						fieldsize = [1 45];
+						definput = {'1'};
+						usrin = inputdlg(prompt,dlgtitle,fieldsize,definput);
+						if usrin{1}=='1'
+							obj.create_model_deviation();
+						end
+					end
+
+					warning("[TM] Some parametric values of the Thermal model changed without running model_init()!")
+					prompt = {['Do you want to run model_init()? (1=yes, 0=no)' newline 'ATTENTION! This will OVERWRITE previous values.']};
+					dlgtitle = '[TM] Thermal Model';
+					fieldsize = [1 45];
+					definput = {'1'};
+					usrin = inputdlg(prompt,dlgtitle,fieldsize,definput);
+					if usrin{1} == '1'
+						obj.model_init();
+					else
+						obj.var_changed = 0;
+					end
+				end
+			end			
+		end
 		function obj = model_init(obj, tm_ver)
 			
 			if nargin < 2
 				tm_ver = obj.model_ver;
 			end
+
+			obj.var_changed = 0;
 			
 			% ==============
 			% C & D
@@ -309,9 +346,9 @@ end
 			dmean = 1.01;
 			obj.param_dev_per = (randn(obj.Nc, 8) / ddiv + dmean);
 		end
+		obj = default_floorplan_config(obj);
 	end
 	methods(Access=protected)
-		obj = default_floorplan_config(obj);
 		[A, B] = create_model(obj, T, pdev, tm_ver);
 	end %Methods
 
@@ -540,6 +577,37 @@ end
 				warning("[TM Error]: C_fp_material wrong input size.");
 				disp(strcat("[TM] C_fp_material required size: [", num2str(cmp(1)), ",", num2str(cmp(2)), ",", num2str(cmp(3)), "]"));
 			end
+		end
+
+		%%%%
+
+		function obj = set.Nc(obj, val)
+			obj.var_changed = 1;
+			disp("[TM] Remember to change Nh, Nv, epos, the parameter deviation vector, and the floorplan accordingly");
+			obj.Nc = val;
+		end
+		function obj = set.Nh(obj, val)
+			obj.var_changed = 1;
+			disp("[TM] Remember to change Nv, epos, and the floorplan accordingly");
+			obj.Nh = val;
+		end
+		function obj = set.Nv(obj, val)
+			obj.var_changed = 1;
+			disp("[TM] Remember to change Nh, epos, and the floorplan accordingly");
+			obj.Nv = val;
+		end
+		function obj = set.epos(obj, val)			
+			un = unique(val);
+			if length(val) ~= length(un)
+				warning("[Thermal] epos (empty positions) was not an unique vector. It has been automatically fixed");
+			end
+			obj.var_changed = 1;
+			disp("[TM] Remember to change Nc, and the floorplan accordingly");
+			obj.epos = un;
+		end
+		function obj = set.Ts(obj, val)
+			obj.var_changed = 1;
+			obj.Ts = val;
 		end
 
 	end %method

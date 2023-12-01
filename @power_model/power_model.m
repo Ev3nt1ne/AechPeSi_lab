@@ -1,4 +1,4 @@
-classdef power_model
+classdef power_model < handle
 	%POWER_MODEL Summary of this class goes here
 	%   Detailed explanation goes here
 	
@@ -88,7 +88,25 @@ classdef power_model
 			%POWER_MODEL Construct an instance of this class
 			%   Detailed explanation goes here
 			%obj.Property1 = inputArg1 + inputArg2;
-			obj = obj.create_core_pw_noise();
+			obj.create_core_pw_noise();
+		end
+		function obj = anteSimCheckPM(obj)
+			%TODO here obj.Nc is wrong
+			if length(obj.pw_dev_per) ~= obj.Nc
+				warning("[PM] Some parametric values of the Thermal model changed!")
+				prompt = {['Do you want to recreate power model noise by running create_core_pw_noise()? (1=yes, 0=no)' newline 'ATTENTION! This will OVERWRITE previous values.']};
+				dlgtitle = '[PM] Power Model';
+				fieldsize = [1 45];
+				definput = {'1'};
+				usrin = inputdlg(prompt,dlgtitle,fieldsize,definput);
+				% TODO here instead of recreating, add missing ones or
+				%	reduce it
+				if usrin{1} == '1'
+					obj.create_core_pw_noise();
+				else
+					error("[PM] Dimension missmatch in power model noise and number of cores.")
+				end				
+			end
 		end
 	end
 
@@ -135,6 +153,7 @@ classdef power_model
 
 			pu = Power_static + Power_dyn;		
 		end
+		%TODO: here I use obj.Nc!!! FIX!
 		function obj = create_core_pw_noise(obj)
 			Covr = chol(obj.pw_gvar);
 			obj.pw_dev_per = ones(obj.Nc, 1);

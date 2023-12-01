@@ -212,6 +212,13 @@ obj.F0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
 obj.T0v = ones(hpc_class.Nc, length(Tv))*diag(Tv);
 %}			
 
+%%
+hpc.Nc = 15;
+hpc.Nh = 5;
+hpc.Nv = 3;
+hpc = hpc.default_floorplan_config();
+hpc = hpc.create_model_deviation();
+hpc = hpc.anteSimCheck;
 
 
 %% MUL and DIV simulations
@@ -262,8 +269,63 @@ disp(strcat("nip_mul: ", num2str(nip_mul), ", ntd: ", num2str(ntd)))
 
 %%
 
-hpc.pws_ls_offset(4, 11, 10)
+Nc = 17;
+Nh = 17;
+Nv = 1;
+vd = 4; %test with 1, 0, full, >full, non divisibili per 2
+% 21, 7 3, 21
+% 
 
+vddone = 0;
+vNh = Nh;
+vNv = Nv;
+cuts = [1 1];
+while (vddone < vd)
+
+	fr = vNh>vNv;
+	cuts = cuts + [fr, ~fr];
+	vNh = Nh/cuts(1);
+	vNv = Nv/cuts(2);
+
+	tt = cuts>[Nh, Nv];
+	cuts = tt.*[Nh, Nv] + ~tt.*cuts;
+	vNh = vNh*(vNh>1) + (vNh<=1);
+	vNv = vNv*(vNv>1) + (vNv<=1);
+
+	if (cuts(2)==Nv) && (cuts(1)==Nh)
+		break;
+	end
+
+	vddone = (cuts(1))*(cuts(2));
+end
+
+steps = floor([Nh, Nv] ./ cuts);
+tbfd = vddone > vd;
+
+VDom = zeros(Nc, vd);
+for i=1:Nh
+	for j=1:Nv
+		[i,j]
+		dom = floor((i-1)/steps(1)) + floor((j-1)/steps(2))*cuts(1) + 1;
+		%fixing odd vd
+		dom = dom + (dom>1)*tbfd*(-1)
+		dom = dom*(dom<=vd) + vd*(dom>vd);
+		idx = (i + (j-1)*Nh)
+		VDom(idx, dom) = 1;
+	end
+end
+
+VDom
+
+%%
+hpc.Nc = 17;
+hpc.Nh = 1;
+hpc.Nv = 17;
+hpc.vd = 21;
+
+hpc.default_VDom_config()
+
+hpc.VDom
 
 %%
 %Taking a big sample for proper testing
