@@ -1,7 +1,11 @@
 function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	simulation(obj, ctrl, show)
 %SIMULATION Summary of this function goes here
-%   Detailed explanation goes here
+%   Detailed explanation goes here	
+
+	obj.anteSimCheckTM();
+	obj.anteSimCheckLab();
+	obj.anteSimCheckPM();
 
 	% To Optimize execution, istead of having several functions called and
 	%	several ifs statement, we use ctrl.Ts_ctrl as the main time step of
@@ -41,10 +45,10 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	nip_counter = nip_mul + target_ts_offset;
 
 	% INIT
-	obj = obj.init_compute_model(obj.Ad_true, obj.Bd_true);
+	obj.init_compute_model(obj.Ad_true, obj.Bd_true);
 
 	%TODO
-	x = obj.x_init + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
+	x = obj.t_init + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
 	F = obj.F_min*ones(obj.Nc,1);
 	V = obj.V_min*ones(obj.vd,1);
 	process = ones(obj.Nc,1);
@@ -100,6 +104,8 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	ctrl = ctrl.cleanup_fnc(obj);
 
 	if show
+		% Pause because it is bugged on Linux
+		pause(0.5);
 		obj.xutplot(cpxplot,cpuplot);
 		pause(0.5);
 		obj.powerconstrplot(cpuplot);

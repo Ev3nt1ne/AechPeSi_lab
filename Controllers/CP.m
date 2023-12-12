@@ -25,9 +25,20 @@ classdef CP < controller
 		pw_inverse = 0;				% use Inverse pw reduction wrt temp
 		
 		alpha_wl = 0.4;				% Moving Average filter parameter for Workload
+		alpha_ma = 0.1;
 		
 		dummy_pw = 0;
 		
+	end
+
+	properties(SetAccess=protected, GetAccess=public)	
+		pw_storage = 0;
+		pw_adapt = 0;
+		pw_old;
+		wl;
+		pbold = 0;
+		pbc = 0;
+		f_ma;
 	end
 	
 	methods
@@ -42,15 +53,18 @@ classdef CP < controller
 
 	methods
 		function [voltage_choice] = cp_voltage_choice(obj, hpc_class, Ft)
+			voltage_choice = hpc_class.V_min*ones(hpc_class.vd,1);
 			for v=1:hpc_class.vd
 				extrV = sum( Ft(:,v) > (hpc_class.FV_table(:,3) + [zeros(hpc_class.FV_levels-1,1); inf])', 2);
-				vote_cast(:,v) = extrV(nonzeros(hpc_class.VDom(:,v).*[1:hpc_class.Nc]')) + 1;
+				%vote_cast(:,v) = extrV(nonzeros(hpc_class.VDom(:,v).*[1:hpc_class.Nc]')) + 1;
+				vote_cast = extrV(nonzeros(hpc_class.VDom(:,v).*[1:hpc_class.Nc]')) + 1;
+				voltage_choice(v,1) = hpc_class.FV_table(round(prctile(vote_cast,obj.voltage_rule)),1);
 			end
-			if size(vote_cast,1) == 1
+			%if size(vote_cast,1) == 1
 				%problem: matrix become array and prctile does not work anymore
-				vote_cast(2,:) = vote_cast;
-			end
-			voltage_choice = hpc_class.FV_table(round(prctile(vote_cast,obj.voltage_rule)),1);
+			%	vote_cast(2,:) = vote_cast;
+			%end
+			%voltage_choice = hpc_class.FV_table(round(prctile(vote_cast,obj.voltage_rule)),1);
 		end
 		function [pu, pw_storage] = cp_pw_dispatcher(obj, T, core_crit_temp, pid_target, delta_p, ipu, min_pw_red)
 			

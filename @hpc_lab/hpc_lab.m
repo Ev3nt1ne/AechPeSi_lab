@@ -1,4 +1,4 @@
-classdef hpc_lab < thermal_model & power_model & perf_model
+classdef hpc_lab < thermal_model & power_model & perf_model & handle
 	%HPC_LAB Summary of this class goes here
 	%   Detailed explanation goes here
 	
@@ -12,6 +12,12 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 		Ts_target (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
 			= 1e-3;			% Commands min Ts, old Ts_input
 
+		vd (1,1) {mustBePositive, mustBeInteger} ...
+			= 3;		% Voltage/Power Domains
+		VDom {mustBeNonnegative, mustBeNumericOrLogical, mustBeNonempty, mustBeLessThanOrEqual(VDom,1)} ...
+			= [1 0 0; 1 0 0; 0 1 0; 0 1 0; 1 0 0; 1 0 0; 0 1 0; 0 1 0; 0 0 1; 0 0 1; 0 0 1; 0 0 1];		% Structure of the Voltage Domains Nc x vd
+		
+
 		%measure_noise = 1;
 		sensor_noise (1,1) {mustBeNonnegative, mustBeNumericOrLogical} ...
 			= 1;
@@ -24,7 +30,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 
 		core_pm;
 
-		x_init;						% Initial Conditions 
+		%x_init;						% Initial Conditions 
 		%urplot;						% Input Reference Plot
 		frtrc;						% Freq Reference Trace
 		%zrplot;						% Power Noise Plot
@@ -102,8 +108,81 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			else
 				obj.osunix = 0;
 			end
+
+			obj.get_size(obj);
+		end		
+		function obj = anteSimCheckLab(obj)
+			% Check if the floorplan has been updated
+			lastwarn('');
+			obj.VDom = obj.VDom;
+			[msgstr, ~] = lastwarn;
+			if ~isempty(msgstr)
+				warning("[LAB] Incorrect dimension of VDom (voltage domains configuration)!")
+				prompt = {['Do you want to run default_VDom_config() to create a default domain config? (1=yes, 0=no)' newline 'ATTENTION! This will OVERWRITE previous values.']};
+				dlgtitle = '[LAB] HPC Lab Simulation';
+				fieldsize = [1 45];
+				definput = {'1'};
+				usrin = inputdlg(prompt,dlgtitle,fieldsize,definput);
+				if usrin{1} == '1'
+					obj.default_VDom_config();
+				else
+					error("[LAB] VDom has not the correct dimension");
+				end				
+			end
 		end
-		
+		function obj = default_VDom_config(obj)			
+			vddone = 0;
+			vNh = obj.Nh;
+			vNv = obj.Nv;
+			cuts = [1 1];
+			while (vddone < obj.vd)
+			
+				fr = vNh>vNv;
+				cuts = cuts + [fr, ~fr];
+				vNh = obj.Nh/cuts(1);
+				vNv = obj.Nv/cuts(2);
+			
+				tt = cuts>[obj.Nh, obj.Nv];
+				cuts = tt.*[obj.Nh, obj.Nv] + ~tt.*cuts;
+				vNh = vNh*(vNh>1) + (vNh<=1);
+				vNv = vNv*(vNv>1) + (vNv<=1);
+			
+				if (cuts(2)==obj.Nv) && (cuts(1)==obj.Nh)
+					break;
+				end
+			
+				vddone = (cuts(1))*(cuts(2));
+			end
+			
+			steps = floor([obj.Nh, obj.Nv] ./ cuts);
+			tbfd = vddone > obj.vd;
+			
+			obj.VDom = zeros(obj.Nc, obj.vd);
+			for i=1:obj.Nh
+				for j=1:obj.Nv
+					dom = floor((i-1)/steps(1)) + floor((j-1)/steps(2))*cuts(1) + 1;
+					%fixing odd vd
+					dom = dom + (dom>1)*tbfd*(-1);
+					dom = dom*(dom<=obj.vd) + obj.vd*(dom>obj.vd);
+					idx = (i + (j-1)*obj.Nh);
+					obj.VDom(idx, dom) = 1;
+				end
+			end
+		end
+	end
+	methods(Static)
+		function totSize = get_size(class) 
+			props = properties(class); 
+			totSize = 0;
+			
+			for ii=1:length(props) 
+  			currentProperty = getfield(class, char(props(ii))); 
+  			s = whos('currentProperty'); 
+  			totSize = totSize + s.bytes; 
+			end
+			
+			disp(strcat("Size: ", num2str(totSize), " bytes")); 
+		end
 	end
 
 	%% Simulations
@@ -480,7 +559,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 			
 			b = bar(1:obj.Nc, BAR1);
 			yl = ylim;
-			ylim([min(min(obj.x_init), ymlj)-273.15, yl(2)]);
+			ylim([min(min(obj.t_init), ymlj)-273.15, yl(2)]);
 			ylabel('T_{Max} [°C]'),xlabel('Core'),grid on;
 			hold on;
 			plot(xlim, [obj.core_crit_temp obj.core_crit_temp]-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
@@ -667,7 +746,15 @@ classdef hpc_lab < thermal_model & power_model & perf_model
 
 	%% Dependent Variables
 	methods
-
+		function obj = set.VDom(obj, val)
+			cmp = [obj.Nc obj.vd];
+			if all(size(val) == cmp) && ~isempty(val)
+				obj.VDom = val;
+			else
+				warning("[LAB Error]: VDom wrong input size.");
+				disp(strcat("[LAB] VDom required size:", num2str(cmp(2))));
+			end
+		end
 	end
 end
 

@@ -34,6 +34,9 @@ classdef mpc < controller
 	properties(SetAccess=protected, GetAccess=public)		
 		mpc_ctrl;					% Persistent variable to optimize controller (prev: Controller)
 		failed;
+		xlplot;
+		tmpc;
+		output_mpc;
 	end
 	
 	methods

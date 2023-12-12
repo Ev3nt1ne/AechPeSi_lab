@@ -56,6 +56,7 @@ function [dxdt, power] = nl_model_dyn(obj,A,B,x,u,d_i,d_p, ot) %, pw, ceff, pw_l
 
 %%
 hpc = hpc_lab;
+hpc.Ts = 5e-5;
 hpc.tsim = 2;
 addpath Controllers/
 
@@ -70,12 +71,12 @@ ctrl = Fuzzy;
 ctrl.C = hpc.C;
 %%
 ctrl = black_wolf;
-ctrl.Ts_ctrl = 5e-3;
+ctrl.Ts_ctrl = 5e-4;
 
 ctrl.C = eye(hpc.Ns);
 hpc.sensor_noise = 1;
 %TODO
-ctrl.Cty = zeros(ctrl.Nhzn, hpc.Nout);
+ctrl.Cty = zeros(ctrl.Nhzn, hpc.Nc);
 ctrl.Ctu = zeros(ctrl.Nhzn, hpc.Nc);
 R_coeff = 10; %10;
 R2_coeff = R_coeff/1; %100; %30; %10
@@ -96,6 +97,21 @@ ctrl.R2(logical(eye(size(ctrl.R2)))) = ctrl.R2(~~eye(size(ctrl.R2))) .* hpc.VDom
 %hpc.R2 = hpc.R2 + (R_coeff/10)*eye(size(hpc.R2));
 ctrl.Q = zeros(hpc.Ns);
 %%
+ctrl = cp_mpc;
+ctrl.Ts_ctrl = 5e-3;
+
+ctrl.C = eye(hpc.Ns);
+hpc.sensor_noise = 1;
+%TODO
+ctrl.Cty = zeros(ctrl.Nhzn, hpc.Nc);
+ctrl.Ctu = zeros(ctrl.Nhzn, hpc.Nc);
+R_coeff = 10; %10;
+
+ctrl.R = R_coeff*eye(hpc.Nc);
+ctrl.R2 = zeros(hpc.Nc);
+ctrl.Q = zeros(hpc.Ns);
+
+%%
 hpc.x_init = hpc.temp_amb * ones(hpc.Ns,1);
 hpc.frtrc = 3.45 * ones(min(ceil(hpc.tsim / hpc.Ts_target)+1,(hpc.tsim/ctrl.Ts_ctrl+1)), hpc.Nc);
 ts = ceil(hpc.tsim / hpc.Ts_target)+1;
@@ -109,8 +125,9 @@ hpc.quad_pw_budget = 450/36*hpc.Nc*ones(2,hpc.vd);
 
 hpc.min_pw_red = 0.6;
 %%
+tic;
 hpc.simulation(ctrl,1);
-
+toc;
 %%
 ll = ceil(hpc.tsim*1e6/hpc.quantum_us);
 hpc.wltrc = zeros(hpc.Nc, hpc.ipl, ll);
@@ -195,6 +212,13 @@ obj.F0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
 obj.T0v = ones(hpc_class.Nc, length(Tv))*diag(Tv);
 %}			
 
+%%
+hpc.Nc = 15;
+hpc.Nh = 5;
+hpc.Nv = 3;
+hpc = hpc.default_floorplan_config();
+hpc = hpc.create_model_deviation();
+hpc = hpc.anteSimCheck;
 
 
 %% MUL and DIV simulations
@@ -245,8 +269,63 @@ disp(strcat("nip_mul: ", num2str(nip_mul), ", ntd: ", num2str(ntd)))
 
 %%
 
-hpc.pws_ls_offset(4, 11, 10)
+Nc = 17;
+Nh = 17;
+Nv = 1;
+vd = 4; %test with 1, 0, full, >full, non divisibili per 2
+% 21, 7 3, 21
+% 
 
+vddone = 0;
+vNh = Nh;
+vNv = Nv;
+cuts = [1 1];
+while (vddone < vd)
+
+	fr = vNh>vNv;
+	cuts = cuts + [fr, ~fr];
+	vNh = Nh/cuts(1);
+	vNv = Nv/cuts(2);
+
+	tt = cuts>[Nh, Nv];
+	cuts = tt.*[Nh, Nv] + ~tt.*cuts;
+	vNh = vNh*(vNh>1) + (vNh<=1);
+	vNv = vNv*(vNv>1) + (vNv<=1);
+
+	if (cuts(2)==Nv) && (cuts(1)==Nh)
+		break;
+	end
+
+	vddone = (cuts(1))*(cuts(2));
+end
+
+steps = floor([Nh, Nv] ./ cuts);
+tbfd = vddone > vd;
+
+VDom = zeros(Nc, vd);
+for i=1:Nh
+	for j=1:Nv
+		[i,j]
+		dom = floor((i-1)/steps(1)) + floor((j-1)/steps(2))*cuts(1) + 1;
+		%fixing odd vd
+		dom = dom + (dom>1)*tbfd*(-1)
+		dom = dom*(dom<=vd) + vd*(dom>vd);
+		idx = (i + (j-1)*Nh)
+		VDom(idx, dom) = 1;
+	end
+end
+
+VDom
+
+%%
+hpc.Nc = 17;
+hpc.Nh = 1;
+hpc.Nv = 17;
+hpc.vd = 21;
+
+hpc.default_VDom_config()
+
+hpc.VDom
 
 %%
 %Taking a big sample for proper testing
