@@ -1,4 +1,9 @@
+# Getting started
+Proof of concept: main_poc.mlx
 
+
+
+# Instalation
 for osqp:
 needs CMake (sudo apt install CMake)
 needs gcc
