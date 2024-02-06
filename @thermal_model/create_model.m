@@ -103,8 +103,8 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 
 	A = zeros(obj.Ns);
 	
-	for i=1:2*lNc
-		if (mod(i,2)>0)	%For each core:
+	for i=1:obj.full_model_layers*lNc
+		if (mod(i,obj.full_model_layers)==1)	%For each core:
 
 			% Core Position
 			ci = fix((i-1)/2)+1;
@@ -324,13 +324,18 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 		end
 		
 		%for j=1:2*lNc
+		%TODO: Here change all %2  and 2* / *2 with full_model_layers
+		%	if the name is too long, change it to fml
+		%IMPORTANT!!!!! the TODO ABOVE is important!... also test changes.
+		%	with the mod, check if it should be ==1, ==2, etc.
+		%		remove all >0 which are wrong
 			
 		% ==============
 		% diagonal terms
 		% ==============
 
 		%Silicon (die temp dyn) 
-		if (mod(i,2)>0)
+		if (mod(i,obj.full_model_layers)==1)
 			A(i,i) = -1/(R_sicu_v*C_si) -1/C_si * (1/R_si_he+1/R_si_hn+1/R_si_hw+1/R_si_hs) - 1/(C_si*R_sipcb_v) * obj.si_pcb_fact;
 			
 			%PCB:
@@ -378,7 +383,7 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 			   A(i,i+2)=1/(R_si_he*C_si); 
 			   A(i,i+2*lNv)=1/(R_si_hs*C_si);
 			   A(i,i-2*lNv)=1/(R_si_hn*C_si);
-			elseif (((mod(i+1,2*lNv)==0) && (i~=2*lNc-1) && (i~=2*lNv-1))) 
+			elseif ((mod(i+1,2*lNv)==0) && (i~=2*lNc-1) && (i~=2*lNv-1)) 
 			   A(i,i-2)=1/(R_si_hw*C_si); 
 			   A(i,i+2*lNv)=1/(R_si_hs*C_si);
 			   A(i,i-2*lNv)=1/(R_si_hn*C_si);

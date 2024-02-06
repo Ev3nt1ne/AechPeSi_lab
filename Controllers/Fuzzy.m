@@ -68,6 +68,9 @@ classdef Fuzzy < CP
 		end		
 		function [F,V, obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
 
+			if obj.ex_count >= 10*obj.Tper
+				obj.ex_count = 2*obj.Tper;
+			end
 			obj.ex_count = obj.ex_count + 1;
 
 			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
@@ -140,7 +143,12 @@ classdef Fuzzy < CP
 			end
 			
 			VDred = min(diag(obj.VCred)*hc.VDom);
-			V = V + fix(VDred/2)'*0.05;
+			%VDred = VDred + (VDred > 0).*(0-VDred); %Saturation here is
+			%	way worse. Dunno Why.
+			V = V + fix(VDred/2)'*0.05; %fix is better than floor!!!
+			%V = V + floor(VDred/2)'*0.05;
+			%saturate V
+			V = V + (V < hc.V_min).*(hc.V_min-V);
 
 			%cap F:
 			% maybe remove?
