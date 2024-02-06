@@ -1,4 +1,4 @@
-classdef cp_mpc < mpc & CP
+classdef cp_mpc < mpc_hpc & CP
 	%CP_MPC Summary of this class goes here
 	%   Detailed explanation goes here
 	

@@ -1,4 +1,4 @@
-classdef black_wolf < mpc & CP
+classdef black_wolf < mpc_hpc & CP
 	%UNTITLED Summary of this class goes here
 	%   Detailed explanation goes here
 	properties

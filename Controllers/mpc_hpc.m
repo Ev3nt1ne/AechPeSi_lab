@@ -1,4 +1,4 @@
-classdef mpc < controller
+classdef mpc_hpc < controller
 	%MPC Summary of this class goes here
 	%   Detailed explanation goes here
 	
@@ -40,7 +40,7 @@ classdef mpc < controller
 	end
 	
 	methods
-		function obj = mpc()
+		function obj = mpc_hpc()
 			%MPC Construct an instance of this class
 			%   Detailed explanation goes here
 
@@ -56,6 +56,7 @@ classdef mpc < controller
 				osqp;
 			catch
 				if obj.osunix
+					%{
 					LIBCURL_PATH = "/lib/x86_64-linux-gnu/";
 					path1 = getenv('LD_LIBRARY_PATH');			  % Store existing path
 					path = strcat(LIBCURL_PATH, ':', path1);      % Add compatible libcurl to path
@@ -66,6 +67,9 @@ classdef mpc < controller
 					addpath(pwd)
 					savepath
 					cd ../
+					%}
+					websave('install_osqp.m','https://raw.githubusercontent.com/osqp/osqp-matlab/master/package/install_osqp.m');
+					install_osqp;
 				else
 					%TODO Windows
 				end
