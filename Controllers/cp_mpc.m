@@ -104,8 +104,15 @@ classdef cp_mpc < mpc_hpc & CP
 			%ops.osqp.max_iter = 17;
 			ops.osqp.warm_start = 1;
 
-			obj.mpc_ctrl = optimizer(constraints,objective,ops,{x{1},ot,ly_uref,ly_usum},{u{1}, x{2}});
-			obj.mpc_ctrl
+            % save yalmip model for potential extraction to external solver or code generation
+            obj.ylmp_opt_variables = {x{1},ot,ly_uref,ly_usum};
+            obj.ylmp_opt_output = {u{1},x{2}};
+            obj.ylmp_constraints = constraints;
+            obj.ylmp_objective = objective;
+
+            % generate optimizer
+            obj.mpc_ctrl = optimizer(constraints,objective,ops,obj.ylmp_opt_variables,obj.ylmp_opt_output);
+			%obj.mpc_ctrl = optimizer(constraints,objective,ops,{x{1},ot,ly_uref,ly_usum},{u{1}, x{2}});
 			
 		end %lin_mpc_setup
 		function uout = call_mpc(obj, x, ot, uref, usum)

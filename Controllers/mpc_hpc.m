@@ -19,6 +19,11 @@ classdef mpc_hpc < controller
 		ymin;
 		yMax;
 
+        ylmp_constraints;                % save yalmip constraints 
+        ylmp_objective;                   % save yalmip objective
+        ylmp_opt_variables;              % save the yalmip optimization variables used
+        ylmp_opt_output;                 % save the yalmip variable that is extracted after optimization
+
 		Ts_obs (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
 			= 1e-3;			% Observer Ts
 

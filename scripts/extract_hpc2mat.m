@@ -35,7 +35,7 @@ experiments = ...
   ];
 
 for values = experiments.'
-    % 1 Instantiate main Class:
+    %% Create HPC problem:
     hpc = hpc_lab;
 
     % Rows and Columns
@@ -61,7 +61,7 @@ for values = experiments.'
     hpc.Ts = 5e-5;
 
     %Decide total simulation time
-    hpc.tsim = 2;
+    hpc.tsim = 0;
 
     %Presence/Absence of sensor noise:
     hpc.sensor_noise = 1;
@@ -95,9 +95,7 @@ for values = experiments.'
     %Others, TODO
     hpc.min_pw_red = 0.6;
     
-    %hpc.anteSimCheckTM();
-    %hpc.anteSimCheckLab();
-    %hpc.anteSimCheckPM();
+
     %
     % Changing Ts to improve the speed of simulation
     %hpc.Ts = 250e-6;
@@ -106,7 +104,7 @@ for values = experiments.'
     hpc.Ts = 5e-5;
     hpc.model_init();
     
-    % MPC
+    %% MPC
     ctrl = cp_mpc();
     ctrl.C = eye(hpc.Ns);
 
@@ -129,17 +127,24 @@ for values = experiments.'
     ctrl.Q = zeros(hpc.Ns);
     
     %% 4 verbose
+    % check
+    %hpc.anteSimCheckTM();
+    %hpc.anteSimCheckLab();
+    %hpc.anteSimCheckPM();
+    
+    %yalmip problem
+    hpc.init_compute_model(hpc.Ad_true, hpc.Bd_true);
+    Nsim = 1; %Nsim = ceil(obj.tsim / ctrl.Ts_ctrl);
+    ctrl = ctrl.init_fnc(hpc, Nsim);
     hpc
     ctrl
 
-    ctrl.init_fnc(hpc,1);
-
     %% 5 dump Quadratic Program matrix data for further optimization, code generation
-    filename = char(compose('%s/_HPC_%dx%d_H%d.mat',basename, hpc.Nh, hpc.Nv, hpc.Nhzn));
+    filename = char(compose('%s/_HPC_%dx%d_H%d.mat',basename, hpc.Nh, hpc.Nv, ctrl.Nhzn));
     display(strcat('Saving model to file:  ',filename));
     ops = sdpsettings('verbose',1,'solver','osqp', 'usex0',0);
-    hpc.ylmp_constraints;
-    %yalmip2mat(filename,hpc.ylmp_constraints,hpc.ylmp_objective,ops,hpc.ylmp_opt_variables,hpc.ylmp_opt_output);
+    ctrl.ylmp_constraints;
+    yalmip2mat(filename,ctrl.ylmp_constraints,ctrl.ylmp_objective,ops,ctrl.ylmp_opt_variables,ctrl.ylmp_opt_output);
     %yalmip_model = export(constraints,hpcective,ops,opt_variables,opt_output);
     %a = yalmip2osqp(yalmip_model);
     %ops = sdpsettings('verbose',1,'solver','osqp', 'savesolverinput',1);
