@@ -1,4 +1,4 @@
-classdef controller
+classdef controller < handle
 	%CONTROLLERS Summary of this class goes here
 	%   Detailed explanation goes here
 	

@@ -24,6 +24,8 @@ classdef mpc_hpc < controller
 
 		Obs_poles = [0.8 0.1];		% Poles of the Luemberg Observer
 
+		save_solver_stats = 0;
+
 	end
 
 	properties(Dependent)
@@ -37,6 +39,8 @@ classdef mpc_hpc < controller
 		xlplot;
 		tmpc;
 		output_mpc;
+
+		solver_stats;
 	end
 	
 	methods
