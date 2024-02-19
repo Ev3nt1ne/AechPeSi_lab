@@ -56,7 +56,7 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = launch_arm_sim(obj, robust
 	Bdl_true = obj.Bd_true;
 	%
 	F_MA = zeros(obj.Nc,1);
-	pid_target = ones(obj.Nc, 1)*obj.core_crit_temp;
+	pid_target = ones(obj.Nc, 1)*obj.core_limit_temp;
 	if robust
 		pid_target = pid_target - ones(obj.Nc, 1)*obj.T_margin;
 	end

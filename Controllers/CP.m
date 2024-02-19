@@ -61,7 +61,7 @@ classdef CP < controller
 			obj.pbc = 0;
 			obj.ex_count = 0;
 			obj.wl = [ones(hc.Nc,1) zeros(hc.Nc, hc.ipl -1)];
-			obj.T_target = ones(hc.Nc, 1)*hc.core_crit_temp;
+			obj.T_target = ones(hc.Nc, 1)*hc.core_limit_temp;
 
 			obj.f_ma = hc.F_min*ones(hc.Nc,1);
 			obj.pid_integ = zeros(hc.Nc,1);
@@ -109,7 +109,7 @@ classdef CP < controller
 			%TODO, quad power budget dispatching
 			delta_p = sum(pu) - p_budget + obj.pw_adapt;
 			if (delta_p > 0)
-				[pu, ~] = obj.cp_pw_dispatcher(T, hc.core_crit_temp, obj.T_target, delta_p, pu, hc.min_pw_red); %todo: pid_target(1:obj.vd)
+				[pu, ~] = obj.cp_pw_dispatcher(T, hc.core_limit_temp, obj.T_target, delta_p, pu, hc.min_pw_red); %todo: core_limit_temp(1:obj.vd)
 			end
 
 			if sum(isempty(pu)) || sum(pu<=0)
@@ -215,7 +215,7 @@ classdef CP < controller
 			%end
 			%voltage_choice = hpc_class.FV_table(round(prctile(vote_cast,obj.voltage_rule)),1);
 		end
-		function [pu, pw_storage] = cp_pw_dispatcher(obj, T, core_crit_temp, pid_target, delta_p, ipu, min_pw_red)
+		function [pu, pw_storage] = cp_pw_dispatcher(obj, T, core_crit_temp, core_limit_temp, delta_p, ipu, min_pw_red)
 			
 			safety_pw = -1e-3;
 			
@@ -235,8 +235,8 @@ classdef CP < controller
 				%compute alpha
 				%check number
 				safety = 1;
-				tt = (pid_target - T - safety)>=0;
-				tt_value = core_crit_temp - pid_target;
+				tt = (core_limit_temp - T - safety)>=0;
+				tt_value = core_crit_temp - core_limit_temp;
 				if tt_value < safety
 					tt_value = safety1; %0.1; %TODO (considering that a margin of 10°C is a max -otherwise too much performance loss-)
 				end
@@ -248,7 +248,7 @@ classdef CP < controller
 					
 					%2 
 					% this seems worse
-					%Alpha = 1./(pid_target - T).*tt + 0.99.*((tt - 1) * (-1));
+					%Alpha = 1./(core_limit_temp - T).*tt + 0.99.*((tt - 1) * (-1));
 
 					%test on numbers .....
 
@@ -280,8 +280,8 @@ classdef CP < controller
 				%compute alpha
 				%check number
 				safety = 5;
-				tt = (pid_target - T - safety)>=0;
-				tt_value = core_crit_temp - pid_target;
+				tt = (core_limit_temp - T - safety)>=0;
+				tt_value = core_crit_temp - core_limit_temp;
 				tt2 = zeros(length(ipu),1);
 				if tt_value < safety
 					tt_value = safety; %0.1; %TODO (considering that a margin of 10°C is a max -otherwise too much performance loss-)
@@ -294,7 +294,7 @@ classdef CP < controller
 
 					%2 
 					% this seems worse
-					%Alpha = 1./(pid_target - T).*tt + 0.99.*((tt - 1) * (-1));
+					%Alpha = 1./(core_limit_temp - T).*tt + 0.99.*((tt - 1) * (-1));
 
 					%test on numbers .....
 

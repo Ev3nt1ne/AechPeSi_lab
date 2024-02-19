@@ -36,7 +36,9 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 		%zrplot;						% Power Noise Plot
 		wltrc;						% Wokrload Trace
 
-		core_crit_temp = 358.15;	
+		%TODO: should rename these as: core_limit_temp and core_crit_temp
+		core_limit_temp = 358.15;
+		core_crit_temp = 368.15;
 
 		%% All Controllers
 		tot_pw_budget;
@@ -347,8 +349,8 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			ax3=subplot(sbp,1,3);
 			plot(t, x(:,1:2:end-obj.add_states)-273.15);
 			grid on,xlabel('Time [s]'),ylabel('Cores (Si) [°C]'), hold on;
-			if max(max(x(:,1:2:end-1))) >= (obj.core_crit_temp-(0.1*(obj.core_crit_temp-273)))
-				yline(obj.core_crit_temp-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
+			if max(max(x(:,1:2:end-1))) >= (obj.core_limit_temp-(0.1*(obj.core_limit_temp-273)))
+				yline(obj.core_limit_temp-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
 			end
 			%
 			ax4=subplot(sbp,1,sbp);
@@ -479,20 +481,20 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			x1 = x1(2:end,:);
 			dim = size(x1,1);
 			%dim2 = dim
-			gr1=obj.C(1:obj.Nc,:)*sum(x1 > obj.core_crit_temp)';
-			tt1 = sum(x1 > obj.core_crit_temp);
+			gr1=obj.C(1:obj.Nc,:)*sum(x1 > obj.core_limit_temp)';
+			tt1 = sum(x1 > obj.core_limit_temp);
 			tt1(tt1==0) = 1;
-			gt1=obj.C(1:obj.Nc,:)*(sum( (x1 - obj.core_crit_temp) .* (x1 > obj.core_crit_temp)) ./ tt1 )';
+			gt1=obj.C(1:obj.Nc,:)*(sum( (x1 - obj.core_limit_temp) .* (x1 > obj.core_limit_temp)) ./ tt1 )';
 
 			if (nargin < 3) || isempty(x2)
 				BAR1 = [sum(obj.Ts*gr1)/obj.Nc 0];
 				BAR2 = [0 sum(gt1)/sum(tt1>1)];
 			else
 				x2 = x2(2:end,:);
-				gr2=obj.C(1:obj.Nc,:)*sum(x2 > obj.core_crit_temp)';
-				tt2 = sum(x2 > obj.core_crit_temp);
+				gr2=obj.C(1:obj.Nc,:)*sum(x2 > obj.core_limit_temp)';
+				tt2 = sum(x2 > obj.core_limit_temp);
 				tt2(tt2==0) = 1;
-				gt2=obj.C(1:obj.Nc,:)*(sum( (x2 - obj.core_crit_temp) .* (x2 > obj.core_crit_temp)) ./ tt2 )';
+				gt2=obj.C(1:obj.Nc,:)*(sum( (x2 - obj.core_limit_temp) .* (x2 > obj.core_limit_temp)) ./ tt2 )';
 				BAR1 = [sum(obj.Ts*gr1)/obj.Nc sum(obj.Ts*gr2)/obj.Nc 0 0 ];
 				BAR2 = [0 0 sum(gt1)/sum(tt1>1) sum(gt2)/sum(tt2>1)];
 			end			
@@ -562,7 +564,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			ylim([min(min(obj.t_init), ymlj)-273.15, yl(2)]);
 			ylabel('T_{Max} [°C]'),xlabel('Core'),grid on;
 			hold on;
-			plot(xlim, [obj.core_crit_temp obj.core_crit_temp]-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
+			plot(xlim, [obj.core_limit_temp obj.core_limit_temp]-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
 			
 			ylp = ylim;
 			
@@ -736,6 +738,235 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			
 			%linkaxes([ax1,ax2,ax3],'x');
 			
+		end
+	end
+
+	%% Result Analysis
+	methods
+		function res = stats_analysis(obj,ctrl,x,u,f,v,w)
+
+			xcp = x(2:end,:)*obj.C(1:obj.Nc,:)' -273.15;
+			ucp = u(2:end,:);
+			fcp = f(2:end,:);
+			vcp = v(2:end,:);
+
+			%%%%%%%%%%%%%%%%%%%%%%%%%
+			% Power
+
+			pwct = max(round(size(ucp,1)/max(length(obj.tot_pw_budget)-1,1)),1);
+			pwtb = repelem(obj.tot_pw_budget(min(2, length(obj.tot_pw_budget)):end), pwct ,1);
+
+			% here it is difficult, because if I make it ceil, it will always be ok for
+			% pw budget going down, but never for power budget going up. If I take
+			% floor it will be the opposite. Hope that round will be ok!
+			delay = round((obj.delay_F_max+obj.delay_V_max) / obj.Ts);
+			sidx = delay + pwct;
+			%
+			pwgr = sum(ucp(1+sidx:end,:),2) - pwtb(1:end-sidx);
+			pwgrP = pwgr ./ pwtb(1:end-sidx);
+			
+			pwgr = pwgr(pwgr > 0);
+			pwgrP = pwgrP(pwgrP > 0);
+			
+			if isempty(pwgr)
+				pwgr = 0;
+			end
+			if isempty(pwgrP)
+				pwgrP = 0;
+			end
+
+			power.exMaxW = max(pwgr);
+			power.exMaxP = max(pwgrP);
+			power.ex95W = prctile(pwgr, 95);
+			power.ex95P = prctile(pwgrP, 95);
+			power.exAvW = mean( pwgr );
+			power.exAvP = mean( pwgrP );
+			power.exSDW = std(pwgr);
+			power.exSkew = skewness(pwgr);
+			power.exKurt = kurtosis(pwgr);
+			%
+			power.exTime = sum( sum(ucp(1+sidx:end,:),2) > pwtb(1:end-sidx) ) *obj.Ts;
+
+
+			%%%%%%%%%%%%%%%%%%%%%%%%%
+			% Temperature
+
+			crt = obj.core_crit_temp-273.15;
+			mnt = obj.core_limit_temp-273.15;
+
+			temp.Max = max(xcp(:));
+			temp.p95 = prctile(xcp(:),95);
+			temp.Av = mean(xcp(:));
+			temp.SDAv = std(mean(xcp));
+			temp.SkewAv = skewness(mean(xcp));
+			temp.KurtAv = kurtosis(mean(xcp));
+			temp.MeanSkew = mean(skewness(xcp));
+			temp.MeanKurt = mean(kurtosis(xcp));
+			%
+			exTC = (xcp-crt) .* (xcp > crt);
+			%exTC = exTC(exTC > 0);
+			if isempty(exTC)
+				exTC = 0;
+			end
+			temp.exCr.Max = max( exTC, [], "all" );
+			temp.exCr.Mean95 = mean(prctile( exTC ,95));
+			temp.exCr.Mean80 = mean(prctile( exTC ,80));
+			temp.exCr.MeanAv = mean( mean(exTC) );
+			temp.exCr.StdAv = std(mean( exTC ));
+			temp.exCr.SkewAv = skewness(mean( exTC ));
+			temp.exCr.KurtAv = kurtosis(mean( exTC ));
+			%
+			exTn = (xcp-mnt) .* (xcp > mnt);
+			%exTn = exTn(exTn > 0);
+			if isempty(exTn)
+				exTn = 0;
+			end
+			temp.exMn.Max = max( exTn, [], "all" );
+			temp.exMn.Mean95 = mean(prctile( exTn ,95));
+			temp.exMn.Mean80 = mean(prctile( exTn ,80));
+			temp.exMn.MeanAv = mean(mean( exTn ));
+			temp.exMn.StdAv = std(mean( exTn ));
+			temp.exMn.SkewAv = skewness(mean( exTn ));
+			temp.exMn.KurtAv = kurtosis(mean( exTn ));
+			%
+			temp.exCr.TotTime = sum(sum( xcp > crt) *obj.Ts);
+			temp.exCr.StdTime = std(sum( xcp > crt) *obj.Ts);
+			temp.exCr.SkewTime = skewness(sum( xcp > crt) *obj.Ts);
+			temp.exCr.KurtTime = kurtosis(sum( xcp > crt) *obj.Ts);
+			%
+			temp.exMn.TotTime = sum(sum( xcp > mnt) *obj.Ts);
+			temp.exMn.StdTime = std(sum( xcp > mnt) *obj.Ts);
+			temp.exMn.SkewTime = skewness(sum( xcp > mnt) *obj.Ts);
+			temp.exMn.KurtTime = kurtosis(sum( xcp > mnt) *obj.Ts);
+			% no need these two: I can divide per obj.Nc
+			temp.exCr.MeanTime = mean(sum( xcp > crt) *obj.Ts);
+			temp.exMn.MeanTime = mean(sum( xcp > mnt) *obj.Ts);
+
+
+			%%%%%%%%%%%%%%%%%%%%%%%%%
+			% freq
+
+			freq.Max = max(fcp(:));
+			freq.min = min(fcp(:));
+			freq.Av = mean(fcp(:));
+			freq.StdAv = std(mean(fcp));
+			freq.SkewAv = skewness(mean(fcp));
+			freq.KurtAv = kurtosis(mean(fcp));
+			freq.MeanSkew = mean(skewness(fcp));
+			freq.MeanKurt = mean(kurtosis(fcp));
+
+			% oscillations:
+			%want to study for 1ms, 10ms, 100ms, 1s
+			mdim = [1e-3 1e-2 1e-1 1] / ctrl.Ts_ctrl;
+			tt = mdim > obj.tsim / ctrl.Ts_ctrl;
+			mdim(tt) = obj.tsim / ctrl.Ts_ctrl;
+			mdim(mdim<1) = 1;
+			
+			for md = 1:length(mdim)
+				dd = mdim(md);
+				ve = zeros(size(fcp) - [dd 0]);
+				for i=1:length(fcp)-dd+1
+					idx = i+dd-1;
+					ve(i,:) = std(fcp(i:idx,:));
+				end
+
+				freq.Osc.Max(md) = max(ve(:));
+				freq.Osc.MeanMax(md) = mean(max(ve));
+				freq.Osc.StdMax(md) = std(max(ve));
+				freq.Osc.SkewMax(md) = skewness(max(ve));
+				freq.Osc.KurtMax(md) = kurtosis(max(ve));
+				freq.Osc.Av(md) = mean(ve(:));
+				freq.Osc.StdAv(md) = std(mean(ve));
+				freq.Osc.MeanStd(md) = mean(std(ve));
+				freq.Osc.SkewAv(md) = skewness(mean(ve));
+				freq.Osc.KurtAv(md) = kurtosis(mean(ve));
+				freq.Osc.MeanSkew(md) = mean(skewness(ve));
+				freq.Osc.MeanKurt(md) = mean(kurtosis(ve));	
+			end
+
+
+			%%%%%%%%%%%%%%%%%%%%%%%%%
+			% Voltage
+
+			vdd.Max = max(vcp(:));
+			vdd.min = min(vcp(:));
+			vdd.Av = mean(vcp(:));
+			vdd.StdAv = std(mean(vcp));
+			vdd.SkewAv = skewness(mean(vcp));
+			vdd.KurtAv = kurtosis(mean(vcp));
+			vdd.MeanSkew = mean(skewness(vcp));
+			vdd.MeanKurt = mean(kurtosis(vcp));
+
+			% oscillations:
+			%want to study for 1ms, 10ms, 100ms, 1s
+			mdim = [1e-3 1e-2 1e-1 1] / ctrl.Ts_ctrl;
+			tt = mdim > obj.tsim / ctrl.Ts_ctrl;
+			mdim(tt) = obj.tsim / ctrl.Ts_ctrl;
+			mdim(mdim<1) = 1;
+			
+			for md = 1:length(mdim)
+				dd = mdim(md);
+				ve = zeros(size(vcp) - [dd 0]);
+				for i=1:length(vcp)-dd+1
+					idx = i+dd-1;
+					ve(i,:) = std(vcp(i:idx,:));
+				end
+
+				vdd.Osc.Max(md) = max(ve(:));
+				vdd.Osc.MeanMax(md) = mean(max(ve));
+				vdd.Osc.StdMax(md) = std(max(ve));
+				vdd.Osc.SkewMax(md) = skewness(max(ve));
+				vdd.Osc.KurtMax(md) = kurtosis(max(ve));
+				vdd.Osc.Av(md) = mean(ve(:));
+				vdd.Osc.StdAv(md) = std(mean(ve));
+				vdd.Osc.MeanStd(md) = mean(std(ve));
+				vdd.Osc.SkewAv(md) = skewness(mean(ve));
+				vdd.Osc.KurtAv(md) = kurtosis(mean(ve));
+				vdd.Osc.MeanSkew(md) = mean(skewness(ve));
+				vdd.Osc.MeanKurt(md) = mean(kurtosis(ve));	
+			end
+
+
+			%%%%%%%%%%%%%%%%%%%%%%%%%
+			% Perf
+			smref = round((size(fcp,1))/(size(obj.frtrc(2:end,:),1)));
+			smf = round((size(obj.frtrc(2:end,:),1))/(size(fcp,1)));
+
+			fd = repelem(obj.frtrc(2:end,:),max(smref,1),1) - repelem(fcp,max(smf,1),1);
+
+			n2 = reshape(fd,[],1);
+			perf.fd.l2norm = norm(n2) / sqrt(obj.Nc) / sqrt(ceil(obj.tsim / ctrl.Ts_ctrl));
+			%perf.fdAv2norm = mean(norm
+			perf.fd.Max = max(fd(:));
+			perf.fd.min = min(fd(:));
+			perf.fd.Av = mean(fd(:));
+			perf.fd.Sum = sum(fd(:));
+			perf.fd.StdAv = std(mean(fd));
+			perf.fd.SkewAv = skewness(mean(fd));
+			perf.fd.KurtAv = kurtosis(mean(fd));
+
+			perf.fd.MeanSkew = mean(skewness(fd));
+			perf.fd.MeanKurt = mean(kurtosis(fd));
+			perf.fd.MeanStd = mean(std(fd));
+
+
+			perf.wl.Max = max(w);
+			perf.wl.Av = mean(w);
+			perf.wl.min = min(w);
+			perf.wl.Std = std(w);
+			perf.wl.Skew = skewness(w);
+			perf.wl.Kurt = kurtosis(w);
+
+			
+			%%%%%%%%%%%%%%%%%%%%%%%%%
+			% out
+			
+			res.power = power;
+			res.temp = temp;
+			res.freq = freq;
+			res.vdd = vdd;
+			res.perf = perf;		
+
 		end
 	end
 

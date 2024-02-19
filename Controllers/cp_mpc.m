@@ -86,8 +86,8 @@ classdef cp_mpc < mpc_hpc & CP
 			%just for Andrino:
 			ops.savesolveroutput = 1;
 			ops.osqp.rho = 0.1;
-			ops.osqp.eps_abs = 0.1;
-			ops.osqp.eps_rel = 0.1;
+			ops.osqp.eps_abs = 0.01;
+			ops.osqp.eps_rel = 0.01;
 
 			obj.mpc_ctrl = optimizer(constraints,objective,ops,{x{1},ot,ly_uref,ly_usum},{u{1}, x{2}});
 			obj.mpc_ctrl
@@ -156,7 +156,7 @@ classdef cp_mpc < mpc_hpc & CP
 
 			obj.wl = [ones(hpc_class.Nc,1) zeros(hpc_class.Nc, hpc_class.ipl -1)];
 
-			obj.T_target = ones(hpc_class.Nc, 1)*hpc_class.core_crit_temp;
+			obj.T_target = ones(hpc_class.Nc, 1)*hpc_class.core_limit_temp;
 
 			obj.f_ma = zeros(hpc_class.Nc,1);
 
