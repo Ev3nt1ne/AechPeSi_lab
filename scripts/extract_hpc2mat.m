@@ -34,6 +34,7 @@ experiments = ...
   6 7 7;
   ];
 
+tic;
 for values = experiments.'
     %% Create HPC problem:
     hpc = hpc_lab;
@@ -46,7 +47,7 @@ for values = experiments.'
     hpc.Nc = hpc.Nh*hpc.Nv;         % Total Number of controlled PE's in thermal model
     
     % Number of Voltage Domains
-    hpc.vd = 3;
+    hpc.vd = hpc.Nc;
 
     % How the cores are distributed per domain
     %hpc.VDom = ... ;
@@ -95,15 +96,6 @@ for values = experiments.'
     %Others, TODO
     hpc.min_pw_red = 0.6;
     
-
-    %
-    % Changing Ts to improve the speed of simulation
-    %hpc.Ts = 250e-6;
-    %hpc.model_init();
-    %hpc.sim_tm_autonomous(tsim_aut)
-    hpc.Ts = 5e-5;
-    hpc.model_init();
-    
     %% MPC
     ctrl = cp_mpc();
     ctrl.C = eye(hpc.Ns);
@@ -149,4 +141,5 @@ for values = experiments.'
     %a = yalmip2osqp(yalmip_model);
     %ops = sdpsettings('verbose',1,'solver','osqp', 'savesolverinput',1);
     %qp = optimize(constraints,hpcective,ops);
- end
+end
+toc;
