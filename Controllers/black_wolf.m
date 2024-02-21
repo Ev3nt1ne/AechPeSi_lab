@@ -47,6 +47,10 @@ classdef black_wolf < mpc_hpc & CP
 			h1 = obj.psac(2);
 			h2 = obj.psac(3);
 
+			if length(h0) < hc.Nc
+				h0 = ones(hc.Nc,1)*h0;
+			end
+
 			Bu = obj.Bd_ctrl(:,1:hc.Nc);
 			Bd = obj.Bd_ctrl(:,hc.Nc+1:end);
 					
@@ -54,7 +58,9 @@ classdef black_wolf < mpc_hpc & CP
 			%constraints = [x{2} == (Adl_mpc + C2*h1)*x{1}-(C2*h1*273.15*ones(hc.Ns,1))+(Bu+(hc.Cc'*h2))*(u0*w)+Bd*ot + hc.Cc*(h0 + h0v)];
 
 			for k = 1 : obj.Nhzn
-					constraints = [constraints, x{k+1} == (obj.Ad_ctrl + obj.C2*h1)*x{k}-(obj.C2*h1*273.15*ones(hc.Ns,1))+(Bu+(hc.Cc'*h2))*(u{k}.*w)+Bd*ot + hc.Cc'*(h0 + h0v)];
+					%constraints = [constraints, x{k+1} == (obj.Ad_ctrl + obj.C2*h1)*x{k}-(obj.C2*h1*273.15*ones(hc.Ns,1))+(Bu+(hc.Cc'*h2))*(u{k}.*w)+Bd*ot + hc.Cc'*(h0 + h0v)];
+					constraints = [constraints, x{k+1} == (obj.Ad_ctrl + Bu*diag(h1)*hc.Cc)*x{k}-(Bu*diag(h1*273.15)*hc.Cc*ones(hc.Ns,1)) ...
+									+ Bu*(u{k}.*(w+h2)) + Bd*ot + Bu*h0 + hc.Cc'*h0v];
 
 					%TODO: Ct I did only for y, and only for max
 					if (~isinf(obj.umin))
@@ -145,9 +151,14 @@ classdef black_wolf < mpc_hpc & CP
 			end
 			obj.C2([end-hpc_class.add_states+1:end], :) = 0;
 
-			[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx();
+			% Voltage
+			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([0.5 1.2], [20 90], 0.9, 1/3.497, 1.93, 1);
+			[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([0.5 1.2], [20 90], 0.9, [6.659 -1.979], -1.48, 1);
+			% Freq
+			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([hpc_class.F_min hpc_class.F_max], [20 90], 0.9, 0.2995, 0, 0);
 			%TODO parametrize
 			[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(8, 8, 10);
+			%obj.psoff_lut=0; Fv=1; Tv=1;
 			%[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(8, 16, 10);
 			obj.F0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
 			obj.T0v = ones(hpc_class.Nc, length(Tv))*diag(Tv);

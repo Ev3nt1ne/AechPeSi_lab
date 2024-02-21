@@ -99,5 +99,124 @@
 	disp(a);
 
 
+	%%
+
+	V = [0.5:0.05:1.2];
+
+	alp = 0.3716; %0.3095;
+	alp0 = 0.306; %0.01;
+	k1 = 1;
+	k2 = 0;
+
+	alpV0 = mean((V - alp0).^(1/alp) - V.^(1/alp))
+
+	F = V.^alp + alp0;
+
+	%{
+	fo = fitoptions('Method','NonlinearLeastSquares',...
+               'Lower',[-20],...
+               'Upper',[20],...
+               'StartPoint',[1]);
+	%}
+
+	%% (ORIGINAL + Offset)
+	f = fit(hpc.FV_table(:,3), hpc.FV_table(:,1), fittype("x^a+b"))
+	alp = 0.4768;
+	alp0 = -0.7277;
+	k1 = 1;
+	k2 = 0;
+
+	%% (ORIGINAL + Offset + k)
+	f = fit(hpc.FV_table(:,3), hpc.FV_table(:,1), fittype("c*x^a+b"))
+	% not working
+
+	%% Original (THIS IS JUST WRONG!)
+	f = fit(hpc.FV_table(:,3), hpc.FV_table(:,1), fittype("x^a"))
+	alp = 0.2502;
+	alp0 = 0;
+	k1 = 1;
+	k2 = 0;
+
+	%% Voltage
+	f = fit(hpc.FV_table(:,1), hpc.FV_table(:,3), fittype("x^a+b"))
+	alp = 3.497;
+	alp0 = 1.93;
+	k1 = 1;
+	k2 = 0;
+	
+	%%
+	f = fit(hpc.FV_table(:,3), hpc.FV_table(:,1), 'exp1')
+	k1 = 0.306;
+	k2 = 0;
+	alp = 0.3716;
+	alp0 = 0;
+
+	%%
+	f = fit(hpc.FV_table(:,3), hpc.FV_table(:,1), 'poly1')
+	k1 = 0.2995;
+	k2 = 0;
+	alp = 1;
+	alp0 = 0.05411;
+
+	%%
+	f = fit(hpc.FV_table(:,3), hpc.FV_table(:,1), 'poly2')
+	k1 = 0.05337;
+	k2 = 0.02734;
+	alp = 2;
+	alp0 = 0.3731;
+
+	%% Voltage
+	f = fit(hpc.FV_table(:,1), hpc.FV_table(:,3), 'poly2')
+	k1 = -1.979;
+	k2 = 6.659;
+	alp = 2;
+	alp0 = -1.48;
+
+	%%
+
+	figure();
+	plot(hpc.FV_table(:,1), hpc.FV_table(:,3));
+	hold on; grid on;
+	plot(k2*hpc.FV_table(:,3) + k1*hpc.FV_table(:,3).^alp + alp0, hpc.FV_table(:,3));
+	%plot(hpc.FV_table(:,3).^alp + alp0, hpc.FV_table(:,3));
+	%plot(hpc.FV_table(:,1), hpc.FV_table(:,1).^(1/alp) + alpV0);
+
+	%%
+	figure();
+	plot(hpc.FV_table(:,1), hpc.FV_table(:,3));
+	hold on; grid on;
+	%plot(hpc.FV_table(:,1), hpc.FV_table(:,1).^alp + alp0);
+	plot(hpc.FV_table(:,1), k2*hpc.FV_table(:,1) + k1*hpc.FV_table(:,1).^alp + alp0);
+	%plot(hpc.FV_table(:,1), hpc.FV_table(:,1).^(1/alp) + alpV0);
+
+
+
+
+	%% Analysis of FV^2
+
+	figure()
+	plot(hpc.FV_table(:,1), hpc.FV_table(:,3).*hpc.FV_table(:,1).*hpc.FV_table(:,1));
+	title("FV^2 wrt V");
+
+	figure()
+	plot(hpc.FV_table(:,3), hpc.FV_table(:,3).*hpc.FV_table(:,1).*hpc.FV_table(:,1));
+	title("FV^2 wrt F");
+
+
+
+	%%
+	
+	iter = [ ];
+	for i=1:length(ctrl.solver_stats)
+		iter = [iter; ctrl.solver_stats(i).solveroutput.info.iter];
+	end
+
+	
+
+	
+
+
+
+
 
 

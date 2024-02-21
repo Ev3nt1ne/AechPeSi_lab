@@ -43,7 +43,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 		%% All Controllers
 		tot_pw_budget;
 		quad_pw_budget;
-		min_pw_red;		
+		min_pw_red;
 
 
 	end

@@ -83,11 +83,26 @@ classdef cp_mpc < mpc_hpc & CP
 			%ops.quadprog.MaxPCGIter = max(1, ops.quadprog.MaxPCGIter * 3);
 			ops.quadprog.MaxIter = 50;
 
-			%just for Andrino:
+			%ops.warmstart = 1;
+
+			%ops.usex0 = 1;
+			%{
+			for i=1:(obj.Nhzn+1)
+				assign(x{i}, (273.15+25)*ones(hc.Ns,1));
+			end
+			for i=1:(obj.Nhzn)
+				assign(u{i}, (2)*ones(hc.Nc,1));
+			end
+			%}
+
+			%just for Andrino:s
 			ops.savesolveroutput = 1;
-			ops.osqp.rho = 0.1;
-			ops.osqp.eps_abs = 0.01;
-			ops.osqp.eps_rel = 0.01;
+			ops.osqp.rho = 0.04; %0.1
+			ops.osqp.eps_abs = 0.01; %0.01
+			ops.osqp.eps_rel = 0.01; %0.01
+			ops.osqp.check_termination = 1;
+			ops.osqp.max_iter = 17;
+			ops.osqp.warm_start = 1;
 
 			obj.mpc_ctrl = optimizer(constraints,objective,ops,{x{1},ot,ly_uref,ly_usum},{u{1}, x{2}});
 			obj.mpc_ctrl
@@ -110,7 +125,7 @@ classdef cp_mpc < mpc_hpc & CP
 				usum(size(usum,1)+1:obj.Nhzn,:) = repmat(usum(size(usum,1),:), obj.Nhzn - size(usum,1),1);
 			end
 			%}
-			
+
 			[uout, err,~,~,optimizer_object, sol] = obj.mpc_ctrl({x, ot, uref, usum});
 
 			% Analyze error flags
