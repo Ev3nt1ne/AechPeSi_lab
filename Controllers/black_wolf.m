@@ -1,4 +1,4 @@
-classdef black_wolf < mpc & CP
+classdef black_wolf < mpc_hpc & CP
 	%UNTITLED Summary of this class goes here
 	%   Detailed explanation goes here
 	properties
@@ -11,6 +11,7 @@ classdef black_wolf < mpc & CP
 		T0v;
 
 		prevF;
+		prevV;
 		C2;
 
 	end
@@ -46,6 +47,10 @@ classdef black_wolf < mpc & CP
 			h1 = obj.psac(2);
 			h2 = obj.psac(3);
 
+			if length(h0) < hc.Nc
+				h0 = ones(hc.Nc,1)*h0;
+			end
+
 			Bu = obj.Bd_ctrl(:,1:hc.Nc);
 			Bd = obj.Bd_ctrl(:,hc.Nc+1:end);
 					
@@ -53,7 +58,9 @@ classdef black_wolf < mpc & CP
 			%constraints = [x{2} == (Adl_mpc + C2*h1)*x{1}-(C2*h1*273.15*ones(hc.Ns,1))+(Bu+(hc.Cc'*h2))*(u0*w)+Bd*ot + hc.Cc*(h0 + h0v)];
 
 			for k = 1 : obj.Nhzn
-					constraints = [constraints, x{k+1} == (obj.Ad_ctrl + obj.C2*h1)*x{k}-(obj.C2*h1*273.15*ones(hc.Ns,1))+(Bu+(hc.Cc'*h2))*(u{k}.*w)+Bd*ot + hc.Cc'*(h0 + h0v)];
+					%constraints = [constraints, x{k+1} == (obj.Ad_ctrl + obj.C2*h1)*x{k}-(obj.C2*h1*273.15*ones(hc.Ns,1))+(Bu+(hc.Cc'*h2))*(u{k}.*w)+Bd*ot + hc.Cc'*(h0 + h0v)];
+					constraints = [constraints, x{k+1} == (obj.Ad_ctrl + Bu*diag(h1)*hc.Cc)*x{k}-(Bu*diag(h1*273.15)*hc.Cc*ones(hc.Ns,1)) ...
+									+ Bu*(u{k}.*(w+h2)) + Bd*ot + Bu*h0 + hc.Cc'*h0v];
 
 					%TODO: Ct I did only for y, and only for max
 					if (~isinf(obj.umin))
@@ -144,9 +151,14 @@ classdef black_wolf < mpc & CP
 			end
 			obj.C2([end-hpc_class.add_states+1:end], :) = 0;
 
-			[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx();
+			% Voltage
+			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([0.5 1.2], [20 90], 0.9, 1/3.497, 1.93, 1);
+			[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([0.5 1.2], [20 90], 0.9, [6.659 -1.979], -1.48, 1);
+			% Freq
+			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([hpc_class.F_min hpc_class.F_max], [20 90], 0.9, 0.2995, 0, 0);
 			%TODO parametrize
 			[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(8, 8, 10);
+			%obj.psoff_lut=0; Fv=1; Tv=1;
 			%[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(8, 16, 10);
 			obj.F0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
 			obj.T0v = ones(hpc_class.Nc, length(Tv))*diag(Tv);
@@ -163,6 +175,7 @@ classdef black_wolf < mpc & CP
 			obj.wl = [ones(hpc_class.Nc,1) zeros(hpc_class.Nc, hpc_class.ipl -1)];
 			obj.lNsim = Nsim;
 			obj.prevF = hpc_class.F_min*ones(hpc_class.Nc,1);
+			obj.prevV = hpc_class.V_min*ones(hpc_class.vd,1);
 			%TODO
 			obj.output_mpc = 1*ones(hpc_class.Nc,1);
 			
@@ -190,7 +203,8 @@ classdef black_wolf < mpc & CP
 			
 			h0v = zeros(hc.Nc, 1);
 			for i=1:hc.Nc
-				h0v(i,1) = obj.psoff_lut(Tidx(i), Fidx(i));
+				atidx = min(Tidx(i)+0, 9);
+				h0v(i,1) = obj.psoff_lut(atidx, Fidx(i));
 			end
 			
 			% Choose Voltage
@@ -208,17 +222,24 @@ classdef black_wolf < mpc & CP
 			%	identified parameters). But since I don't have an
 			%	identification atm, I will use this to not use the real
 			%	model which seems to me as too simplicistic
-			% power_mpc = output_mpc*Ceff + hc.VDom*obj.prevV*k1*exp() + k2
+			power_mpc = obj.output_mpc.*Ceff + ...
+				(hc.VDom*obj.prevV*hc.leak_vdd_k + hc.leak_process_k*process).* ...
+				exp(hc.leak_exp_vdd_k*hc.VDom*obj.prevV + (hc.Cc*Tobs-273.15)*hc.leak_exp_t_k + hc.leak_exp_k);
 			
-			state_MPC = (obj.Ad_ctrl + obj.C2*obj.psac(2))*Tobs-(obj.C2*obj.psac(2)*273.15*ones(hc.Ns,1)) + ...
-				(obj.Bd_ctrl(:,1:hc.Nc)+(hc.Cc'*obj.psac(3)))*(obj.output_mpc.*Ceff)+obj.Bd_ctrl(:,hc.Nc+1:end)*(1000*hc.temp_amb) + hc.Cc'*(obj.psac(1) + h0v);
+			%state_MPC = (obj.Ad_ctrl + obj.C2*obj.psac(2))*Tobs-(obj.C2*obj.psac(2)*273.15*ones(hc.Ns,1)) + ...
+			%	(obj.Bd_ctrl(:,1:hc.Nc)+(hc.Cc'*obj.psac(3)))*(obj.output_mpc.*Ceff)+obj.Bd_ctrl(:,hc.Nc+1:end)*(1000*hc.temp_amb) + hc.Cc'*(obj.psac(1) + h0v);
+
+			state_MPC = obj.Ad_ctrl*Tobs + obj.Bd_ctrl*[power_mpc; 1000*hc.temp_amb];
 
 			%TBD is it needed?
 			%Update T0v
 			%TODO here hc.Cc
 			[~, Tidx] = min(abs(obj.T0v - hc.Cc*state_MPC),[],2);
 			for i=1:hc.Nc
-				h0v(i,1) = obj.psoff_lut(Tidx(i), Fidx(i));
+				%Here it does not change a lot if I add stuff. Fixeing it to 9 does not
+				%solve the overhead problem.
+				atidx = min(Tidx(i)+0, 9);
+				h0v(i,1) = obj.psoff_lut(atidx, Fidx(i));
 			end
 			
 			%state_MPC = Tobs;
@@ -273,6 +294,7 @@ classdef black_wolf < mpc & CP
 			%toto = ["T0", "T1", "T2-mpc", "prevMPC T0-T1", "mpc T1-T2", "prev F T0-T1", "F T1-T2", "V T1-T2", "wl T-1 - T0"; toto]
 
 			obj.prevF = F;
+			obj.prevV = V;
 
 		end
 
@@ -283,8 +305,8 @@ classdef black_wolf < mpc & CP
 				
 			figure();
 			%plot(obj.Ts*sim_mul*[1:Nsim]', pceff(2:end,:)*20+293, 'g'); hold on;
-			plot(t1, cpxplot(2:end,:) - 273, 'b'); hold on; grid on;
-			plot(t2, [NaN*ones(2,size(obj.tmpc,2)); (obj.tmpc(2:end-2,:) - 273)], 'm'); hold on;
+			plot(t1, cpxplot(2:end,:) - 273.15, 'b'); hold on; grid on;
+			plot(t2, [NaN*ones(1,size(obj.tmpc,2)); (obj.tmpc(2:end-1,:) - 273.15)], 'm'); hold on;
 			%plot(t2, [(obj.tmpc(2+2:end,:) - 273); NaN*ones(2,size(obj.tmpc,2))], 'm'); hold on;
 			%plot(t2, obj.tmpc(2:end,:) - 273.15, 'm'); hold on;
 			xlabel("Time [s]");

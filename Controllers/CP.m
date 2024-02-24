@@ -38,7 +38,9 @@ classdef CP < controller
 		wl;
 		pbold = 0;
 		pbc = 0;
+
 		f_ma;
+		pid_integ;
 	end
 	
 	methods
@@ -47,11 +49,158 @@ classdef CP < controller
 			%   Detailed explanation goes here
 			
 		end
+		function [obj] = init_fnc(obj, hc, Nsim)
+			%TODO understand which one I actually really need
+			%TODO understand which needs to go out and which in
+			obj.pw_storage = 0;
+			obj.pw_adapt = 0;
+			obj.pw_old = [];
+			obj.pw_old{1} = 1*hc.Nc;
+			obj.pw_old{2} = 1*hc.Nc;
+			obj.pbold = 0;
+			obj.pbc = 0;
+			obj.ex_count = 0;
+			obj.wl = [ones(hc.Nc,1) zeros(hc.Nc, hc.ipl -1)];
+			obj.T_target = ones(hc.Nc, 1)*hc.core_limit_temp;
+
+			obj.f_ma = hc.F_min*ones(hc.Nc,1);
+			obj.pid_integ = zeros(hc.Nc,1);
+		end
+		function [F,V, obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
+
+			obj.ex_count = obj.ex_count + 1;
+
+			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
+			p_budget = hc.tot_pw_budget(min(target_index, length(hc.tot_pw_budget)));
+
+			if p_budget~=obj.pbold
+				obj.pbold = p_budget;
+				obj.pbc = 1;
+			else
+				obj.pbc = 0;
+			end
+
+			T = pvt{hc.PVT_T};
+			process = pvt{hc.PVT_P};
+
+			obj.pw_storage = 0;
+
+			% Process Workload
+			obj.wl = obj.wl*(1-obj.alpha_wl) + i_wl*obj.alpha_wl;
+			Ceff = obj.wl * (hc.dyn_ceff_k)';
+
+			% Process Power Budget
+			% (?)
+	
+			% Adapt Measured&Computed Power
+			obj.pw_adapt = obj.cp_pw_adapt(obj.pw_adapt, i_pwm, obj.pw_old{1}, obj.pbc);
+			obj.pw_old{1} = obj.pw_old{2};
+
+			% Choose Voltage
+			obj.f_ma(obj.f_ma<0) = 0; %saturate F_MA
+			FD = diag(f_ref - obj.f_ma)*hc.VDom;			
+			V = obj.cp_voltage_choice(hc, FD);
+			F = f_ref;
+
+			% Compute Power
+			pu = (Ceff.*F.*(hc.VDom*V) + hc.leak_vdd_k).*(hc.VDom*V) + process*hc.leak_process_k;
+
+			% DispatchPower
+			%TODO, quad power budget dispatching
+			delta_p = sum(pu) - p_budget + obj.pw_adapt;
+			if (delta_p > 0)
+				[pu, ~] = obj.cp_pw_dispatcher(T, hc.core_limit_temp, obj.T_target, delta_p, pu, hc.min_pw_red); %todo: core_limit_temp(1:obj.vd)
+			end
+
+			if sum(isempty(pu)) || sum(pu<=0)
+				disp("error, something wrong");
+				F = hc.F_min * ones(hc.Nc,1);
+				V = hc.V_min * ones(hc.vd,1);
+				%TODO should I trigger some other cleanup?
+				return;
+			end
+
+			% PID
+			[upid, obj.pid_integ] = obj.cp_pid(hc, T, obj.T_target, obj.pid_integ, pu);
+			% Controller Output
+			pu = pu + upid;
+			%cpdebug(s+1,:) = upid;
+
+			% Compute Freq
+			F = (((pu - process*hc.leak_process_k) ./ (hc.VDom*V)) - hc.leak_vdd_k) ./ (hc.VDom*V) ./ Ceff;
+		
+			% Save OG freq
+			F_og = F;
+	
+			% Process Freq
+			%	Check vs maxF, Temp hysteresis, etc.
+			fmaxi = hc.FV_table(sum(hc.VDom * V > ones(hc.Nc,1)*hc.FV_table(:,1)'+1e-6, 2) + 1, 3);
+			F = F + (F>fmaxi).*(fmaxi - F);
+			F = F + (F<hc.F_min).*(hc.F_min*ones(hc.Nc,1) - F);
+			
+			%TEST: TODO REMOVE
+			pu = (Ceff.*F.*(hc.VDom*V) + hc.leak_vdd_k).*(hc.VDom*V) + process*hc.leak_process_k;
+			obj.pw_old{2} = sum(pu);
+
+			%TODO
+			alpha_MA = 0.037;
+			%if powerbudget has changed || freq changed
+			% interpolate a parabola
+			%	parabola depends on the changes (powe >> freq, and Delta of changes)
+			% f_MA = f_ref - f_app --> sat 0
+			%	Sat 0 is a choice, without we have TurboBoost!
+			%TODO Turbo boosting is not working!
+			turbo_boost = zeros(hc.Nc,1);
+			tt = (f_ref - F_og)>-turbo_boost;
+			obj.f_ma = obj.f_ma*(1-alpha_MA) + alpha_MA*(tt.*(f_ref - F_og) + (~tt).*0); %This is 0 and not turbo_boost!
+
+		end
+		function [obj] = cleanup_fnc(obj, hc)
+		end
+		function [obj] = plot_fnc(obj, hc, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
+		end
 		
 	end
 		
 
 	methods
+		function [upid, ointeg] = cp_pid(obj, hc, T, pid_target, pid_integ, pu)
+			
+			kp_l = obj.kp;
+			ki_l = obj.ki*obj.Ts_ctrl;
+
+			% PID error
+			e = pid_target - T;
+
+			% PID error banding
+			eA = ~(obj.pid_e_down>0).*(e>0) + ~(obj.pid_e_up>0).*(e<=0);
+			if (obj.pid_e_down>0)
+				eA = (e*(1-obj.pid_e_band_coeff)/obj.pid_e_down + obj.pid_e_band_coeff) .* (e>0);
+			end
+			if (obj.pid_e_up>0)
+				eA = eA + ((-e*(1-obj.pid_e_band_coeff)/obj.pid_e_up + obj.pid_e_band_coeff) .* (e<=0));
+			end
+			%eA = eA*obj.pid_e_band_coeff + ~eA;	
+			eA = eA + (eA>1).*(1-eA);
+			e = e .* eA;
+
+			% PID Integral
+			ointeg = pid_integ + ki_l*e;
+			eI = ointeg>obj.aw_up;
+			ointeg = eI*obj.aw_up + (~eI).*ointeg;
+			eI = ointeg<(pu*obj.aw_down_c);
+			ointeg = eI.*(pu*obj.aw_down_c) + (~eI).*ointeg;
+
+			% PID Proporitonal (& Output)
+			upid = kp_l*e + ointeg;
+
+			% PID Output Saturation
+			eU = upid>obj.sat_up;
+			upid = eU*obj.sat_up + (~eU).*upid;
+			%TODO
+			eU = upid < (-(pu-ones(hc.Nc,1).*hc.min_pw_red*0.7));
+			upid = eU.*(-(pu-ones(hc.Nc,1).*hc.min_pw_red*0.7)) + (~eU).*upid;
+		end
 		function [voltage_choice] = cp_voltage_choice(obj, hpc_class, Ft)
 			voltage_choice = hpc_class.V_min*ones(hpc_class.vd,1);
 			for v=1:hpc_class.vd
@@ -66,7 +215,7 @@ classdef CP < controller
 			%end
 			%voltage_choice = hpc_class.FV_table(round(prctile(vote_cast,obj.voltage_rule)),1);
 		end
-		function [pu, pw_storage] = cp_pw_dispatcher(obj, T, core_crit_temp, pid_target, delta_p, ipu, min_pw_red)
+		function [pu, pw_storage] = cp_pw_dispatcher(obj, T, core_crit_temp, core_limit_temp, delta_p, ipu, min_pw_red)
 			
 			safety_pw = -1e-3;
 			
@@ -86,8 +235,8 @@ classdef CP < controller
 				%compute alpha
 				%check number
 				safety = 1;
-				tt = (pid_target - T - safety)>=0;
-				tt_value = core_crit_temp - pid_target;
+				tt = (core_limit_temp - T - safety)>=0;
+				tt_value = core_crit_temp - core_limit_temp;
 				if tt_value < safety
 					tt_value = safety1; %0.1; %TODO (considering that a margin of 10°C is a max -otherwise too much performance loss-)
 				end
@@ -99,7 +248,7 @@ classdef CP < controller
 					
 					%2 
 					% this seems worse
-					%Alpha = 1./(pid_target - T).*tt + 0.99.*((tt - 1) * (-1));
+					%Alpha = 1./(core_limit_temp - T).*tt + 0.99.*((tt - 1) * (-1));
 
 					%test on numbers .....
 
@@ -131,8 +280,8 @@ classdef CP < controller
 				%compute alpha
 				%check number
 				safety = 5;
-				tt = (pid_target - T - safety)>=0;
-				tt_value = core_crit_temp - pid_target;
+				tt = (core_limit_temp - T - safety)>=0;
+				tt_value = core_crit_temp - core_limit_temp;
 				tt2 = zeros(length(ipu),1);
 				if tt_value < safety
 					tt_value = safety; %0.1; %TODO (considering that a margin of 10°C is a max -otherwise too much performance loss-)
@@ -145,7 +294,7 @@ classdef CP < controller
 
 					%2 
 					% this seems worse
-					%Alpha = 1./(pid_target - T).*tt + 0.99.*((tt - 1) * (-1));
+					%Alpha = 1./(core_limit_temp - T).*tt + 0.99.*((tt - 1) * (-1));
 
 					%test on numbers .....
 

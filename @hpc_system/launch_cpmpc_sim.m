@@ -167,7 +167,7 @@ function [cpxplot,cpuplot, cpfplot, cpvplot, xlplot, wlop] = launch_cpmpc_sim(ob
 		%TODO, quad power budget dispatching
 		%delta_p = sum(pu) - obj.tot_pw_budget + pw_adapt;
 		%if (delta_p > 0)
-		%	[pu, pws] = obj.cp_pw_dispatcher(T, obj.core_crit_temp, delta_p, pu);
+		%	[pu, pws] = obj.cp_pw_dispatcher(T, obj.core_limit_temp, delta_p, pu);
 		%	pw_storage = pw_storage + pws;
 		%end
 

@@ -133,7 +133,7 @@ function [xplot, uplot] = launch_lin_mpc_sim(obj, robust, obs, comp)
 		uindex = 1;
 		u_ref = obj.urplot(uindex,:)';
 
-		pid_target = obj.core_crit_temp*ones(obj.Nc,1);
+		pid_target = obj.core_limit_temp*ones(obj.Nc,1);
 		%if robust == 1
 		pid_target = pid_target - obj.Cty(end,1:end-1)';
 

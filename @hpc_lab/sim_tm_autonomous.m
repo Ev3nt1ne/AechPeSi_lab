@@ -120,7 +120,7 @@ function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma, show, save)
 		time = ts/N;
 
 		%TODO parametrize 25 and 130
-		mt = round( (obj.core_crit_temp - 273.15)*1.5 /5) * 5;
+		mt = round( (obj.core_limit_temp - 273.15)*1.5 /5) * 5;
 		hclrlim = [ max(min(xfp,[],'All'), min(x_init)-273.15) min(max(xfp,[],'All'), mt) ];	
 
 		for tst=1:length(figname)	

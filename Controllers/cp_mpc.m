@@ -1,4 +1,4 @@
-classdef cp_mpc < mpc & CP
+classdef cp_mpc < mpc_hpc & CP
 	%CP_MPC Summary of this class goes here
 	%   Detailed explanation goes here
 	
@@ -83,6 +83,15 @@ classdef cp_mpc < mpc & CP
 			%ops.quadprog.MaxPCGIter = max(1, ops.quadprog.MaxPCGIter * 3);
 			ops.quadprog.MaxIter = 50;
 
+			%just for Andrino:s
+			ops.savesolveroutput = 1;
+			ops.osqp.rho = 0.04; %0.1
+			ops.osqp.eps_abs = 0.01; %0.01
+			ops.osqp.eps_rel = 0.01; %0.01
+			ops.osqp.check_termination = 1;
+			ops.osqp.max_iter = 17;
+			ops.osqp.warm_start = 1;
+
             % save yalmip model for potential extraction to external solver or code generation
             obj.ylmp_opt_variables = {x{1},ot,ly_uref,ly_usum};
             obj.ylmp_opt_output = {u{1},x{2}};
@@ -91,6 +100,7 @@ classdef cp_mpc < mpc & CP
 
             % generate optimizer
             obj.mpc_ctrl = optimizer(constraints,objective,ops,obj.ylmp_opt_variables,obj.ylmp_opt_output);
+			obj.mpc_ctrl
 			
 		end %lin_mpc_setup
 		function uout = call_mpc(obj, x, ot, uref, usum)
@@ -110,13 +120,18 @@ classdef cp_mpc < mpc & CP
 				usum(size(usum,1)+1:obj.Nhzn,:) = repmat(usum(size(usum,1),:), obj.Nhzn - size(usum,1),1);
 			end
 			%}
-			
-			[uout, problem,~,~,optimizer_object] = obj.mpc_ctrl({x, ot, uref, usum});
+
+			[uout, err,~,~,optimizer_object, sol] = obj.mpc_ctrl({x, ot, uref, usum});
 
 			% Analyze error flags
-			%if problem
+			%if err
 			%	warning(yalmiperror(problem))
-			%end			
+			%end
+
+			% Save solver stats
+			if obj.save_solver_stats
+				obj.solver_stats = [obj.solver_stats sol];
+			end
 		end %lin_mpc
 	end
 
@@ -151,12 +166,14 @@ classdef cp_mpc < mpc & CP
 
 			obj.wl = [ones(hpc_class.Nc,1) zeros(hpc_class.Nc, hpc_class.ipl -1)];
 
-			obj.T_target = ones(hpc_class.Nc, 1)*hpc_class.core_crit_temp;
+			obj.T_target = ones(hpc_class.Nc, 1)*hpc_class.core_limit_temp;
 
 			obj.f_ma = zeros(hpc_class.Nc,1);
 
 			%TODO
 			obj.output_mpc = 1*ones(hpc_class.Nc,1);
+
+			obj.solver_stats = [];
 
 		end
 		function [F,V,obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
@@ -259,7 +276,7 @@ classdef cp_mpc < mpc & CP
 			figure();
 			%plot(obj.Ts*sim_mul*[1:Nsim]', pceff(2:end,:)*20+293, 'g'); hold on;
 			plot(t1, cpxplot(2:end,:) - 273, 'b'); hold on; grid on;
-			plot(t2, [NaN*ones(2,size(obj.tmpc,2)); (obj.tmpc(2:end-2,:) - 273)], 'm'); hold on;
+			plot(t2, [NaN*ones(1,size(obj.tmpc,2)); (obj.tmpc(2:end-1,:) - 273)], 'm'); hold on;
 			%plot(t2, [(obj.tmpc(2+2:end,:) - 273); NaN*ones(2,size(obj.tmpc,2))], 'm'); hold on;
 			%plot(t2, obj.tmpc(2:end,:) - 273.15, 'm'); hold on;
 			xlabel("Time [s]");
