@@ -70,14 +70,7 @@ classdef cp_mpc < mpc_hpc & CP
 				objective = objective + (u{k}-ly_uref)'*obj.R*(u{k}-ly_uref) + u{k}'*obj.R2*(u{k}) + x{k+1}'*obj.Q*x{k+1};
 			end
 
-			%ops = sdpsettings('verbose',1,'solver','quadprog', 'usex0',1);
-			ops = sdpsettings('verbose',1,'solver','osqp', 'usex0',0); %You have specified an initial point, but the selected solver (OSQP) does not support warm-starts through YALMIP
-			ops.quadprog.TolCon = 1e-2;
-			ops.quadprog.TolX = 1e-5;
-			ops.quadprog.TolFun = 1e-3;
-			ops.convertconvexquad = 0;
-			%ops.quadprog.MaxPCGIter = max(1, ops.quadprog.MaxPCGIter * 3);
-			ops.quadprog.MaxIter = 50;
+
 			
             % extract model from yalmip to QP formulation
             obj.ylmp_opt_variables = {x{1},ot,ly_uref,ly_usum};
@@ -85,8 +78,8 @@ classdef cp_mpc < mpc_hpc & CP
             obj.ylmp_constraints = constraints;
             obj.ylmp_objective = objective;
             if obj.ops.warm_start
-                ops.osqp = obj.ops;
-                ymod = export(constraints,objective,ops);
+                obj.ops
+                ymod = export(constraints,objective,sdpsettings('solver','osqp'));
                 % save model .mat file
                 mz = struct(); % save in mazomeros file format
                 % cut away the -inf to inf constraints yalmip adds at the end of constraint matrix
@@ -114,10 +107,17 @@ classdef cp_mpc < mpc_hpc & CP
 
                 % setup osqp solver
                 obj.osqps = osqp();
-                obj.osqps.setup(obj.mz.P, obj.mz.q, obj.mz.A, obj.mz.l, obj.mz.u ,ymod.options());
+                obj.osqps.setup(obj.mz.P, obj.mz.q, obj.mz.A, obj.mz.l, obj.mz.u ,obj.ops);
             else
                 % generate optimizer
-                obj.mpc_ctrl = optimizer(constraints,objective,ops,obj.ylmp_opt_variables,obj.ylmp_opt_output);
+                % OSQP) does not support warm-starts through YALMIP
+			    yops = sdpsettings('verbose',1,'solver','osqp', 'usex0',0);
+			    yops.quadprog.TolCon = 1e-2;
+			    yops.quadprog.TolX = 1e-5;
+			    yops.quadprog.TolFun = 1e-3;
+			    yops.convertconvexquad = 0;
+			    yops.quadprog.MaxIter = 50;
+                obj.mpc_ctrl = optimizer(constraints,objective,yops,obj.ylmp_opt_variables,obj.ylmp_opt_output);
 			    obj.mpc_ctrl
             end
 			
