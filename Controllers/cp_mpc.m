@@ -101,6 +101,7 @@ classdef cp_mpc < mpc_hpc & CP
 			obj.ops.osqp.warm_start = 1;
 
             % save yalmip model for potential extraction to external solver or code generation
+
 			
             % extract model from yalmip to QP formulation
             obj.ylmp_opt_variables = {x{1},ot,ly_uref,ly_usum};
@@ -108,8 +109,8 @@ classdef cp_mpc < mpc_hpc & CP
             obj.ylmp_constraints = constraints;
             obj.ylmp_objective = objective;
             if obj.ops.warm_start
-                lops.osqp = obj.ops;
-                ymod = export(constraints,objective,lops);
+                %lops.osqp = obj.ops;
+                ymod = export(constraints,objective,sdpsettings('solver','osqp'));
                 % save model .mat file
                 lmz = struct(); % save in mazomeros file format
                 % cut away the -inf to inf constraints yalmip adds at the end of constraint matrix
@@ -139,11 +140,22 @@ classdef cp_mpc < mpc_hpc & CP
 
                 % setup osqp solver
                 obj.osqps = osqp();
-                obj.osqps.setup(obj.mz.P, obj.mz.q, obj.mz.A, obj.mz.l, obj.mz.u ,ymod.options());
+                obj.osqps.setup(obj.mz.P, obj.mz.q, obj.mz.A, obj.mz.l, obj.mz.u ,obj.ops);
             else
                 % generate optimizer
-            	obj.mpc_ctrl = optimizer(constraints,objective,obj.ops,obj.ylmp_opt_variables,obj.ylmp_opt_output);
+                % OSQP) does not support warm-starts through YALMIP
+				%{
+			    yops = sdpsettings('verbose',1,'solver','osqp', 'usex0',0);
+			    yops.quadprog.TolCon = 1e-2;
+			    yops.quadprog.TolX = 1e-5;
+			    yops.quadprog.TolFun = 1e-3;
+			    yops.convertconvexquad = 0;
+			    yops.quadprog.MaxIter = 50;
+                obj.mpc_ctrl = optimizer(constraints,objective,yops,obj.ylmp_opt_variables,obj.ylmp_opt_output);
+				%}
+				obj.mpc_ctrl = optimizer(constraints,objective,obj.ops,obj.ylmp_opt_variables,obj.ylmp_opt_output);
 				%obj.mpc_ctrl = optimizer(constraints,objective,ops,{x{1},ot,ly_uref,ly_usum},{u{1}, x{2}});
+			    obj.mpc_ctrl
             end
 
 			
