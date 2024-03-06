@@ -14,6 +14,9 @@ classdef cp_mpc < mpc_hpc & CP
         osqps;                           % osqp solver object - used for warm-starting        
         dimx;                            % MPC state dimension
         dimu;                            % MPC output dimension
+
+        cutoffA;                         % sparsify cutoff for discretized state-to-state evolution matrix
+        cutoffB;                         % "        "      for discretized input-to-state "         "
 	end
 	
 	methods
@@ -23,6 +26,8 @@ classdef cp_mpc < mpc_hpc & CP
 			
             obj.ops = osqp.default_settings();
             obj.ops.warm_start = false;
+            obj.cutoffA = 0;
+            obj.cutoffB = 0;
 		end
 		
 	end
@@ -37,7 +42,11 @@ classdef cp_mpc < mpc_hpc & CP
             obj.dimx = hc.Ns;
             obj.dimu = hc.Nc;
 			x = sdpvar(repmat(hc.Ns,1,obj.Nhzn+1),repmat(1,1,obj.Nhzn+1));
-			u = sdpvar(repmat(hc.Nc,1,obj.Nhzn),repmat(1,1,obj.Nhzn));
+            if obj.Nhzn == 1
+                u = sdpvar(hc.Nc,1);
+            else
+			    u = sdpvar(repmat(hc.Nc,1,obj.Nhzn),repmat(1,1,obj.Nhzn));
+            end
 			
 			ot = sdpvar(1,1); %assume ambient temperatre horizon independent
 
@@ -48,27 +57,32 @@ classdef cp_mpc < mpc_hpc & CP
 			Bd = obj.Bd_ctrl(:,hc.Nc+1:end);
 					
 			constraints = [];
+			objective = 0;
 
             if obj.ops.warm_start
                 % dummy input constraints, requried for OSQP as inputs must be parametric.
                 %% This is required to avoid refactorization of KKT linear system matrix.
                 %% set to weird constant to verify index placement in l-vector by Yalmip
-                constraints = [constraints, x{1} == 0];
-                constraints = [constraints, ot == 1];
-                constraints = [constraints, ly_uref == 2];
-                constraints = [constraints, ly_usum == 3];
+                constraints = [constraints, x{1} == 273+80];
+                constraints = [constraints, ot == 273+25];
+                constraints = [constraints, ly_uref == 18];
+                constraints = [constraints, ly_usum == 17*hc.Nc];
             end
-
-			for k = 1 : obj.Nhzn
-			    constraints = [constraints, x{k+1} == obj.Ad_ctrl*x{k}+Bu*u{k}+Bd*ot];
-			    constraints = [constraints, hc.Cc*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
-			    constraints = [constraints,sum(u{k}) <= ly_usum - sum(obj.Ctu(k,:),2)];
-		    end
+            
+            if obj.Nhzn == 1
+                constraints = [constraints, x{2} == obj.Ad_ctrl*x{1}+Bu*u+Bd*ot];
+			    constraints = [constraints, hc.Cc*x{2} <= obj.T_target - obj.Cty(1,:)'];
+			    constraints = [constraints,sum(u) <= ly_usum - sum(obj.Ctu(1,:),2)];
+				objective = objective + (u-ly_uref)'*obj.R*(u-ly_uref) + u'*obj.R2*(u) + x{2}'*obj.Q*x{2};
+            else
+			    for k = 1 : obj.Nhzn
+			        constraints = [constraints, x{k+1} == obj.Ad_ctrl*x{k}+Bu*u{k}+Bd*ot];
+			        constraints = [constraints, hc.Cc*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
+			        constraints = [constraints,sum(u{k}) <= ly_usum - sum(obj.Ctu(k,:),2)];
+				    objective = objective + (u{k}-ly_uref)'*obj.R*(u{k}-ly_uref) + u{k}'*obj.R2*(u{k}) + x{k+1}'*obj.Q*x{k+1};
+                end
+            end
 			
-			objective = 0;
-			for k = 1:obj.Nhzn
-				objective = objective + (u{k}-ly_uref)'*obj.R*(u{k}-ly_uref) + u{k}'*obj.R2*(u{k}) + x{k+1}'*obj.Q*x{k+1};
-			end
 
 
 			
@@ -78,7 +92,7 @@ classdef cp_mpc < mpc_hpc & CP
             obj.ylmp_constraints = constraints;
             obj.ylmp_objective = objective;
             if obj.ops.warm_start
-                obj.ops
+                obj.ops;
                 ymod = export(constraints,objective,sdpsettings('solver','osqp'));
                 % save model .mat file
                 mz = struct(); % save in mazomeros file format
@@ -185,6 +199,20 @@ classdef cp_mpc < mpc_hpc & CP
 			disc = obj.discreate_system(hpc_class, obj.Ts_ctrl);
 			obj.Ad_ctrl = disc.A;
 			obj.Bd_ctrl = disc.B;
+
+            % sparsify
+            if obj.cutoffA ~= 0
+                nnzS = nnz(obj.Ad_ctrl);
+                obj.Ad_ctrl(obj.Ad_ctrl < obj.cutoffA) = 0;
+                nnzE = nnz(obj.Ad_ctrl);
+                disp(sprintf('sparsifying A by x%f.  nnz(A) goes from %d to %d.',nnzS/nnzE, nnzS, nnzE));
+            end
+            if obj.cutoffB ~= 0
+                nnzS = nnz(obj.Bd_ctrl);
+                obj.Bd_ctrl(obj.Bd_ctrl < obj.cutoffB) = 0;
+                nnzE = nnz(obj.Bd_ctrl);
+                disp(sprintf('sparsifying B by x%f.  nnz(B) goes from %d to %d.',nnzS/nnzE, nnzS, nnzE));
+            end
 
 			obj = obj.setup_mpc(hpc_class);
 
