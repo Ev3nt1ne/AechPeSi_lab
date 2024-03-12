@@ -97,11 +97,11 @@ classdef cp_mpc < mpc_hpc & CP
 
 			%just for Andrino:s
 			ops.savesolveroutput = 1;
-			ops.osqp.rho = 0.04; %0.1
+			ops.osqp.rho = 0.1; %0.1 %0.04
 			ops.osqp.eps_abs = 0.01; %0.01
 			ops.osqp.eps_rel = 0.01; %0.01
 			ops.osqp.check_termination = 1;
-			ops.osqp.max_iter = 17;
+			%ops.osqp.max_iter = 17;
 			ops.osqp.warm_start = 1;
 
 			obj.mpc_ctrl = optimizer(constraints,objective,ops,{x{1},ot,ly_uref,ly_usum},{u{1}, x{2}});
