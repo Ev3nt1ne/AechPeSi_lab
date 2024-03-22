@@ -107,8 +107,8 @@ for values = experiments.'
     ctrl.C = eye(hpc.Ns);
 
     % options
-    ctrl.cutoffA = 5e-2;
-    ctrl.cutoffB = 5e-2;
+    ctrl.cutoffA = 5e-3;
+    ctrl.cutoffB = 5e-3;
     ctrl.ops.warm_start = true;
 
     % Control Horizon
