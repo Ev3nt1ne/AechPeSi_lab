@@ -308,7 +308,7 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 				dRN(drow, dcol) = R_si_hn;
 				dRS(drow, dcol) = R_si_hs;
 				dRE(drow, dcol) = R_si_he;
-				dRW(drow, dcol) = R_si_hw;
+				dRW(drow, dcol) = R_si_hw;si_pcb_fact
 
 				R_sicu_v
 				

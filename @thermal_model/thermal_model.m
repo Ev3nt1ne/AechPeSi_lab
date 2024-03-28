@@ -5,11 +5,11 @@ classdef thermal_model < handle
 	properties		
 		%% System Structure
 		Nc (1,1) {mustBePositive, mustBeInteger} ...
-			= 12;		% Number of Cores
+			= 9;		% Number of Cores
 		Nh (1,1) {mustBePositive, mustBeInteger} ...
 			= 3;		% Number of rows
 		Nv (1,1) {mustBePositive, mustBeInteger} ...
-			= 4;		% Number of cols
+			= 3;		% Number of cols
 		epos {mustBeNonnegative, mustBeNumeric, mustBeFinite} ... %empty positions
 			= [];
 
@@ -89,16 +89,16 @@ classdef thermal_model < handle
 		R_TIM2 (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
 			= 2.5; %6; %4; 0.75;
 		case_fan_dis (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
-			= 0.25; %0.85 %0.1 - 1
+			= 0.10; %0.85 %0.1 - 1
 		case_fan_nom_speed (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
 			= 1000; %fan_nom_speed
 		al_fan_dis (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
-			= 10; %heatsink_fan_dis
+			= 4; %heatsink_fan_dis
 		al_fins_coeff (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
 			= 3; %fins_coeff
 
 		air_factor (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
-			= 100;
+			= 80;
 		%air_time_factor = 10; %20
 
 		pw2therm_coeff = 1.05; %0.90 %0.41; 0.7;
@@ -159,9 +159,9 @@ end
 		si_pos		= 1;
 		cu_pos		= 2;
 
-		si_pcb_fact = 0.1;
-		pcb_mb_fact = 15;
-		mb_air_fact = 10;
+		si_pcb_fact = 0.08;
+		pcb_mb_fact = 35; %17
+		mb_air_fact = 35; %18
 
 		%%% PHYSICAL values
 
