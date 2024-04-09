@@ -89,16 +89,16 @@ classdef thermal_model < handle
 		R_TIM2 (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
 			= 2.5; %6; %4; 0.75;
 		case_fan_dis (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
-			= 0.25; %0.85 %0.1 - 1
+			= 0.10*3; %0.25 %0.85 %0.1 - 1
 		case_fan_nom_speed (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
 			= 1000; %fan_nom_speed
 		al_fan_dis (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
-			= 10; %heatsink_fan_dis
+			= 4*3; %0.10 %heatsink_fan_dis
 		al_fins_coeff (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
 			= 3; %fins_coeff
 
 		air_factor (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
-			= 100;
+			= 80; %100;
 		%air_time_factor = 10; %20
 
 		pw2therm_coeff = 1.05; %0.90 %0.41; 0.7;
@@ -159,9 +159,9 @@ end
 		si_pos		= 1;
 		cu_pos		= 2;
 
-		si_pcb_fact = 0.1;
-		pcb_mb_fact = 15;
-		mb_air_fact = 10;
+		si_pcb_fact = 0.08; %0.1;
+		pcb_mb_fact = 35; %15;
+		mb_air_fact = 35; %10;
 
 		%%% PHYSICAL values
 

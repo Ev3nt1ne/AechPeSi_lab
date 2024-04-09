@@ -19,7 +19,7 @@ classdef perf_model < handle
 		wl_mem_weigth = [0.95 0.15 0.05 0.20 0];				% memory boundness
 
 		quantum_us = 50;
-		quantum_F = 1; %GHz
+		quantum_F = 4.0; %GHz
 	end
 
 	properties(Dependent)
@@ -34,7 +34,7 @@ classdef perf_model < handle
 	end
 	
 	methods
-		function obj = perf_model(inputArg1,inputArg2)
+		function obj = perf_model()
 			%PERF_MODEL Construct an instance of this class
 			%   Detailed explanation goes here
 			
@@ -285,7 +285,7 @@ classdef perf_model < handle
 		end
 		function [pwl, res] = quanta2wl(obj, wlp, instr, mem_instr_conv)
 			mem_wgt = sum(wlp.*obj.wl_mem_weigth,2).*(instr>0);
-			cinstr = instr.*(mem_wgt + (1-mem_wgt).*mem_instr_conv); %mem_wgt.*mem_instr_conv.*instr + (1-mem_wgt).*instr;
+			cinstr = instr.*((1-mem_wgt) + (mem_wgt).*mem_instr_conv); %mem_wgt.*mem_instr_conv.*instr + (1-mem_wgt).*instr;
 						
 			pwl = min(cinstr, obj.qt_storage); %obj.qt_storage./cinstr;
 			res = round(instr - pwl.*(instr./cinstr));

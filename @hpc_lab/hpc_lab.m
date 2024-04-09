@@ -645,8 +645,8 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			movegui(fig, 'northeast');
 			
 			ax1 = subplot(3,4,[1:4]);
-			smref = round((size(f,1)-1)/(size(obj.frtrc,1)-1));
-			smf = round((size(obj.frtrc,1)-1)/(size(f,1)-1));
+			smref = round(max((size(f,1)-1),1)/max((size(obj.frtrc,1)-1),1));
+			smf = round(max((size(obj.frtrc,1)-1),1)/max((size(f,1)-1),1));
 			
 			gr = repelem(f(2:1:end,:),max(smf,1),1) - repelem(obj.frtrc(2:end,:),max(smref,1),1);
 			plot(obj.tsim*[0:(1/size(gr,1)):1]', [zeros(1,obj.Nc); gr]);

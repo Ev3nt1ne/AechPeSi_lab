@@ -1,9 +1,9 @@
 
 %% 1: Instantiate the class
-hpc = hpc_system();
+hpc = hpc_lab;
 
-%path = "/home/eventine/Documents/MATLAB/Results";
-path = "C:\Users\giovanni.bambini2\OneDrive - Alma Mater Studiorum Università di Bologna\___PhD\Papers\TAAS-2023\Results\Automated";
+path = "/home/eventine/Documents/MATLAB/Results";
+%path = "C:\Users\giovanni.bambini2\OneDrive - Alma Mater Studiorum Università di Bologna\___PhD\Papers\TAAS-2023\Results\Automated";
 
 if isunix
 	separator_os = "/";
@@ -19,19 +19,19 @@ hpc.Nh = 6; %9;			% Number of rows
 hpc.Nv = 6; %8;			% Number of cols
 
 % Version of the Thermal Model
-hpc.thermal_model_ver = 0;
+hpc.model_ver = 0;
 % Exponential Leakage
-hpc.exp_leakage = 1;
+hpc.leak_exp = 1;
 % Noise and Variation
-hpc.model_variation = 1;
-hpc = hpc.create_core_pw_noise();
-hpc.measure_noise = 1;
+hpc.pw_dev_per = 1;
+hpc.param_dev_per = 1;
+hpc = hpc.create_model_deviation();
+
+hpc.sensor_noise = 1;
 
 % External Ambient Temperature
-temp_amb = 25.0 + 273.15;
+hpc.t_outside = 25.0 + 273.15;
 
-% Create Thermal Model:
-hpc = hpc.create_thermal_model();
 
 %% 3: Simulation setup
 
@@ -42,10 +42,13 @@ hpc.Ts = 50e-6;
 % Workload Quantum-step
 hpc.quantum_us = 50;
 
-% Controller Time-Step
-hpc.Ts_ctrl = 500e-6;
 % Input Time-Step
-hpc.Ts_input = 1e-3;
+hpc.Ts_target = 1e-3;
+
+% Create Thermal Model:
+hpc.default_floorplan_config();
+hpc.create_model_deviation();
+hpc.model_init();
 
 % Probability for each WL	
 hpc.wl_prob = [0 2 3 2 2.5];	
@@ -54,8 +57,7 @@ hpc.wl_min_exec_us = [50e3/8 5e3 5e3 5e3 100e3];
 % mean execution in us
 hpc.wl_mean_exec_us = [150e3/8 10e3 10e3 10e3 200e3];	
 
-hpc.measure_noise = 1;
-hpc.T_noise_max = 0.5;
+hpc.sensor_noise_amplitude = [1.0; 1.0; 1.0]; %og was 0.5
 hpc.F_discretization_step = 0.05;
 
 hpc.pw_gmean = 0.02;
@@ -63,29 +65,31 @@ hpc.pw_gvar = 1;
 hpc.pw_glim = [-0.02 0.05];
 hpc.pw_3sigma_on3 = 0.05;
 
-hpc = hpc.create_core_pw_noise();
+hpc.create_core_pw_noise();
 
 %% 4 Controller
 
 % Max Temperature
-hpc.core_crit_temp = 85 + 273.15;
+hpc.core_limit_temp = 85 + 273.15;
+hpc.core_crit_temp = 95 + 273.15;
 % Max Power
-ts = ceil(hpc.tsim / hpc.Ts_input)+1;
-hpc.tot_pw_budget = 450/36*hpc.Nc*ones(ts,1);
-ts = ceil(ts/4);
-hpc.tot_pw_budget(ts+1:2*ts) = 2*hpc.Nc;
-hpc.tot_pw_budget(2*ts+1:3*ts) = 5*hpc.Nc;
-hpc.tot_pw_budget(3*ts+1:3*ts+ceil(ts/2)) = 3*hpc.Nc;
-hpc.tot_pw_budget(3*ts+ceil(ts/2)+1:end) = 8*hpc.Nc;
+tt = min(ceil(hpc.tsim / hpc.Ts_target)+1, (hpc.tsim/1e-4+1));
+%Target Power Budget
+hpc.tot_pw_budget = 450/36*hpc.Nc*ones(tt,1);
+tu = ceil(tt/4);
+hpc.tot_pw_budget(tu+1:2*tu) = 2*hpc.Nc;
+hpc.tot_pw_budget(2*tu+1:3*tu) = 5*hpc.Nc;
+hpc.tot_pw_budget(3*tu+1:3*tu+ceil(tu/2)) = 3*hpc.Nc;
+hpc.tot_pw_budget(3*tu+ceil(tu/2)+1:end) = 8*hpc.Nc;
 
 % Delays
 hpc.delay_F_mean = 1e-5;		% Mean Frequency application Delay
 hpc.delay_V_mean = 1e-5;		% Mean Voltage application Delay
 
 %{
-%hpc.wrplot = zeros(size(hpc.wrplot));
-%hpc.wrplot(:,hpc.ipl,:) = 1;
-%hpc.wrplot(:,2,:) = 1;
+%hpc.wltrc = zeros(size(hpc.wltrc));
+%hpc.wltrc(:,hpc.ipl,:) = 1;
+%hpc.wltrc(:,2,:) = 1;
 hpc.alpha_wl = 0.08; %0.4;
 
 hpc.kp = 1.9518;				% PID Kp
@@ -118,20 +122,23 @@ hpc.sat_up = 0;
 %hpc = hpc.create_thermal_model();
 %hpc.thermal_model_ver = 1;
 %hpc.exp_leakage = 0;
-hpc.x_init = (60+273.15)*ones(hpc.Ns,1); %temp_amb*ones(hpc.Ns,1);
+hpc.t_init = (0+273.15)*ones(hpc.Ns,1); %temp_amb*ones(hpc.Ns,1);
 %hpc.x_init(end-1:end,1) = temp_amb+20;
-hpc.tesim = 1.5;
+%hpc.tesim = 1.5;
 %hpc.simulate_aut();
 
 %hpc.exp_leakage = 1;
 %hpc.simulate_aut();
+
+%Others, TODO
+hpc.min_pw_red = 0.6;
 
 %% ITERATE ON WORKLOAD
 wl_times = 3;
 th_models = 3; %2;
 ndom = 4;
 robust = 0;
-show = 0;
+show = 1;
 savetofile = 0;
 
 tres = [];
@@ -148,10 +155,11 @@ vres{ndom, th_models, 3, wl_times} = [];
 wlres = [];
 wlres{ndom, th_models, 3, wl_times} = [];
 
+
 coreid1 = [4 8 12 17 20 22 27 31 36];
 coreid2 = [1 10 11 14 16 24 29 32 34];
 coreid12 = [ 1 4 8 10 11 12 14 16 17 20 22 24 27 29 31 32 34 36];
-
+%{
 p1 = 94.2399*ones(hpc.Nc,1);
 p2 = 10.9303*ones(hpc.Nc,1);
 p2(coreid1) = 94.2399;
@@ -166,10 +174,13 @@ p3 = [   91.2498; 88.9647; 87.6472; 90.7673; 88.1172; 89.4897; 88.7772; 89.0797;
 perf_max_check{1} = p1;
 perf_max_check{2} = p2;
 perf_max_check{3} = p3;
+%}
 
 
 %% Last modifications
-hpc.measure_noise = 0;
+% ?????
+%{
+hpc.measure_noise = 0; 
 
 hpc.kp = 1.9518*0.3;				% PID Kp
 hpc.ki = 73.931/1.7;				% PID Ki
@@ -178,11 +189,9 @@ hpc.pid_e_down = 5;
 hpc.pid_e_up = 0.5;
 hpc.pid_e_band_coeff = 0.3;
 
-% wl dritto omogeneo:
-ll = ceil(hpc.tsim*1e6/hpc.quantum_us);
-
 hpc.ctrl_MA = 1;
 hpc.iterative_fv = ~hpc.ctrl_MA;
+%}
 
 %% 
 % Import the file
@@ -208,6 +217,8 @@ end
 
 figid = 1;
 
+addpath('Controllers/');
+
 %%
 for wli=1:wl_times
 	
@@ -216,37 +227,38 @@ for wli=1:wl_times
 	bwl = 1;
 	switch wli
 		case 1
-			%full vector			
-			hpc.wrplot = zeros(hpc.Nc, hpc.ipl, ll);
-			hpc.wrplot(:,5,:) = 1;
+			%full vector
+			ll = ceil(hpc.tsim*1e6/hpc.quantum_us);
+			hpc.wltrc = zeros(hpc.Nc, hpc.ipl, ll);
+			hpc.wltrc(:,5,:) = 1;
 			% Max Freq all time:
-			hpc.frplot = 3.45 * ones(min(ceil(hpc.tsim / hpc.Ts_input)+1,(hpc.tsim/hpc.Ts_ctrl+1)), hpc.Nc);
+			hpc.frtrc = 3.45 * ones(tt,hpc.Nc);
 		case 2
 			%full idle but 9 cores
 			ll = ceil(hpc.tsim*1e6/hpc.quantum_us);
-			hpc.wrplot = zeros(hpc.Nc, hpc.ipl, ll);
-			hpc.wrplot(:,bwl,:) = 1;
+			hpc.wltrc = zeros(hpc.Nc, hpc.ipl, ll);
+			hpc.wltrc(:,bwl,:) = 1;
 			
 			% Med Freq all time:
-			hpc.frplot = hpc.F_min * ones(min(ceil(hpc.tsim / hpc.Ts_input)+1,(hpc.tsim/hpc.Ts_ctrl+1)), hpc.Nc);
+			hpc.frtrc = hpc.F_min * ones(tt,hpc.Nc);
 			
-			hpc.wrplot(coreid1,bwl,:) = 0;
-			hpc.wrplot(coreid1,5,:) = 1;
+			hpc.wltrc(coreid1,bwl,:) = 0;
+			hpc.wltrc(coreid1,5,:) = 1;
 			% Max Freq all time:
-			hpc.frplot(:, coreid1) = 3.45;
+			hpc.frtrc(:, coreid1) = 3.45;
 							
-			hpc.wrplot(coreid2,bwl,:) = 0;
-			hpc.wrplot(coreid2,3,:) = 0.70;
-			hpc.wrplot(coreid2,2,:) = 0.30;
-			hpc.frplot(:, coreid2) = 2.7;
+			hpc.wltrc(coreid2,bwl,:) = 0;
+			hpc.wltrc(coreid2,3,:) = 0.70;
+			hpc.wltrc(coreid2,2,:) = 0.30;
+			hpc.frtrc(:, coreid2) = 2.7;
 		case 3
-			hpc.wrplot = wlwl3;
+			hpc.wltrc = wlwl3;
 			% Max Freq all time:
-			hpc.frplot = 3.45 * ones(min(ceil(hpc.tsim / hpc.Ts_input)+1,(hpc.tsim/hpc.Ts_ctrl+1)), hpc.Nc);
+			hpc.frtrc = 3.45 * ones(tt,hpc.Nc);
 		case 4
-			hpc.wrplot = wlwl3;
+			hpc.wltrc = wlwl4;
 			% Max Freq all time:
-			hpc.frplot = 3.45 * ones(min(ceil(hpc.tsim / hpc.Ts_input)+1,(hpc.tsim/hpc.Ts_ctrl+1)), hpc.Nc);
+			hpc.frtrc = 3.45 * ones(tt,hpc.Nc);
 	end
 	
 	%% ITERATE ON Thermal Models
@@ -254,14 +266,14 @@ for wli=1:wl_times
 	
 		switch mdli
 			case 1
-				hpc.thermal_model_ver = 0;
-				hpc = hpc.create_thermal_model();
+				hpc.model_ver = 0;
+				hpc = hpc.model_init();
 			case 2
-				hpc.thermal_model_ver = 1;
-				hpc = hpc.create_thermal_model();
+				hpc.model_ver = 1;
+				hpc = hpc.model_init();
 			case 3
-				hpc.thermal_model_ver = 2;
-				hpc = hpc.create_thermal_model();
+				hpc.model_ver = 2;
+				hpc = hpc.model_init();
 		end
 		
 		%% ITERATE ON DOMAINS
@@ -333,13 +345,19 @@ for wli=1:wl_times
 			hpc.quad_pw_budget = 450/36*hpc.Nc*ones(2,hpc.vd);
 			itname = strcat('Model: ', int2str(mdli), ' - Domains: ', int2str(di), ' - WL: ', int2str(wli));
 
+			%hpc.anteSimCheckTM();
+			%hpc.anteSimCheckLab();
+			%hpc.anteSimCheckPM();
 			%%
 
 			%hpc.dummy_pw = 1;
 
 			% New ControlPulp
-			hpc.Ts_ctrl = 500e-6;
-			[xop, uop, fop, vop, wlop] = hpc.launch_ncp_sim(robust, show);
+			ctrl = Fuzzy;
+			ctrl.C = hpc.Cc;
+			ctrl.Ts_ctrl = 500e-6;
+			[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
+			%{
 			wlop = wlop ./ perf_max_check{wli} * 100;
 			xres{di, mdli, 1, wli} = xop;
 			ures{di, mdli, 1, wli} = uop; 
@@ -347,17 +365,18 @@ for wli=1:wl_times
 			vres{di, mdli, 1, wli} = vop;
 			wlres{di, mdli, 1, wli} = wlop;
 			if wli == 2
-				frplot_hold = hpc.frplot;
+				frtrc_hold = hpc.frtrc;
 				fop = fop(:,coreid12);
 				wlop = wlop(coreid12);
-				hpc.frplot = hpc.frplot(:,coreid12);
+				hpc.frtrc = hpc.frtrc(:,coreid12);
 			end
 			tres{di, mdli, 1, wli} = hpc.stats_analysis(xop, uop, fop, vop, wlop);
 			if wli == 2
-				hpc.frplot = frplot_hold;
+				hpc.frtrc = frtrc_hold;
 				fop = fres{di, mdli, 1, wli};
 				wlop = wlres{di, mdli, 1, wli};
 			end
+			%}
 			
 			if show
 				figarray = flip(findobj('Type','figure'));
@@ -368,7 +387,7 @@ for wli=1:wl_times
 				figid = length(figarray)+1;
 			end
 			if savetofile
-				t2 = hpc.Ts_ctrl*[0:length(fop)-1]';
+				t2 = ctrl.Ts_ctrl*[0:length(fop)-1]';
 				
 				hpc.saveall(xop, uop, fop, vop, wlop, t2, path, regexprep(strcat('Alg: NCP - ', itname), ':', '_'));
 			end
@@ -376,8 +395,11 @@ for wli=1:wl_times
 			%hpc.paperTPplot(hpc.Ts*[0:4000*10]', xop, uop);
 			
 			% Old ControlPulp
-			hpc.Ts_ctrl = 500e-6;
-			[xop, uop, fop, vop, wlop] = hpc.launch_cp_sim(robust, 0, show);
+			ctrl = CP;
+			ctrl.C = hpc.Cc;
+			ctrl.Ts_ctrl = 500e-6;
+			[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
+			%{
 			wlop = wlop ./ perf_max_check{wli} * 100;
 			xres{di, mdli, 2, wli} = xop;
 			ures{di, mdli, 2, wli} = uop; 
@@ -385,17 +407,18 @@ for wli=1:wl_times
 			vres{di, mdli, 2, wli} = vop;
 			wlres{di, mdli, 2, wli} = wlop;			
 			if wli == 2
-				frplot_hold = hpc.frplot;
+				frtrc_hold = hpc.frtrc;
 				fop = fop(:,coreid12);
 				wlop = wlop(coreid12);
-				hpc.frplot = hpc.frplot(:,coreid12);
+				hpc.frtrc = hpc.frtrc(:,coreid12);
 			end
 			tres{di, mdli, 2, wli} = hpc.stats_analysis(xop, uop, fop, vop, wlop);
 			if wli == 2
-				hpc.frplot = frplot_hold;
+				hpc.frtrc = frtrc_hold;
 				fop = fres{di, mdli, 2, wli};
 				wlop = wlres{di, mdli, 2, wli};
 			end
+			%}
 			
 			if show
 				figarray = flip(findobj('Type','figure'));
@@ -407,13 +430,14 @@ for wli=1:wl_times
 				figid = length(figarray)+1;
 			end
 			if savetofile
-				t2 = hpc.Ts_ctrl*[0:length(fop)-1]';
+				t2 = ctrl.Ts_ctrl*[0:length(fop)-1]';
 
 				hpc.saveall(xop, uop, fop, vop, wlop, t2, path, regexprep(strcat('Alg: CP - ', itname), ':', '_'));
 			end
 
 			
 			% IBM
+			%{
 			hpc.Ts_ctrl = 250e-6;
 			[xop, uop, fop, vop, wlop] = hpc.launch_occ_sim(1, 2, robust, show);
 			wlop = wlop ./ perf_max_check{wli} * 100;
@@ -423,14 +447,14 @@ for wli=1:wl_times
 			vres{di, mdli, 3, wli} = vop;
 			wlres{di, mdli, 3, wli} = wlop;
 			if wli == 2
-				frplot_hold = hpc.frplot;
+				frtrc_hold = hpc.frtrc;
 				fop = fop(:,coreid12);
 				wlop = wlop(coreid12);
-				hpc.frplot = hpc.frplot(:,coreid12);
+				hpc.frtrc = hpc.frtrc(:,coreid12);
 			end
 			tres{di, mdli, 3, wli} = hpc.stats_analysis(xop, uop, fop, vop, wlop);
 			if wli == 2
-				hpc.frplot = frplot_hold;
+				hpc.frtrc = frtrc_hold;
 				fop = fres{di, mdli, 3, wli};
 				wlop = wlres{di, mdli, 3, wli};
 			end			
@@ -449,6 +473,7 @@ for wli=1:wl_times
 
 				hpc.saveall(xop, uop, fop, vop, wlop, t2, path, regexprep(strcat('Alg: OCC - ', itname), {':', ' '}, {'_', ''}));
 			end
+			%}
 			
 
 		end % for di domains
