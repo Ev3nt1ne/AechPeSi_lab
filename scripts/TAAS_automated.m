@@ -122,7 +122,7 @@ hpc.sat_up = 0;
 %hpc = hpc.create_thermal_model();
 %hpc.thermal_model_ver = 1;
 %hpc.exp_leakage = 0;
-hpc.t_init = (0+273.15)*ones(hpc.Ns,1); %temp_amb*ones(hpc.Ns,1);
+hpc.t_init = (45+273.15)*ones(hpc.Ns,1); %temp_amb*ones(hpc.Ns,1);
 %hpc.x_init(end-1:end,1) = temp_amb+20;
 %hpc.tesim = 1.5;
 %hpc.simulate_aut();
@@ -140,6 +140,7 @@ ndom = 4;
 robust = 0;
 show = 1;
 savetofile = 0;
+hpc.compare_vs_baseline = 1;
 
 tres = [];
 tres{ndom, th_models, 3, wl_times} = [];
@@ -155,10 +156,14 @@ vres{ndom, th_models, 3, wl_times} = [];
 wlres = [];
 wlres{ndom, th_models, 3, wl_times} = [];
 
+if hpc.Nc == 36
+	coreid1 = [4 8 12 17 20 22 27 31 36];
+	coreid2 = [1 10 11 14 16 24 29 32 34];
+	coreid12 = [ 1 4 8 10 11 12 14 16 17 20 22 24 27 29 31 32 34 36];
+else
+	error("didn't set coreid up!");
+end
 
-coreid1 = [4 8 12 17 20 22 27 31 36];
-coreid2 = [1 10 11 14 16 24 29 32 34];
-coreid12 = [ 1 4 8 10 11 12 14 16 17 20 22 24 27 29 31 32 34 36];
 %{
 p1 = 94.2399*ones(hpc.Nc,1);
 p2 = 10.9303*ones(hpc.Nc,1);
@@ -267,17 +272,25 @@ for wli=1:wl_times
 		switch mdli
 			case 1
 				hpc.model_ver = 0;
-				hpc = hpc.model_init();
+				hpc.model_init();
 			case 2
 				hpc.model_ver = 1;
-				hpc = hpc.model_init();
+				hpc.model_init();
 			case 3
 				hpc.model_ver = 2;
-				hpc = hpc.model_init();
+				hpc.model_init();
+		end
+
+		if hpc.compare_vs_baseline
+			% Compute ideal&unrestricted baseline
+			%since atm it is domain independent:
+				hpc.vd = hpc.Nc;
+				hpc.VDom = eye(hpc.Nc);
+			%[wmaxc, perfmaxc] = hpc.base_ideal_unr();
 		end
 		
 		%% ITERATE ON DOMAINS
-		for di=1:ndom
+		for di=4:ndom
 			% cases:
 			% 1: Single Domain
 			% 2: 4 Domains
@@ -298,12 +311,13 @@ for wli=1:wl_times
 						hpc.VDom([4:6 10:12 16:18], 2) = 1;
 						hpc.VDom([19:21 25:27 31:33], 3) = 1;
 						hpc.VDom([22:24 28:30 34:36], 4) = 1;
-					end
-					if hpc.Nc == 72
+					elseif hpc.Nc == 72
 						hpc.VDom([1:6 13:18 25:30], 1) = 1;
 						hpc.VDom([7:12 19:24 31:36], 2) = 1;
 						hpc.VDom([37:42 49:54 61:66], 3) = 1;
 						hpc.VDom([43:48 55:60 67:72], 4) = 1;
+					else
+						error("didn't set VDom for this Nc!");
 					end
 				case 3
 					hpc.vd = 9;
@@ -319,8 +333,7 @@ for wli=1:wl_times
 						hpc.VDom([25:26 31:32], 7) = 1;
 						hpc.VDom([27:28 33:34], 8) = 1;
 						hpc.VDom([29:30 35:36], 9) = 1;
-					end
-					if hpc.Nc == 72
+					elseif hpc.Nc == 72
 						hpc.VDom([1:4 9:12], 1) = 1;
 						hpc.VDom([5:8 13:16], 2) = 1;
 						hpc.VDom([17:20 25:28], 3) = 1;
@@ -330,6 +343,8 @@ for wli=1:wl_times
 						hpc.VDom([49:52 57:60], 7) = 1;
 						hpc.VDom([53:56 61:64], 8) = 1;
 						hpc.VDom([65:72], 9) = 1;
+					else
+						error("didn't set VDom for this Nc!");
 					end
 				case 4
 					hpc.vd = hpc.Nc;
@@ -356,9 +371,8 @@ for wli=1:wl_times
 			ctrl = Fuzzy;
 			ctrl.C = hpc.Cc;
 			ctrl.Ts_ctrl = 500e-6;
+			
 			[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
-			%{
-			wlop = wlop ./ perf_max_check{wli} * 100;
 			xres{di, mdli, 1, wli} = xop;
 			ures{di, mdli, 1, wli} = uop; 
 			fres{di, mdli, 1, wli} = fop;
@@ -370,13 +384,12 @@ for wli=1:wl_times
 				wlop = wlop(coreid12);
 				hpc.frtrc = hpc.frtrc(:,coreid12);
 			end
-			tres{di, mdli, 1, wli} = hpc.stats_analysis(xop, uop, fop, vop, wlop);
+			tres{di, mdli, 1, wli} = hpc.stats_analysis(ctrl, xop, uop, fop, vop, wlop);
 			if wli == 2
 				hpc.frtrc = frtrc_hold;
 				fop = fres{di, mdli, 1, wli};
 				wlop = wlres{di, mdli, 1, wli};
 			end
-			%}
 			
 			if show
 				figarray = flip(findobj('Type','figure'));
@@ -398,9 +411,7 @@ for wli=1:wl_times
 			ctrl = CP;
 			ctrl.C = hpc.Cc;
 			ctrl.Ts_ctrl = 500e-6;
-			[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
-			%{
-			wlop = wlop ./ perf_max_check{wli} * 100;
+			%[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
 			xres{di, mdli, 2, wli} = xop;
 			ures{di, mdli, 2, wli} = uop; 
 			fres{di, mdli, 2, wli} = fop;
@@ -412,13 +423,12 @@ for wli=1:wl_times
 				wlop = wlop(coreid12);
 				hpc.frtrc = hpc.frtrc(:,coreid12);
 			end
-			tres{di, mdli, 2, wli} = hpc.stats_analysis(xop, uop, fop, vop, wlop);
+			tres{di, mdli, 2, wli} = hpc.stats_analysis(ctrl, xop, uop, fop, vop, wlop);
 			if wli == 2
 				hpc.frtrc = frtrc_hold;
 				fop = fres{di, mdli, 2, wli};
 				wlop = wlres{di, mdli, 2, wli};
 			end
-			%}
 			
 			if show
 				figarray = flip(findobj('Type','figure'));
@@ -437,10 +447,10 @@ for wli=1:wl_times
 
 			
 			% IBM
-			%{
-			hpc.Ts_ctrl = 250e-6;
-			[xop, uop, fop, vop, wlop] = hpc.launch_occ_sim(1, 2, robust, show);
-			wlop = wlop ./ perf_max_check{wli} * 100;
+			ctrl = IBM_OCC;
+			ctrl.C = hpc.Cc;
+			ctrl.Ts_ctrl = 250e-6;
+			%[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
 			xres{di, mdli, 3, wli} = xop;
 			ures{di, mdli, 3, wli} = uop; 
 			fres{di, mdli, 3, wli} = fop;
@@ -452,12 +462,12 @@ for wli=1:wl_times
 				wlop = wlop(coreid12);
 				hpc.frtrc = hpc.frtrc(:,coreid12);
 			end
-			tres{di, mdli, 3, wli} = hpc.stats_analysis(xop, uop, fop, vop, wlop);
+			tres{di, mdli, 3, wli} = hpc.stats_analysis(ctrl, xop, uop, fop, vop, wlop);
 			if wli == 2
 				hpc.frtrc = frtrc_hold;
 				fop = fres{di, mdli, 3, wli};
 				wlop = wlres{di, mdli, 3, wli};
-			end			
+			end
 
 			if show
 				figarray = flip(findobj('Type','figure'));
@@ -473,7 +483,6 @@ for wli=1:wl_times
 
 				hpc.saveall(xop, uop, fop, vop, wlop, t2, path, regexprep(strcat('Alg: OCC - ', itname), {':', ' '}, {'_', ''}));
 			end
-			%}
 			
 
 		end % for di domains

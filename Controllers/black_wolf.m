@@ -209,7 +209,7 @@ classdef black_wolf < mpc_hpc & CP
 			
 			% Choose Voltage
 			FD = diag(f_ref)*hc.VDom;
-			V = obj.cp_voltage_choice(hc, FD);
+			V = obj.compute_sharedV(hc, FD, obj.voltage_rule);
 			F = f_ref;
 
 			input_mpc = F .* (hc.VDom*(V .* V));

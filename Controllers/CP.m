@@ -99,7 +99,7 @@ classdef CP < controller
 			% Choose Voltage
 			obj.f_ma(obj.f_ma<0) = 0; %saturate F_MA
 			FD = diag(f_ref - obj.f_ma)*hc.VDom;			
-			V = obj.cp_voltage_choice(hc, FD);
+			V = obj.compute_sharedV(hc, FD, obj.voltage_rule);
 			F = f_ref;
 
 			% Compute Power
@@ -200,20 +200,6 @@ classdef CP < controller
 			%TODO
 			eU = upid < (-(pu-ones(hc.Nc,1).*hc.min_pw_red*0.7));
 			upid = eU.*(-(pu-ones(hc.Nc,1).*hc.min_pw_red*0.7)) + (~eU).*upid;
-		end
-		function [voltage_choice] = cp_voltage_choice(obj, hpc_class, Ft)
-			voltage_choice = hpc_class.V_min*ones(hpc_class.vd,1);
-			for v=1:hpc_class.vd
-				extrV = sum( Ft(:,v) > (hpc_class.FV_table(:,3) + [zeros(hpc_class.FV_levels-1,1); inf])', 2);
-				%vote_cast(:,v) = extrV(nonzeros(hpc_class.VDom(:,v).*[1:hpc_class.Nc]')) + 1;
-				vote_cast = extrV(nonzeros(hpc_class.VDom(:,v).*[1:hpc_class.Nc]')) + 1;
-				voltage_choice(v,1) = hpc_class.FV_table(round(prctile(vote_cast,obj.voltage_rule)),1);
-			end
-			%if size(vote_cast,1) == 1
-				%problem: matrix become array and prctile does not work anymore
-			%	vote_cast(2,:) = vote_cast;
-			%end
-			%voltage_choice = hpc_class.FV_table(round(prctile(vote_cast,obj.voltage_rule)),1);
 		end
 		function [pu, pw_storage] = cp_pw_dispatcher(obj, T, core_crit_temp, core_limit_temp, delta_p, ipu, min_pw_red)
 			

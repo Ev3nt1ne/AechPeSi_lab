@@ -90,6 +90,20 @@ classdef controller < handle
 				c_lim_sup = c_lim_sup + (sn~=so).*(res-c_lim_sup);				
 			end
 		end
+		function [voltage_choice] = compute_sharedV(hpc_class, Ft, vrule)
+			voltage_choice = hpc_class.V_min*ones(hpc_class.vd,1);
+			for v=1:hpc_class.vd
+				extrV = sum( Ft(:,v) > (hpc_class.FV_table(:,3) + [zeros(hpc_class.FV_levels-1,1); inf])', 2);
+				%vote_cast(:,v) = extrV(nonzeros(hpc_class.VDom(:,v).*[1:hpc_class.Nc]')) + 1;
+				vote_cast = extrV(nonzeros(hpc_class.VDom(:,v).*[1:hpc_class.Nc]')) + 1;
+				voltage_choice(v,1) = hpc_class.FV_table(round(prctile(vote_cast,vrule)),1);
+			end
+			%if size(vote_cast,1) == 1
+				%problem: matrix become array and prctile does not work anymore
+			%	vote_cast(2,:) = vote_cast;
+			%end
+			%voltage_choice = hpc_class.FV_table(round(prctile(vote_cast,obj.voltage_rule)),1);
+		end
 	end
 
 	%% Dependent Variables

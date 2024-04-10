@@ -307,7 +307,7 @@ classdef cp_mpc < mpc_hpc & CP
 			
 			% Choose Voltage
 			FD = diag(f_ref-obj.f_ma)*hc.VDom;
-			V = obj.cp_voltage_choice(hc, FD);
+			V = obj.compute_sharedV(hc, FD, obj.voltage_rule);
 			F = f_ref;
 
 			% Compute Power

@@ -118,7 +118,7 @@ classdef Fuzzy < CP
 
 			% Choose Voltage
 			FD = diag(f_ref)*hc.VDom;			
-			V = obj.cp_voltage_choice(hc, FD);
+			V = obj.compute_sharedV(hc, FD, obj.voltage_rule);
 			F = f_ref;
 
 			% Control Temperature:

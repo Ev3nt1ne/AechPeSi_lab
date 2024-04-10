@@ -241,19 +241,22 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 
 					g1=obj.gaussian_filter(max(obj.Nv, obj.Nh),2.5)*16;
 					%g1 = g1 + (1-0.025 - g1(1));
-					g1 = 1./g1 * 0.75;						
+					g1 = 1./g1 * 0.75;
+
+					lrow = irow - obj.extt_rows;
+					lcol = icol - obj.extl_cols;
 					
-					R_si_hn = R_si_hn * g1(irow,icol); % * 2.67;
-					R_si_hs = R_si_hs * g1(irow,icol); % * 2.67;
-					R_si_he = R_si_he * g1(irow,icol); % * 2.67;
-					R_si_hw = R_si_hw * g1(irow,icol); % * 2.67;							
+					R_si_hn = R_si_hn * g1(lrow,lcol); % * 2.67;
+					R_si_hs = R_si_hs * g1(lrow,lcol); % * 2.67;
+					R_si_he = R_si_he * g1(lrow,lcol); % * 2.67;
+					R_si_hw = R_si_hw * g1(lrow,lcol); % * 2.67;							
 
 					R_sicu_v = R_sicu_v / 2.2; %1.5;
 
-					R_cu_hn = R_cu_hn * g1(irow,icol) * 2; % * 4;
-					R_cu_hs = R_cu_hs * g1(irow,icol) * 2; % * 4;
-					R_cu_he = R_cu_he * g1(irow,icol) * 2; % * 4;
-					R_cu_hw = R_cu_hw * g1(irow,icol) * 2; % * 4;
+					R_cu_hn = R_cu_hn * g1(lrow,lcol) * 2; % * 4;
+					R_cu_hs = R_cu_hs * g1(lrow,lcol) * 2; % * 4;
+					R_cu_he = R_cu_he * g1(lrow,lcol) * 2; % * 4;
+					R_cu_hw = R_cu_hw * g1(lrow,lcol) * 2; % * 4;
 
 					%R_cual_v = R_cual_v; %* 1.5;% * 1.3;							
 					%R_sipcb_v = R_sipcb_v; % * 1.5;
@@ -614,8 +617,8 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 			if (tm_ver == 1) %|| (tm_ver == 2)
 				g2=obj.gaussian_filter(max(obj.Nv, obj.Nh),3)*16;
 				g2 = g2 + (1-0.01 - g2(1));
-				C_core = C_core / g2(irow-obj.extt_rows,icol-obj.extl_cols);% / 1.5;
-			end							
+				C_core = C_core / g2(irow,icol);% / 1.5;
+			end
 					
 			B(i,k) = 1/C_core * obj.pw2therm_coeff;
 		end

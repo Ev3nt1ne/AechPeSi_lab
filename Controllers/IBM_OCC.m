@@ -320,7 +320,7 @@ classdef IBM_OCC < controller
 				for vidx=1:hc.vd
 					fc = F.*hc.VDom(:,vidx);
 					fcm = max(fc);
-					V(vidx) = hc.FV_table(sum(fcm > hc.FV_table(:,3))+1,1);
+					V(vidx,:) = hc.FV_table(sum(fcm > hc.FV_table(:,3))+1,1);
 					%V = V + vc*obj.VDom(:,vidx);			
 				end
 			%end
