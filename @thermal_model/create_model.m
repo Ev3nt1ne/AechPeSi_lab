@@ -234,7 +234,7 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 					end
 
 				case 1				
-					obj.pw2therm_coeff = obj.pw2therm_coeff * 0.85;
+					obj.pw2therm_coeff = 0.85; %0.9;
 					
 					C_si = C_si*1.1;
 					C_cu = C_cu*1.1;
@@ -272,17 +272,20 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 					%g1 = g1 + (1-0.025 - g1(1));
 					g1 = 1./g1 * 0.7;						
 					
-					R_si_hn = R_si_hn * g1(irow,icol); % * 2.67;
-					R_si_hs = R_si_hs * g1(irow,icol); % * 2.67;
-					R_si_he = R_si_he * g1(irow,icol); % * 2.67;
-					R_si_hw = R_si_hw * g1(irow,icol); % * 2.67;							
+					lrow = irow - obj.extt_rows;
+					lcol = icol - obj.extl_cols;
+					
+					R_si_hn = R_si_hn * g1(lrow,lcol); % * 2.67;
+					R_si_hs = R_si_hs * g1(lrow,lcol); % * 2.67;
+					R_si_he = R_si_he * g1(lrow,lcol); % * 2.67;
+					R_si_hw = R_si_hw * g1(lrow,lcol); % * 2.67;							
 
 					R_sicu_v = R_sicu_v / 1.2;
 
-					R_cu_hn = R_cu_hn * g1(irow,icol) * 2; % * 4;
-					R_cu_hs = R_cu_hs * g1(irow,icol) * 2; % * 4;
-					R_cu_he = R_cu_he * g1(irow,icol) * 2; % * 4;
-					R_cu_hw = R_cu_hw * g1(irow,icol) * 2; % * 4;
+					R_cu_hn = R_cu_hn * g1(lrow,lcol) * 2; % * 4;
+					R_cu_hs = R_cu_hs * g1(lrow,lcol) * 2; % * 4;
+					R_cu_he = R_cu_he * g1(lrow,lcol) * 2; % * 4;
+					R_cu_hw = R_cu_hw * g1(lrow,lcol) * 2; % * 4;
 
 					R_cual_v = R_cual_v / 1.5;% * 1.3;							
 					R_sipcb_v = R_sipcb_v / 1.5;

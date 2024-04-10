@@ -286,11 +286,11 @@ for wli=1:wl_times
 			%since atm it is domain independent:
 				hpc.vd = hpc.Nc;
 				hpc.VDom = eye(hpc.Nc);
-			%[wmaxc, perfmaxc] = hpc.base_ideal_unr();
+			[wmaxc, perfmaxc] = hpc.base_ideal_unr();
 		end
 		
 		%% ITERATE ON DOMAINS
-		for di=4:ndom
+		for di=1:ndom
 			% cases:
 			% 1: Single Domain
 			% 2: 4 Domains
@@ -360,9 +360,6 @@ for wli=1:wl_times
 			hpc.quad_pw_budget = 450/36*hpc.Nc*ones(2,hpc.vd);
 			itname = strcat('Model: ', int2str(mdli), ' - Domains: ', int2str(di), ' - WL: ', int2str(wli));
 
-			%hpc.anteSimCheckTM();
-			%hpc.anteSimCheckLab();
-			%hpc.anteSimCheckPM();
 			%%
 
 			%hpc.dummy_pw = 1;
@@ -411,7 +408,7 @@ for wli=1:wl_times
 			ctrl = CP;
 			ctrl.C = hpc.Cc;
 			ctrl.Ts_ctrl = 500e-6;
-			%[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
+			[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
 			xres{di, mdli, 2, wli} = xop;
 			ures{di, mdli, 2, wli} = uop; 
 			fres{di, mdli, 2, wli} = fop;
@@ -450,7 +447,7 @@ for wli=1:wl_times
 			ctrl = IBM_OCC;
 			ctrl.C = hpc.Cc;
 			ctrl.Ts_ctrl = 250e-6;
-			%[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
+			[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
 			xres{di, mdli, 3, wli} = xop;
 			ures{di, mdli, 3, wli} = uop; 
 			fres{di, mdli, 3, wli} = fop;
