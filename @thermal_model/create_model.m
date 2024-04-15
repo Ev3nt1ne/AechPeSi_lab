@@ -234,7 +234,7 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 					end
 
 				case 1				
-					obj.pw2therm_coeff = 0.85; %0.9;
+					obj.pw2therm_coeff = 0.85;
 					
 					C_si = C_si*1.1;
 					C_cu = C_cu*1.1;

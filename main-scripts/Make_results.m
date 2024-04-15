@@ -3,214 +3,8 @@
 WL_N = 3;
 old_perf = 1;
 
-p1 = [   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   94.2399
-   ];
-
-p2 = [   68.7267
-   10.9303
-   10.9303
-   94.2399
-   10.9303
-   10.9303
-   10.9303
-   94.2399
-   10.9303
-   68.7267
-   68.7267
-   94.2399
-   10.9303
-   68.7267
-   10.9303
-   68.7267
-   94.2399
-   10.9303
-   10.9303
-   94.2399
-   10.9303
-   94.2399
-   10.9303
-   68.7267
-   10.9303
-   10.9303
-   94.2399
-   10.9303
-   68.7267
-   10.9303
-   94.2399
-   68.7267
-   10.9303
-   68.7267
-   10.9303
-   94.2399];
-
-%p2 = p2(coreid12);
-
-p3 = [   91.2498
-   88.9647
-   87.6472
-   90.7673
-   88.1172
-   89.4897
-   88.7772
-   89.0797
-   88.9622
-   89.5697
-   90.2273
-   88.7547
-   88.6847
-   88.2572
-   90.0673
-   88.8922
-   88.5272
-   88.0022
-   89.2972
-   87.3722
-   88.4622
-   89.3922
-   88.1097
-   89.5147
-   88.3922
-   88.8197
-   87.2572
-   88.7122
-   90.2573
-   87.3047
-   89.3597
-   86.9047
-   87.7922
-   89.0322
-   88.6722
-   90.6123
-   ];
-
-
-perf_max_check{1} = p1;
-perf_max_check{2} = p2;
-perf_max_check{3} = p3;
-
 
 %%
-
-%tres{di, mdli, 2, wli} = hpc.stats_analysis(xop, uop, fop, vop, wlop);
-
-needs2do = 1;
-if needs2do
-wlres_new =[];
-for di=1:4
-	for mdli=1:3
-		for wli=1:WL_N
-			bwl = 1;
-			switch wli
-				case 1
-					%full vector			
-					hpc.wrplot = zeros(hpc.Nc, hpc.ipl, ll);
-					hpc.wrplot(:,5,:) = 1;
-					% Max Freq all time:
-					hpc.frplot = 3.45 * ones(min(ceil(hpc.tsim / hpc.Ts_input)+1,(hpc.tsim/hpc.Ts_ctrl+1)), hpc.Nc);
-				case 2
-					%full idle but 9 cores
-					ll = ceil(hpc.tsim*1e6/hpc.quantum_us);
-					hpc.wrplot = zeros(hpc.Nc, hpc.ipl, ll);
-					hpc.wrplot(:,bwl,:) = 1;
-
-					% Med Freq all time:
-					hpc.frplot = hpc.F_min * ones(min(ceil(hpc.tsim / hpc.Ts_input)+1,(hpc.tsim/hpc.Ts_ctrl+1)), hpc.Nc);
-
-					coreid1 = [4 8 12 17 20 22 27 31 36];			
-					hpc.wrplot(coreid1,bwl,:) = 0;
-					hpc.wrplot(coreid1,5,:) = 1;
-					% Max Freq all time:
-					hpc.frplot(:, coreid1) = 3.45;
-				
-					coreid2 = [1 10 11 14 16 24 29 32 34];			
-					hpc.wrplot(coreid2,bwl,:) = 0;
-					hpc.wrplot(coreid2,3,:) = 0.70;
-					hpc.wrplot(coreid2,2,:) = 0.30;
-					hpc.frplot(:, coreid2) = 2.7;
-					
-					%
-					%
-					%
-					coreid12 = [ 1 4 8 10 11 12 14 16 17 20 22 24 27 29 31 32 34 36];
-					
-					for i=1:3
-						f = fres{di, mdli, i, wli};
-						fcp = f(2:end,:);					
-
-						smref = round((size(fcp,1))/(size(hpc.frplot(2:end,:),1)));
-						smf = round((size(hpc.frplot(2:end,:),1))/(size(fcp,1)));
-
-						fd = repelem(hpc.frplot(2:end,:),max(smref,1),1) - repelem(fcp,max(smf,1),1);
-						fd = fd(:, coreid12);
-
-						n2 = reshape(fd,[],1);
-						perf_fd2norm(di, mdli, i) = norm(n2);
-
-						w = wlres{di, mdli, i, wli}./ perf_max_check{wli} * 100;
-
-						w = w(coreid12);
-
-						perf_wlMax(di, mdli, i) = max(w);
-						perf_wlAv(di, mdli, i) = mean(w);
-						perf_wlmin(di, mdli, i) = min(w);
-					end				
-					
-				case 3
-					%hpc.wrplot = wlwl3;
-					% Max Freq all time:
-					hpc.frplot = 3.45 * ones(min(ceil(hpc.tsim / hpc.Ts_input)+1,(hpc.tsim/hpc.Ts_ctrl+1)), hpc.Nc);
-				case 4
-					%hpc.wrplot = wlwl3;
-					% Max Freq all time:
-					hpc.frplot = 3.45 * ones(min(ceil(hpc.tsim / hpc.Ts_input)+1,(hpc.tsim/hpc.Ts_ctrl+1)), hpc.Nc);
-			end
-
-			for i=1:3
-				%[di, mdli, i, wli]
-				wlres_new{di, mdli, i, wli} = wlres{di, mdli, i, wli} ./ perf_max_check{wli} * 100;
-				tres{di, mdli, i, wli} = hpc.stats_analysis(xres{di, mdli, i, wli}, ures{di, mdli, i, wli}, ...
-					fres{di, mdli, i, wli}, vres{di, mdli, i, wli}, wlres_new{di, mdli, i, wli});
-			end
-		end
-	end
-end
-
-end %needs2do
 
 %% TEMPERATURE
 
@@ -233,13 +27,13 @@ for WL=1:WL_N
 			disp("Ex Max");
 			strj = "";
 			for i=1:3
-				if isempty(tres{DOM, MODEL, i, WL}.temp.exMaxCr)
+				if isempty(tres{DOM, MODEL, i, WL}.temp.exMn.Max)
 					BARj( WL, lj, rowj , i ) = 0;
 				else
-					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exMaxCr;
+					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exMn.Max;
 				end
 				
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exMaxCr, '%.2f'));	
+				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exMn.Max, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -252,8 +46,8 @@ for WL=1:WL_N
 			disp("Ex 95");
 			strj = "";
 			for i=1:3
-				%BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.ex95pCr;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.ex95pCr, '%.2f'));	
+				%BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exMn.Mean95;
+				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exMn.Mean95, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -266,8 +60,8 @@ for WL=1:WL_N
 			disp("Ex Av");
 			strj = "";
 			for i=1:3	
-				BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exAvCr;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exAvCr, '%.2f'));	
+				BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exMn.MeanAv;
+				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exMn.MeanAv, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -280,8 +74,8 @@ for WL=1:WL_N
 			disp("Time Ex tot");
 			strj = "";
 			for i=1:3
-				%BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exTotTimeCr;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exTotTimeCr, '%.3f'));	
+				%BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exMn.TotTime;
+				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exMn.TotTime, '%.3f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -294,8 +88,8 @@ for WL=1:WL_N
 			disp("Time Ex Av %");
 			strj = "";
 			for i=1:3	
-				BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exAvTimeCr/0.75*100;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exAvTimeCr/0.75*100, '%.2f'));	
+				BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exMn.MeanTime/0.75*100;
+				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exMn.MeanTime/0.75*100, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -336,9 +130,9 @@ for WL=1:WL_N
 end
 
 figure();
-tt = size(BARj,2);
+tp = size(BARj,2);
 
-axgrid = [tt,WL_N];  % [#rows, #cols]
+axgrid = [tp,WL_N];  % [#rows, #cols]
 titles = {'Max Exceeded Temperature [°C]', 'Average Exceeded Temperature [°C]', 'Average Exceeded Time [%]', 'Average Temperature [°C]'}; 
 xlabelsj = {'W:1D', 'W:4D', 'W:9D', 'W:AD', 'A:1D', 'A:4D', 'A:9D', 'A:AD', 'R:1D', 'R:4D', 'R:9D', 'R:AD' };
 wltitles = {'MAX-WL', 'MULTI-WL', 'CLOUD-WL'};
@@ -347,7 +141,7 @@ tclMain.TileSpacing = 'compact';
 tclMain.Padding = 'compact';
 tcl = gobjects(1,axgrid(1));
 ax = gobjects(axgrid); 
-for i=1:tt
+for i=1:tp
 	tcl(i) = tiledlayout(tclMain,1,axgrid(2));
 	tcl(i).Layout.Tile = i; 
 	for WL=1:WL_N
@@ -479,9 +273,9 @@ for WL=1:WL_N
 end
 
 figure();
-tt = size(BARj,2);
+tp = size(BARj,2);
 
-axgrid = [tt,WL_N];  % [#rows, #cols]
+axgrid = [tp,WL_N];  % [#rows, #cols]
 titles = {'Max Exceeded Power [%]', '95-p Exceeded Power [%]', 'Average Exceeded Power [%]', 'Total Exceeded Time [%]'}; 
 xlabelsj = {'W:1D', 'W:4D', 'W:9D', 'W:AD', 'A:1D', 'A:4D', 'A:9D', 'A:AD', 'R:1D', 'R:4D', 'R:9D', 'R:AD' };
 wltitles = {'MAX-WL', 'MULTI-WL', 'CLOUD-WL'};
@@ -490,7 +284,7 @@ tclMain.TileSpacing = 'compact';
 tclMain.Padding = 'compact';
 tcl = gobjects(1,axgrid(1));
 ax = gobjects(axgrid); 
-for i=1:tt
+for i=1:tp
 	tcl(i) = tiledlayout(tclMain,1,axgrid(2));
 	tcl(i).Layout.Tile = i; 
 	for WL=1:WL_N
@@ -512,7 +306,7 @@ tclMain.TileSpacing = 'compact';
 tclMain.Padding = 'compact';
 tcl = gobjects(1,axgrid(1));
 ax = gobjects(axgrid);  
-for i=1:tt
+for i=1:tp
 	tcl(i) = tiledlayout(tclMain,1,axgrid(2));
 	tcl(i).Layout.Tile = i; 
 	for WL=1:WL_N
@@ -546,29 +340,13 @@ for WL=1:WL_N
 			%
 			disp("2-norm");
 			strj = "";
-			if (WL == 2) && (old_perf)
-				for i=1:3
-					BARj( WL, lj, rowj , i ) = perf_fd2norm(DOM, MODEL, i) / sqrt(18) / sqrt(4000);
-					if i==3
-						BARj( WL, lj, rowj , i ) = BARj( WL, lj, rowj , i ) / sqrt(2);
-					end
-					strj = strcat( strj, num2str(BARj( WL, lj, rowj , i ), '%.2f'));	
-					if i<3
-						strj = strcat( strj, " | ");
-					end
-				end
-			else
 				for i=1:3	
-					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.perf.fd2norm / sqrt(hpc.Nc) / sqrt(4000);
-					if i==3
-						BARj( WL, lj, rowj , i ) = BARj( WL, lj, rowj , i ) / sqrt(2);
-					end
+					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.perf.fd.l2norm;
 					strj = strcat( strj, num2str(BARj( WL, lj, rowj , i ), '%.2f'));	
 					if i<3
 						strj = strcat( strj, " | ");
 					end
 				end
-			end
 			
 			lj = lj+1;
 			disp(strj);
@@ -576,24 +354,14 @@ for WL=1:WL_N
 				
 			%
 			disp("Max perf");
-			strj = "";
-			if (WL == 2) && (old_perf)
-				for i=1:3
-					BARj( WL, lj, rowj , i ) = perf_wlMax(DOM, MODEL, i);
-					strj = strcat( strj, num2str(BARj( WL, lj, rowj , i ), '%.2f'));	
-					if i<3
-						strj = strcat( strj, " | ");
-					end
-				end
-			else
+			strj = ""; 
 				for i=1:3	
-					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.perf.wlMax;
-					strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.perf.wlMax, '%.2f'));	
+					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.perf.wl.Max;
+					strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.perf.wl.Max, '%.2f'));	
 					if i<3
 						strj = strcat( strj, " | ");
 					end
 				end
-			end
 			lj = lj+1;
 			disp(strj);
 			%
@@ -601,23 +369,13 @@ for WL=1:WL_N
 			%
 			disp("average perf");
 			strj = "";
-			if (WL == 2) && (old_perf)
-				for i=1:3
-					BARj( WL, lj, rowj , i ) = perf_wlAv(DOM, MODEL, i);
-					strj = strcat( strj, num2str(perf_wlAv(DOM, MODEL, i), '%.2f'));	
-					if i<3
-						strj = strcat( strj, " | ");
-					end
-				end
-			else
 				for i=1:3	
-					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.perf.wlAv;
-					strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.perf.wlAv, '%.2f'));	
+					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.perf.wl.Av;
+					strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.perf.wl.Av, '%.2f'));	
 					if i<3
 						strj = strcat( strj, " | ");
 					end
 				end
-			end
 			lj = lj+1;
 			disp(strj);
 			%
@@ -625,23 +383,13 @@ for WL=1:WL_N
 			%
 			disp("min Perf");
 			strj = "";
-			if (WL == 2) && (old_perf)
-				for i=1:3
-					BARj( WL, lj, rowj , i ) = perf_wlmin(DOM, MODEL, i);
-					strj = strcat( strj, num2str(perf_wlmin(DOM, MODEL, i), '%.2f'));	
-					if i<3
-						strj = strcat( strj, " | ");
-					end
-				end
-			else
 				for i=1:3	
-					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.perf.wlmin;
-					strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.perf.wlmin, '%.2f'));	
+					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.perf.wl.min;
+					strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.perf.wl.min, '%.2f'));	
 					if i<3
 						strj = strcat( strj, " | ");
 					end
 				end
-			end
 			lj = lj+1;
 			disp(strj);
 			%
@@ -650,9 +398,9 @@ for WL=1:WL_N
 end
 
 figure();
-tt = size(BARj,2);
+tp = size(BARj,2);
 
-axgrid = [tt,WL_N];  % [#rows, #cols]
+axgrid = [tp,WL_N];  % [#rows, #cols]
 titles = {'2-norm of the \Delta F_{pe}', 'Max Executed Workload (MAX-Wl_p) [%]', 'Average Executed Workload (AV-Wl_p) [%]', 'min Executed Workload (MIN-Wl_p) [%]'}; 
 xlabelsj = {'W:1D', 'W:4D', 'W:9D', 'W:AD', 'A:1D', 'A:4D', 'A:9D', 'A:AD', 'R:1D', 'R:4D', 'R:9D', 'R:AD' };
 wltitles = {'MAX-WL', 'MULTI-WL', 'CLOUD-WL'};
@@ -661,7 +409,7 @@ tclMain.TileSpacing = 'compact';
 tclMain.Padding = 'compact';
 tcl = gobjects(1,axgrid(1));
 ax = gobjects(axgrid); 
-for i=1:tt
+for i=1:tp
 	tcl(i) = tiledlayout(tclMain,1,axgrid(2));
 	tcl(i).Layout.Tile = i; 
 	for WL=1:WL_N
@@ -697,9 +445,9 @@ for d=1:3
 		%acc1 = acc1 + perf_wlAv(d, m, 1);
 		%acc2 = acc2 + perf_wlAv(d, m, 2);
 		%acc3 = acc3 + perf_wlAv(d, m, 3);
-		acc1 = acc1 + perft2{d, m, 1, 2}.wlAv;
-		acc2 = acc2 + perft2{d, m, 2, 2}.wlAv;
-		acc3 = acc3 + perft2{d, m, 3, 2}.wlAv;
+		acc1 = acc1 + tres{d, m, 1, 2}.perf.wl.Av;
+		acc2 = acc2 + tres{d, m, 2, 2}.perf.wl.Av;
+		acc3 = acc3 + tres{d, m, 3, 2}.perf.wl.Av;
 		
 		%acc1 = acc1 + tres{d, m, 1, 3}.perf.fd2norm / sqrt(hpc.Nc) / sqrt(4000);
 		%acc2 = acc2 + tres{d, m, 2, 3}.perf.fd2norm / sqrt(hpc.Nc) / sqrt(4000);
@@ -712,7 +460,7 @@ for d=1:3
 		for w=1:3
 			
 			%
-			quant = tres{d, m, alg, w}.temp.exAvTimeCr/0.75*100;
+			quant = tres{d, m, alg, w}.temp.exMn.MeanTime/0.75*100;
 			%
 			if quant > maxj
 				maxj = quant;
@@ -779,7 +527,7 @@ end
 normavmin = normavmin'
 
 perf_avg - perf_min
-
+hpc.frtrc;
 
 
 %% Performance 2
@@ -793,42 +541,40 @@ for di=1:4
 
 		%full idle but 9 cores
 		ll = ceil(hpc.tsim*1e6/hpc.quantum_us);
-		hpc.wrplot = zeros(hpc.Nc, hpc.ipl, ll);
-		hpc.wrplot(:,bwl,:) = 1;
-
+		hpc.wltrc = zeros(hpc.Nc, hpc.ipl, ll);
+		hpc.wltrc(:,bwl,:) = 1;
+			
 		% Med Freq all time:
-		hpc.frplot = hpc.F_min * ones(min(ceil(hpc.tsim / hpc.Ts_input)+1,(hpc.tsim/hpc.Ts_ctrl+1)), hpc.Nc);
-
-		coreid1 = [4 8 12 17 20 22 27 31 36];			
-		hpc.wrplot(coreid1,bwl,:) = 0;
-		hpc.wrplot(coreid1,5,:) = 1;
+		tt = min(ceil(hpc.tsim / hpc.Ts_target)+1, (hpc.tsim/1e-4+1));
+		hpc.frtrc = hpc.F_min * ones(tt,hpc.Nc);
+			
+		hpc.wltrc(coreid1,bwl,:) = 0;
+		hpc.wltrc(coreid1,5,:) = 1;
 		% Max Freq all time:
-		hpc.frplot(:, coreid1) = 3.45;
-
-		coreid2 = [1 10 11 14 16 24 29 32 34];			
-		hpc.wrplot(coreid2,bwl,:) = 0;
-		hpc.wrplot(coreid2,3,:) = 0.70;
-		hpc.wrplot(coreid2,2,:) = 0.30;
-		hpc.frplot(:, coreid2) = 2.7;
+		hpc.frtrc(:, coreid1) = 3.45;
+							
+		hpc.wltrc(coreid2,bwl,:) = 0;
+		hpc.wltrc(coreid2,3,:) = 0.70;
+		hpc.wltrc(coreid2,2,:) = 0.30;
+		hpc.frtrc(:, coreid2) = 2.7;
 
 		%
 		%
 		%
 		coreid12 = [ 1 4 8 10 11 12 14 16 17 20 22 24 27 29 31 32 34 36];
-		coreid3 = [2 3 5 6 7 9 13 15 18 19 21 23 25 26 28 30 33 35];
-		
+		coreid3 = [2 3 5 6 7 9 13 15 18 19 21 23 25 26 28 30 33 35];		
 
 		for i=1:3
 			for cc=1:2
 				fcp = fres{di, mdli, i, wli};
 				fcp = fcp(2:end,:);
-				wlres_new{di, mdli, i, wli} = wlres{di, mdli, i, wli} ./ perf_max_check{wli} * 100;
-				w = wlres_new{di, mdli, i, wli};
+				%wlres_new{di, mdli, i, wli} = wlres{di, mdli, i, wli} ./ perf_max_check{wli} * 100;
+				w = wlres{di, mdli, i, wli};
 
-				smref = round((size(fcp,1))/(size(hpc.frplot(2:end,:),1)));
-				smf = round((size(hpc.frplot(2:end,:),1))/(size(fcp,1)));
-
-				fd = repelem(hpc.frplot(2:end,:),max(smref,1),1) - repelem(fcp,max(smf,1),1);
+				smref = round((size(fcp,1))/(size(hpc.frtrc(2:end,:),1)));
+				smf = round((size(hpc.frtrc(2:end,:),1))/(size(fcp,1)));
+				
+				fd = repelem(hpc.frtrc(2:end,:),max(smref,1),1) - repelem(fcp,max(smf,1),1);
 				
 				switch cc
 					case 1
@@ -880,10 +626,7 @@ for cc=1:2
 			strj = "";
 			disp(strcat(num2str(di), " - ", num2str(mdli), " - ", num2str(i), " - ", num2str(cc)));
 			for i=1:3	
-				BARj( cc, lj, rowj , i ) = perft2{DOM, MODEL, i, cc}.fd2norm / sqrt(hpc.Nc) / sqrt(4000);
-				if i==3
-					BARj( cc, lj, rowj , i ) = BARj( cc, lj, rowj , i ) / sqrt(2);
-				end
+				BARj( cc, lj, rowj , i ) = perft2{DOM, MODEL, i, cc}.fd2norm;
 				strj = strcat( strj, num2str(BARj( cc, lj, rowj , i ), '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
@@ -940,9 +683,9 @@ end
 
 %%
 figure();
-tt = size(BARj,2);
+tp = size(BARj,2);
 
-axgrid = [tt,2];  % [#rows, #cols]
+axgrid = [tp,2];  % [#rows, #cols]
 titles = {'2-norm of the \Delta F_{pe}', 'Max Executed Workload [%]', 'Average Executed Workload [%]', 'min Executed Workload [%]'}; 
 xlabelsj = {'W:1D', 'W:4D', 'W:9D', 'W:AD', 'A:1D', 'A:4D', 'A:9D', 'A:AD', 'R:1D', 'R:4D', 'R:9D', 'R:AD' };
 wltitles = {'VECT WL @3.45GHz', 'INT/FLOAT WL @2.7GHz', 'CLOUD-WL'};
@@ -951,7 +694,7 @@ tclMain = tiledlayout(axgrid(1),1);
 %tclMain.Padding = 'compact';
 tcl = gobjects(1,axgrid(1));
 ax = gobjects(axgrid); 
-for i=1:tt
+for i=1:tp
 	tcl(i) = tiledlayout(tclMain,1,axgrid(2));
 	tcl(i).Layout.Tile = i; 
 	for cc=1:2

@@ -179,6 +179,10 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 				end
 			end
 		end
+		function obj = taas_fix(obj, wl)
+			obj.pmc_need_update = 0;
+			obj.perf_max_check = wl;
+		end
 	end
 	methods(Static)
 		function totSize = get_size(class) 
@@ -192,6 +196,35 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			end
 			
 			disp(strcat("Size: ", num2str(totSize), " bytes")); 
+		end
+		function g=gaussian_filter(Filter_size, sigma)
+			%size=5; %filter size, odd number
+			size=Filter_size;
+			g=zeros(size,size); %2D filter matrix
+			%sigma=2; %standard deviation
+			%gaussian filter
+			for i=-(size-1)/2:(size-1)/2
+    			for j=-(size-1)/2:(size-1)/2
+        			x0=(size+1)/2; %center
+        			y0=(size+1)/2; %center
+        			x=i+x0; %row
+        			y=j+y0; %col
+        			g(y,x)=exp(-((x-x0)^2+(y-y0)^2)/2/sigma/sigma);
+    			end
+			end
+			%normalize gaussian filter
+			sum1=sum(g);
+			sum2=sum(sum1);
+			g=g/sum2;
+
+			%plot 3D
+			%g1=Gaussian_filter(50,2);
+			%g2=Gaussian_filter(50,7);
+			%g3=Gaussian_filter(50,11);
+			%figure(1);
+			%subplot(1,3,1);surf(g1);title('filter size = 50, sigma = 2');
+			%subplot(1,3,2);surf(g2);title('filter size = 50, sigma = 7');
+			%subplot(1,3,3);surf(g3);title('filter size = 50, sigma = 11');
 		end
 	end
 
@@ -335,35 +368,6 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			fig.Position = [1, 1, 1920*bmpres,1080*bmpres];
 			exportgraphics(fig, strcat(path_name,file_ext), 'Resolution', graph_dpi);
 			close(fig);			
-		end
-		function g=gaussian_filter(Filter_size, sigma)
-			%size=5; %filter size, odd number
-			size=Filter_size;
-			g=zeros(size,size); %2D filter matrix
-			%sigma=2; %standard deviation
-			%gaussian filter
-			for i=-(size-1)/2:(size-1)/2
-    			for j=-(size-1)/2:(size-1)/2
-        			x0=(size+1)/2; %center
-        			y0=(size+1)/2; %center
-        			x=i+x0; %row
-        			y=j+y0; %col
-        			g(y,x)=exp(-((x-x0)^2+(y-y0)^2)/2/sigma/sigma);
-    			end
-			end
-			%normalize gaussian filter
-			sum1=sum(g);
-			sum2=sum(sum1);
-			g=g/sum2;
-
-			%plot 3D
-			%g1=Gaussian_filter(50,2);
-			%g2=Gaussian_filter(50,7);
-			%g3=Gaussian_filter(50,11);
-			%figure(1);
-			%subplot(1,3,1);surf(g1);title('filter size = 50, sigma = 2');
-			%subplot(1,3,2);surf(g2);title('filter size = 50, sigma = 7');
-			%subplot(1,3,3);surf(g3);title('filter size = 50, sigma = 11');
 		end
 	end
 	methods
@@ -735,7 +739,12 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			else
 				cmp = size(obj.wltrc,3)-1;
 			end
-			gr = w ./ cmp * 100;
+			%this if() is for saveall() and other plot
+			if w <= 1.001
+				gr = w * 100;
+			else
+				gr = w ./ cmp * 100;
+			end
 			subplot(3,4,[9:10]);
 			b = bar(gr);
 			for pb = 1:length(b)
@@ -785,6 +794,60 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			%linkaxes([ax1,ax2,ax3],'x');
 			
 		end
+		function [] = saveall(obj, xop, uop, fop, vop, wop, path, name)
+			if nargin < 7 || (strlength(path)<1)
+				if isunix
+					path = "/tmp/MATLAB-Figures";
+				else
+					path = "C:\temp\MATLAB-Figures";
+				end
+			end
+			if nargin < 8 || (strlength(name)<1)
+				name = string(datetime('now','Format','dd-MMM-yyyy HH_mm_ss_SSS'));
+			end
+
+			if ~exist(path, 'dir')
+				mkdir(path);
+			end
+			if isunix
+				separator_os = "/";
+			else
+				separator_os = "\";
+			end
+			
+			fig = [];
+			namefig = "";
+			res = 1;
+
+			for i=1:5
+				switch i
+					case 1
+						fig = obj.xutplot(xop, uop);
+						namefig = "TP";
+						res = 1.5;
+					case 2
+						fig = obj.powerconstrplot(uop);
+						namefig = "Pw";
+						res = 1;
+					case 3
+						fig = obj.tempconstrplot(xop);
+						namefig = "T";
+						res = 1;
+					case 4
+						fig = obj.perfplot(fop, wop / 100 );
+						namefig = "Perf";
+						res = 1;
+					case 5 
+						fig = obj.fvplot(fop,vop);
+						namefig = "FV";
+						res = 1.5;
+				end
+				if ~isempty(fig)
+					path_name = strcat(path,separator_os,namefig, "-", name);
+					obj.savetofile(fig, path_name, res);
+				end
+			end %for
+		end %function
 	end
 
 	%% Result Analysis

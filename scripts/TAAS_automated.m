@@ -122,7 +122,7 @@ hpc.sat_up = 0;
 %hpc = hpc.create_thermal_model();
 %hpc.thermal_model_ver = 1;
 %hpc.exp_leakage = 0;
-hpc.t_init = (45+273.15)*ones(hpc.Ns,1); %temp_amb*ones(hpc.Ns,1);
+hpc.t_init = (25+273.15)*ones(hpc.Ns,1); %temp_amb*ones(hpc.Ns,1);
 %hpc.x_init(end-1:end,1) = temp_amb+20;
 %hpc.tesim = 1.5;
 %hpc.simulate_aut();
@@ -138,7 +138,7 @@ wl_times = 3;
 th_models = 3; %2;
 ndom = 4;
 robust = 0;
-show = 1;
+show = 0;
 savetofile = 0;
 hpc.compare_vs_baseline = 1;
 
@@ -265,6 +265,16 @@ for wli=1:wl_times
 			% Max Freq all time:
 			hpc.frtrc = 3.45 * ones(tt,hpc.Nc);
 	end
+
+	if hpc.compare_vs_baseline
+		% Compute ideal&unrestricted baseline
+		%since atm it is domain independent:
+			hpc.vd = hpc.Nc;
+			hpc.VDom = eye(hpc.Nc);
+		[wmaxc, perfmaxc] = hpc.base_ideal_unr();
+		awl = hpc.perf_max_check;
+		perf_max_check{wli} = awl;
+	end
 	
 	%% ITERATE ON Thermal Models
 	for mdli=1:th_models
@@ -279,14 +289,6 @@ for wli=1:wl_times
 			case 3
 				hpc.model_ver = 2;
 				hpc.model_init();
-		end
-
-		if hpc.compare_vs_baseline
-			% Compute ideal&unrestricted baseline
-			%since atm it is domain independent:
-				hpc.vd = hpc.Nc;
-				hpc.VDom = eye(hpc.Nc);
-			[wmaxc, perfmaxc] = hpc.base_ideal_unr();
 		end
 		
 		%% ITERATE ON DOMAINS
@@ -380,12 +382,14 @@ for wli=1:wl_times
 				fop = fop(:,coreid12);
 				wlop = wlop(coreid12);
 				hpc.frtrc = hpc.frtrc(:,coreid12);
+				hpc.taas_fix(awl);
 			end
 			tres{di, mdli, 1, wli} = hpc.stats_analysis(ctrl, xop, uop, fop, vop, wlop);
 			if wli == 2
 				hpc.frtrc = frtrc_hold;
 				fop = fres{di, mdli, 1, wli};
 				wlop = wlres{di, mdli, 1, wli};
+				hpc.taas_fix(awl);
 			end
 			
 			if show
@@ -397,9 +401,7 @@ for wli=1:wl_times
 				figid = length(figarray)+1;
 			end
 			if savetofile
-				t2 = ctrl.Ts_ctrl*[0:length(fop)-1]';
-				
-				hpc.saveall(xop, uop, fop, vop, wlop, t2, path, regexprep(strcat('Alg: NCP - ', itname), ':', '_'));
+				hpc.saveall(xop, uop, fop, vop, wlop, path, regexprep(strcat('Alg: NCP - ', itname), ':', '_'));
 			end
 			
 			%hpc.paperTPplot(hpc.Ts*[0:4000*10]', xop, uop);
@@ -419,12 +421,14 @@ for wli=1:wl_times
 				fop = fop(:,coreid12);
 				wlop = wlop(coreid12);
 				hpc.frtrc = hpc.frtrc(:,coreid12);
+				hpc.taas_fix(awl);				
 			end
 			tres{di, mdli, 2, wli} = hpc.stats_analysis(ctrl, xop, uop, fop, vop, wlop);
 			if wli == 2
 				hpc.frtrc = frtrc_hold;
 				fop = fres{di, mdli, 2, wli};
 				wlop = wlres{di, mdli, 2, wli};
+				hpc.taas_fix(awl);
 			end
 			
 			if show
@@ -437,9 +441,7 @@ for wli=1:wl_times
 				figid = length(figarray)+1;
 			end
 			if savetofile
-				t2 = ctrl.Ts_ctrl*[0:length(fop)-1]';
-
-				hpc.saveall(xop, uop, fop, vop, wlop, t2, path, regexprep(strcat('Alg: CP - ', itname), ':', '_'));
+				hpc.saveall(xop, uop, fop, vop, wlop, path, regexprep(strcat('Alg: CP - ', itname), ':', '_'));
 			end
 
 			
@@ -458,12 +460,14 @@ for wli=1:wl_times
 				fop = fop(:,coreid12);
 				wlop = wlop(coreid12);
 				hpc.frtrc = hpc.frtrc(:,coreid12);
+				hpc.taas_fix(awl);
 			end
 			tres{di, mdli, 3, wli} = hpc.stats_analysis(ctrl, xop, uop, fop, vop, wlop);
 			if wli == 2
 				hpc.frtrc = frtrc_hold;
 				fop = fres{di, mdli, 3, wli};
 				wlop = wlres{di, mdli, 3, wli};
+				hpc.taas_fix(awl);
 			end
 
 			if show
@@ -476,9 +480,7 @@ for wli=1:wl_times
 				figid = length(figarray)+1;
 			end
 			if savetofile
-				t2 = hpc.Ts_ctrl*[0:length(fop)-1]';
-
-				hpc.saveall(xop, uop, fop, vop, wlop, t2, path, regexprep(strcat('Alg: OCC - ', itname), {':', ' '}, {'_', ''}));
+				hpc.saveall(xop, uop, fop, vop, wlop, path, regexprep(strcat('Alg: OCC - ', itname), {':', ' '}, {'_', ''}));
 			end
 			
 
