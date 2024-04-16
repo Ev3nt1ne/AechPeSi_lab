@@ -25,7 +25,7 @@ classdef cp_mpc < mpc_hpc & CP
 			%   Detailed explanation goes here
 			
             obj.ops = osqp.default_settings();
-            obj.ops.warm_start = false;
+            obj.ops.warm_start = 0;
             obj.cutoffA = 0;
             obj.cutoffB = 0;
 		end
@@ -85,13 +85,13 @@ classdef cp_mpc < mpc_hpc & CP
 			
 
 			%ops = sdpsettings('verbose',1,'solver','quadprog', 'usex0',1);
-			obj.ops = sdpsettings('verbose',1,'solver','osqp', 'usex0',0); %You have specified an initial point, but the selected solver (OSQP) does not support warm-starts through YALMIP
-			obj.ops.quadprog.TolCon = 1e-2;
-			obj.ops.quadprog.TolX = 1e-5;
-			obj.ops.quadprog.TolFun = 1e-3;
-			obj.ops.convertconvexquad = 0;
-			%ops.quadprog.MaxPCGIter = max(1, ops.quadprog.MaxPCGIter * 3);
-			obj.ops.quadprog.MaxIter = 50;
+			lops = sdpsettings('verbose',1,'solver','osqp', 'usex0',0); %You have specified an initial point, but the selected solver (OSQP) does not support warm-starts through YALMIP
+			lops.quadprog.TolCon = 1e-2;
+			lops.quadprog.TolX = 1e-5;
+			lops.quadprog.TolFun = 1e-3;
+			lops.convertconvexquad = 0;
+			%lquadprog.MaxPCGIter = max(1, ops.quadprog.MaxPCGIter * 3);
+			lops.quadprog.MaxIter = 50;
 
 			%ops.warmstart = 1;
 
@@ -106,13 +106,13 @@ classdef cp_mpc < mpc_hpc & CP
 			%}
 
 			%just for Andrino:s
-			obj.ops.savesolveroutput = 1;
-			obj.ops.osqp.rho = 0.1; %0.1 %0.04
-			obj.ops.osqp.eps_abs = 0.01; %0.01
-			obj.ops.osqp.eps_rel = 0.01; %0.01
-			obj.ops.osqp.check_termination = 1;
+			lops.savesolveroutput = 1;
+			lops.osqp.rho = 0.1; %0.1 %0.04
+			lops.osqp.eps_abs = 0.01; %0.01
+			lops.osqp.eps_rel = 0.01; %0.01
+			lops.osqp.check_termination = 1;
 			%ops.osqp.max_iter = 17;
-			obj.ops.osqp.warm_start = 1;
+			lops.osqp.warm_start = 1;
 
             % save yalmip model for potential extraction to external solver or code generation
 
@@ -167,7 +167,7 @@ classdef cp_mpc < mpc_hpc & CP
 			    yops.quadprog.MaxIter = 50;
                 obj.mpc_ctrl = optimizer(constraints,objective,yops,obj.ylmp_opt_variables,obj.ylmp_opt_output);
 				%}
-				obj.mpc_ctrl = optimizer(constraints,objective,obj.ops,obj.ylmp_opt_variables,obj.ylmp_opt_output);
+				obj.mpc_ctrl = optimizer(constraints,objective,lops,obj.ylmp_opt_variables,obj.ylmp_opt_output);
 				%obj.mpc_ctrl = optimizer(constraints,objective,ops,{x{1},ot,ly_uref,ly_usum},{u{1}, x{2}});
 			    obj.mpc_ctrl
             end

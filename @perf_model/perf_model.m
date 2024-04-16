@@ -20,6 +20,7 @@ classdef perf_model < handle
 
 		quantum_us = 50;
 		quantum_F = 4.0; %GHz
+		mem_F = 0.4;
 	end
 
 	properties(Dependent)
@@ -82,7 +83,7 @@ classdef perf_model < handle
 			sp(primary_wl) = sp(primary_wl) + hmp;
 			
 		end
-		function wl_trace = generate_wl_trace(obj, Nc, ts, show)
+		function wl_trace = generate_wl_trace(obj, Nc, ts, F_max, show)
 			
 			if (nargin < 2) || isempty(Nc)
 				warning("[PM Error]: Nc missing or empty!");
@@ -109,8 +110,12 @@ classdef perf_model < handle
 			ipl = length(obj.wl_prob);
 			wl_trace = zeros(Nc,ipl, ll);
 
-			wl_min_exec_qt = ceil(obj.wl_min_exec_us / obj.quantum_us);
-			wl_mean_exec_qt = ceil(obj.wl_mean_exec_us / obj.quantum_us) - wl_min_exec_qt;
+			tmem = obj.mem_F / obj.quantum_F;
+			tF = F_max / obj.quantum_F;
+			memtdep = obj.wl_mem_weigth*tmem + (1-obj.wl_mem_weigth)*tF;
+
+			wl_min_exec_qt = ceil(obj.wl_min_exec_us .* memtdep / obj.quantum_us);
+			wl_mean_exec_qt = ceil(obj.wl_mean_exec_us .* memtdep / obj.quantum_us) - wl_min_exec_qt;
 			wl_mean_exec_qt(wl_mean_exec_qt<=0) = 0;
 
 			%check on normalization
