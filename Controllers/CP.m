@@ -28,7 +28,10 @@ classdef CP < controller
 		alpha_ma = 0.1;
 		
 		dummy_pw = 0;
-		
+
+		o_inc_steps; %Tper+3; %TODO:
+		o_dec_steps = 20;
+		o_hys_steps = 5; %15		
 	end
 
 	properties(SetAccess=protected, GetAccess=public)	
@@ -41,6 +44,15 @@ classdef CP < controller
 
 		f_ma;
 		pid_integ;
+
+		nOut;
+		o_inc_st = 0;
+		o_dec_st = 0;
+		o_inc_step_count = 0; %v_inc_steps;
+		o_dec_step_count = 0; %v_dec_steps;
+		o_hys_act = 0;
+		o_hys_step_count = 0; %v_hys_steps;
+		hys_p_count = 0;
 	end
 	
 	methods
@@ -65,6 +77,16 @@ classdef CP < controller
 
 			obj.f_ma = hc.F_min*ones(hc.Nc,1);
 			obj.pid_integ = zeros(hc.Nc,1);
+
+			obj.o_inc_st = 0;
+			obj.o_dec_st = 0;
+			obj.o_inc_step_count = 0; %v_inc_steps;
+			obj.o_dec_step_count = 0; %v_dec_steps;
+			obj.o_inc_steps = 1+3;
+			obj.o_hys_act = 0;
+			obj.o_hys_step_count = 0; %v_hys_steps;
+			obj.hys_p_count = 0;
+			obj.nOut = hc.F_min*ones(hc.Nc,1);
 		end
 		function [F,V, obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
 
@@ -76,6 +98,13 @@ classdef CP < controller
 			if p_budget~=obj.pbold
 				obj.pbold = p_budget;
 				obj.pbc = 1;
+				obj.hys_p_count = 0;
+				obj.o_hys_act = 0;
+				obj.o_inc_st = 0;
+				obj.o_dec_st = 0;
+				obj.o_inc_step_count = 0; %v_inc_steps;
+				obj.o_dec_step_count = 0; %v_dec_steps;
+				obj.o_hys_step_count = 0;
 			else
 				obj.pbc = 0;
 			end
@@ -131,6 +160,56 @@ classdef CP < controller
 		
 			% Save OG freq
 			F_og = F;
+
+
+			%% HYSTERESIS F-FILTER ACTIVATION
+			%{
+			F_inc = (F > (obj.nOut+1e-3));
+			F_dec = (F < (obj.nOut-1e-3));
+			
+			obj.o_inc_st = obj.o_inc_st | F_inc;
+			obj.o_inc_step_count = (obj.o_inc_steps.*F_inc) + ((~F_inc).*(obj.o_inc_step_count - obj.o_inc_st));
+			
+			obj.o_inc_st = (obj.o_inc_step_count>0); % | o_dec_st;
+			
+			obj.o_dec_st = obj.o_inc_st & ( obj.o_dec_st | F_dec);
+			%if o_dec_st
+			%	s=s;
+			%end
+			%o_dec_step_count = (o_dec_steps.*V_dec) + ((~V_dec).*(o_dec_step_count - o_dec_st));
+			obj.o_dec_step_count = ((obj.o_dec_step_count>0).*(obj.o_dec_step_count-1)) + (obj.o_dec_step_count<=0).*(obj.o_dec_st.*obj.o_dec_steps);
+			
+			obj.o_dec_st = (obj.o_dec_step_count>0);
+			
+			o_hys_act_hold = obj.o_hys_act;
+			
+			obj.o_hys_act = obj.o_hys_act | (obj.o_dec_st & F_inc);
+			
+			%Initialize
+			obj.o_hys_step_count = ((obj.o_hys_step_count>0).*obj.o_hys_step_count) + (obj.o_hys_step_count<=0).*(obj.o_hys_act.*obj.o_hys_steps);
+			%Reduce
+			%pull = (Ceff.*F.*(obj.VDom*V) + obj.leak_vdd/1000).*(obj.VDom*V) + d_p*obj.leak_process/1000;
+			f_hys_red = (i_pwm - p_budget) < -(p_budget*(0.125+obj.hys_p_count/10));
+			%(sum(pull) - p_budget + pw_adapt) < -6 ;
+			%(delta_p < (p_budget - 6)); %TODO: 6 depends on the #of cores, #of domains, and the ratio between the two.
+			%TODO: also depends on the power budget itself, and the PMAX, PMIN
+			obj.o_hys_step_count = (obj.o_hys_act & obj.o_hys_step_count) .* ...
+				(obj.o_hys_step_count - f_hys_red);
+			
+			obj.o_hys_act = (obj.o_hys_step_count>0);
+			
+			obj.hys_p_count = obj.hys_p_count + (o_hys_act_hold ~= obj.o_hys_act) .* obj.o_hys_act;
+
+			F = F.*((~obj.o_hys_act)|(F<=obj.nOut)) + obj.nOut.*(obj.o_hys_act & (F>obj.nOut));
+			
+			obj.nOut = F;
+
+
+			% Save OG freq
+			F_og = F;
+			%}
+
+			%%
 	
 			% Process Freq
 			%	Check vs maxF, Temp hysteresis, etc.

@@ -714,5 +714,29 @@ end
 
 %%
 
+%{
+main = fieldnames(tres{1,1,1,1,1})
+for i=1:length(main)
+	
+end
 
 
+for ctl=1:1
+	for WL=1:WL_N
+		for MODEL=1:3
+			for DOM=1:4
+				%tres{2, DOM, MODEL, ctl, WL}.power
+				%tres{2, DOM, MODEL, ctl, WL}.temp
+				%tres{2, DOM, MODEL, ctl, WL}.freq
+				%tres{2, DOM, MODEL, ctl, WL}.vdd
+
+				%
+				tres{2, DOM, MODEL, ctl, WL}.perf.fd.Max - tres{1, DOM, MODEL, ctl, WL}.perf.fd.Max
+				tres{2, DOM, MODEL, ctl, WL}.perf.fd.min - tres{1, DOM, MODEL, ctl, WL}.perf.fd.min
+				tres{2, DOM, MODEL, ctl, WL}.perf.fd.Av - tres{1, DOM, MODEL, ctl, WL}.perf.fd.Av
+				tres{2, DOM, MODEL, ctl, WL}.perf.fd.StdAv - tres{1, DOM, MODEL, ctl, WL}.perf.fd.StdAv
+			end
+		end
+	end
+end
+%}

@@ -141,20 +141,23 @@ robust = 0;
 show = 0;
 savetofile = 0;
 hpc.compare_vs_baseline = 1;
+hpc.sensor_noise = 0;
+
+test_iter = 2;%20;
 
 tres = [];
-tres{ndom, th_models, 3, wl_times} = [];
+tres{test_iter, ndom, th_models, 3, wl_times} = [];
 
 xres = [];
-xres{ndom, th_models, 3, wl_times} = [];
+%xres{ndom, th_models, 3, wl_times} = [];
 ures = [];
-ures{ndom, th_models, 3, wl_times} = [];
+%ures{ndom, th_models, 3, wl_times} = [];
 fres = [];
-fres{ndom, th_models, 3, wl_times} = [];
+%fres{ndom, th_models, 3, wl_times} = [];
 vres = [];
-vres{ndom, th_models, 3, wl_times} = [];
+%vres{ndom, th_models, 3, wl_times} = [];
 wlres = [];
-wlres{ndom, th_models, 3, wl_times} = [];
+wlres{test_iter, ndom, th_models, 3, wl_times} = [];
 
 if hpc.Nc == 36
 	coreid1 = [4 8 12 17 20 22 27 31 36];
@@ -225,6 +228,11 @@ figid = 1;
 addpath('Controllers/');
 
 %%
+for tit=1:test_iter
+	%tvit = (60-25)/(test_iter-1)*(tit-1);
+	%hpc.t_init = (25+tvit+273.15)*ones(hpc.Ns,1); %temp_amb*ones(hpc.Ns,1);
+	%hpc.t_init(end) = min(hpc.t_init(end), 42+273.15);
+
 for wli=1:wl_times
 	
 	tic
@@ -360,7 +368,7 @@ for wli=1:wl_times
 			end
 
 			hpc.quad_pw_budget = 450/36*hpc.Nc*ones(2,hpc.vd);
-			itname = strcat('Model: ', int2str(mdli), ' - Domains: ', int2str(di), ' - WL: ', int2str(wli));
+			itname = strcat('Model: ', int2str(mdli), ' - Domains: ', int2str(di), ' - WL: ', int2str(wli), ' - test: ', int2str(tit));
 
 			%%
 
@@ -372,23 +380,24 @@ for wli=1:wl_times
 			ctrl.Ts_ctrl = 500e-6;
 			
 			[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
-			xres{di, mdli, 1, wli} = xop;
-			ures{di, mdli, 1, wli} = uop; 
-			fres{di, mdli, 1, wli} = fop;
-			vres{di, mdli, 1, wli} = vop;
-			wlres{di, mdli, 1, wli} = wlop;
+			%xres{di, mdli, 1, wli} = xop;
+			%ures{di, mdli, 1, wli} = uop; 
+			%fres{di, mdli, 1, wli} = fop;
+			%vres{di, mdli, 1, wli} = vop;
+			wlres{tit, di, mdli, 1, wli} = wlop;
 			if wli == 2
 				frtrc_hold = hpc.frtrc;
+				fop_hold = fop;
 				fop = fop(:,coreid12);
 				wlop = wlop(coreid12);
 				hpc.frtrc = hpc.frtrc(:,coreid12);
 				hpc.taas_fix(awl);
 			end
-			tres{di, mdli, 1, wli} = hpc.stats_analysis(ctrl, xop, uop, fop, vop, wlop);
+			tres{tit, di, mdli, 1, wli} = hpc.stats_analysis(ctrl, xop, uop, fop, vop, wlop);
 			if wli == 2
 				hpc.frtrc = frtrc_hold;
-				fop = fres{di, mdli, 1, wli};
-				wlop = wlres{di, mdli, 1, wli};
+				fop = fop_hold;
+				wlop = wlres{tit,di, mdli, 1, wli};
 				hpc.taas_fix(awl);
 			end
 			
@@ -402,6 +411,8 @@ for wli=1:wl_times
 			end
 			if savetofile
 				hpc.saveall(xop, uop, fop, vop, wlop, path, regexprep(strcat('Alg: NCP - ', itname), ':', '_'));
+			else
+				hpc.savetofile(hpc.xutplot(xop, uop),strcat(path,separator_os,regexprep(strcat('Alg: NCP - ', itname), "-", "TP")),1);
 			end
 			
 			%hpc.paperTPplot(hpc.Ts*[0:4000*10]', xop, uop);
@@ -411,23 +422,24 @@ for wli=1:wl_times
 			ctrl.C = hpc.Cc;
 			ctrl.Ts_ctrl = 500e-6;
 			[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
-			xres{di, mdli, 2, wli} = xop;
-			ures{di, mdli, 2, wli} = uop; 
-			fres{di, mdli, 2, wli} = fop;
-			vres{di, mdli, 2, wli} = vop;
-			wlres{di, mdli, 2, wli} = wlop;			
+			%xres{di, mdli, 2, wli} = xop;
+			%ures{di, mdli, 2, wli} = uop; 
+			%fres{di, mdli, 2, wli} = fop;
+			%vres{di, mdli, 2, wli} = vop;
+			wlres{tit, di, mdli, 2, wli} = wlop;			
 			if wli == 2
 				frtrc_hold = hpc.frtrc;
+				fop_hold = fop;
 				fop = fop(:,coreid12);
 				wlop = wlop(coreid12);
 				hpc.frtrc = hpc.frtrc(:,coreid12);
-				hpc.taas_fix(awl);				
+				hpc.taas_fix(awl);
 			end
-			tres{di, mdli, 2, wli} = hpc.stats_analysis(ctrl, xop, uop, fop, vop, wlop);
+			tres{tit, di, mdli, 2, wli} = hpc.stats_analysis(ctrl, xop, uop, fop, vop, wlop);
 			if wli == 2
 				hpc.frtrc = frtrc_hold;
-				fop = fres{di, mdli, 2, wli};
-				wlop = wlres{di, mdli, 2, wli};
+				fop = fop_hold;
+				wlop = wlres{tit,di, mdli, 2, wli};
 				hpc.taas_fix(awl);
 			end
 			
@@ -440,6 +452,7 @@ for wli=1:wl_times
 				end
 				figid = length(figarray)+1;
 			end
+			
 			if savetofile
 				hpc.saveall(xop, uop, fop, vop, wlop, path, regexprep(strcat('Alg: CP - ', itname), ':', '_'));
 			end
@@ -450,23 +463,24 @@ for wli=1:wl_times
 			ctrl.C = hpc.Cc;
 			ctrl.Ts_ctrl = 250e-6;
 			[xop, uop, fop, vop, wlop] = hpc.simulation(ctrl, show);
-			xres{di, mdli, 3, wli} = xop;
-			ures{di, mdli, 3, wli} = uop; 
-			fres{di, mdli, 3, wli} = fop;
-			vres{di, mdli, 3, wli} = vop;
-			wlres{di, mdli, 3, wli} = wlop;
+			%xres{di, mdli, 3, wli} = xop;
+			%ures{di, mdli, 3, wli} = uop; 
+			%fres{di, mdli, 3, wli} = fop;
+			%vres{di, mdli, 3, wli} = vop;
+			wlres{tit, di, mdli, 3, wli} = wlop;
 			if wli == 2
 				frtrc_hold = hpc.frtrc;
+				fop_hold = fop;
 				fop = fop(:,coreid12);
 				wlop = wlop(coreid12);
 				hpc.frtrc = hpc.frtrc(:,coreid12);
 				hpc.taas_fix(awl);
 			end
-			tres{di, mdli, 3, wli} = hpc.stats_analysis(ctrl, xop, uop, fop, vop, wlop);
+			tres{tit, di, mdli, 3, wli} = hpc.stats_analysis(ctrl, xop, uop, fop, vop, wlop);
 			if wli == 2
 				hpc.frtrc = frtrc_hold;
-				fop = fres{di, mdli, 3, wli};
-				wlop = wlres{di, mdli, 3, wli};
+				fop = fop_hold;
+				wlop = wlres{tit,di, mdli, 3, wli};
 				hpc.taas_fix(awl);
 			end
 
@@ -489,6 +503,8 @@ for wli=1:wl_times
 	toc
 	
 end % for wl_times
+
+end %test_iter
 
 
 
