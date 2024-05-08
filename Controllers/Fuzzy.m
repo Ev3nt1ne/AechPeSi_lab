@@ -99,7 +99,7 @@ classdef Fuzzy < CP
 			T = pvt{hc.PVT_T};
 			process = pvt{hc.PVT_P};
 			
-			if (obj.ex_count>obj.Tper+1) && (mod(obj.ex_count,obj.Tper)==2)
+			if (mod(obj.ex_count,obj.Tper)==2) % && (obj.ex_count>obj.Tper+1)
 				obj.derT = T - obj.T_old;
 				obj.T_old = T;
 			end

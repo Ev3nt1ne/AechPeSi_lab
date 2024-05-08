@@ -361,6 +361,10 @@ classdef cp_mpc < mpc_hpc & CP
 			if hc.F_discretization_step > 0
 				F = fix(F/hc.F_discretization_step) * hc.F_discretization_step;
 			end
+			%	Check vs maxF, Temp hysteresis, etc.
+			fmaxi = hc.FV_table(sum(hc.VDom * V > ones(hc.Nc,1)*hc.FV_table(:,1)'+1e-6, 2) + 1, 3);
+			F = F + (F>fmaxi).*(fmaxi - F);
+			F = F + (F<hc.F_min).*(hc.F_min*ones(hc.Nc,1) - F);
 	
 			%if powerbudget has changed || freq changed
 			% interpolate a parabola

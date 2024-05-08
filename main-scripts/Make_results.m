@@ -3,7 +3,7 @@
 WL_N = 3;
 old_perf = 1;
 
-
+TEST = 8;
 %%
 
 %% TEMPERATURE
@@ -27,13 +27,13 @@ for WL=1:WL_N
 			disp("Ex Max");
 			strj = "";
 			for i=1:3
-				if isempty(tres{DOM, MODEL, i, WL}.temp.exMn.Max)
+				if isempty(tres{TEST, DOM, MODEL, i, WL}.temp.exMn.Max)
 					BARj( WL, lj, rowj , i ) = 0;
 				else
-					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exMn.Max;
+					BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.temp.exMn.Max;
 				end
 				
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exMn.Max, '%.2f'));	
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.temp.exMn.Max, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -46,8 +46,8 @@ for WL=1:WL_N
 			disp("Ex 95");
 			strj = "";
 			for i=1:3
-				%BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exMn.Mean95;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exMn.Mean95, '%.2f'));	
+				%BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.temp.exMn.Mean95;
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.temp.exMn.Mean95, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -60,8 +60,8 @@ for WL=1:WL_N
 			disp("Ex Av");
 			strj = "";
 			for i=1:3	
-				BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exMn.MeanAv;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exMn.MeanAv, '%.2f'));	
+				BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.temp.exMn.MeanAv;
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.temp.exMn.MeanAv, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -74,8 +74,8 @@ for WL=1:WL_N
 			disp("Time Ex tot");
 			strj = "";
 			for i=1:3
-				%BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exMn.TotTime;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exMn.TotTime, '%.3f'));	
+				%BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.temp.exMn.TotTime;
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.temp.exMn.TotTime, '%.3f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -88,8 +88,8 @@ for WL=1:WL_N
 			disp("Time Ex Av %");
 			strj = "";
 			for i=1:3	
-				BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.exMn.MeanTime/0.75*100;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.exMn.MeanTime/0.75*100, '%.2f'));	
+				BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.temp.exMn.MeanTime/0.75*100;
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.temp.exMn.MeanTime/0.75*100, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -102,8 +102,8 @@ for WL=1:WL_N
 			disp("T Max %");
 			strj = "";
 			for i=1:3	
-				%BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.Max;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.Max, '%.2f'));	
+				%BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.temp.Max;
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.temp.Max, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -116,8 +116,8 @@ for WL=1:WL_N
 			disp("T Av %");
 			strj = "";
 			for i=1:3	
-				BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.temp.Av;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.temp.Av, '%.2f'));	
+				BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.temp.Av;
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.temp.Av, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -177,7 +177,7 @@ for WL=1:WL_N
 			disp("Ex Max W");
 			strj = "";
 			for i=1:3	
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.power.exMaxW, '%.2f'));	
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.power.exMaxW, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -189,12 +189,12 @@ for WL=1:WL_N
 			disp("Ex Max %");
 			strj = "";
 			for i=1:3
-				if isempty(tres{DOM, MODEL, i, WL}.power.exMaxP)
+				if isempty(tres{TEST, DOM, MODEL, i, WL}.power.exMaxP)
 					BARj( WL, lj, rowj , i ) = 0;
 				else
-					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.power.exMaxP*100;
+					BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.power.exMaxP*100;
 				end				
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.power.exMaxP*100, '%.2f'));	
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.power.exMaxP*100, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -207,7 +207,7 @@ for WL=1:WL_N
 			disp("Ex 95 W");
 			strj = "";
 			for i=1:3	
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.power.ex95W, '%.2f'));	
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.power.ex95W, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -219,8 +219,8 @@ for WL=1:WL_N
 			disp("Ex 95 P");
 			strj = "";
 			for i=1:3
-				BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.power.ex95P*100;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.power.ex95P*100, '%.2f'));	
+				BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.power.ex95P*100;
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.power.ex95P*100, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -233,7 +233,7 @@ for WL=1:WL_N
 			disp("Ex Av W");
 			strj = "";
 			for i=1:3	
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.power.exAvW, '%.2f'));	
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.power.exAvW, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -245,8 +245,8 @@ for WL=1:WL_N
 			disp("Ex Av P");
 			strj = "";
 			for i=1:3	
-				BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.power.exAvP*100;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.power.exAvP*100, '%.2f'));	
+				BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.power.exAvP*100;
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.power.exAvP*100, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -259,8 +259,8 @@ for WL=1:WL_N
 			disp("Ex Time Tot");
 			strj = "";
 			for i=1:3	
-				BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.power.exTime/1.5*100;
-				strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.power.exTime/1.5*100, '%.2f'));	
+				BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.power.exTime/1.5*100;
+				strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.power.exTime/1.5*100, '%.2f'));	
 				if i<3
 					strj = strcat( strj, " | ");
 				end
@@ -341,7 +341,7 @@ for WL=1:WL_N
 			disp("2-norm");
 			strj = "";
 				for i=1:3	
-					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.perf.fd.l2norm;
+					BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.perf.fd.l2norm;
 					strj = strcat( strj, num2str(BARj( WL, lj, rowj , i ), '%.2f'));	
 					if i<3
 						strj = strcat( strj, " | ");
@@ -356,8 +356,8 @@ for WL=1:WL_N
 			disp("Max perf");
 			strj = ""; 
 				for i=1:3	
-					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.perf.wl.Max;
-					strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.perf.wl.Max, '%.2f'));	
+					BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.perf.wl.Max;
+					strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.perf.wl.Max, '%.2f'));	
 					if i<3
 						strj = strcat( strj, " | ");
 					end
@@ -370,8 +370,8 @@ for WL=1:WL_N
 			disp("average perf");
 			strj = "";
 				for i=1:3	
-					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.perf.wl.Av;
-					strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.perf.wl.Av, '%.2f'));	
+					BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.perf.wl.Av;
+					strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.perf.wl.Av, '%.2f'));	
 					if i<3
 						strj = strcat( strj, " | ");
 					end
@@ -384,8 +384,8 @@ for WL=1:WL_N
 			disp("min Perf");
 			strj = "";
 				for i=1:3	
-					BARj( WL, lj, rowj , i ) = tres{DOM, MODEL, i, WL}.perf.wl.min;
-					strj = strcat( strj, num2str(tres{DOM, MODEL, i, WL}.perf.wl.min, '%.2f'));	
+					BARj( WL, lj, rowj , i ) = tres{TEST, DOM, MODEL, i, WL}.perf.wl.min;
+					strj = strcat( strj, num2str(tres{TEST, DOM, MODEL, i, WL}.perf.wl.min, '%.2f'));	
 					if i<3
 						strj = strcat( strj, " | ");
 					end
@@ -566,10 +566,10 @@ for di=1:4
 
 		for i=1:3
 			for cc=1:2
-				fcp = fres{di, mdli, i, wli};
+				fcp = fres{TEST, di, mdli, i, wli};
 				fcp = fcp(2:end,:);
 				%wlres_new{di, mdli, i, wli} = wlres{di, mdli, i, wli} ./ perf_max_check{wli} * 100;
-				w = wlres{di, mdli, i, wli};
+				w = wlres{TEST, di, mdli, i, wli};
 
 				smref = round((size(fcp,1))/(size(hpc.frtrc(2:end,:),1)));
 				smf = round((size(hpc.frtrc(2:end,:),1))/(size(fcp,1)));
@@ -589,20 +589,20 @@ for di=1:4
 				end
 
 				n2 = reshape(fd,[],1);
-				perft2{di, mdli, i, cc}.fd2norm = norm(n2);
+				perft2{TEST,di, mdli, i, cc}.fd2norm = norm(n2);
 				%perf.fdAv2norm = mean(norm
-				perft2{di, mdli, i, cc}.fdMax = max(fd(:));
-				perft2{di, mdli, i, cc}.fdmin = min(fd(:));
-				perft2{di, mdli, i, cc}.fdAv = mean(fd(:));
-				perft2{di, mdli, i, cc}.fdSum = sum(fd(:));
-				perft2{di, mdli, i, cc}.fdAvSD = std(mean(fd));
-				perft2{di, mdli, i, cc}.fdSDMean = mean(std(fd));
+				perft2{TEST,di, mdli, i, cc}.fdMax = max(fd(:));
+				perft2{TEST,di, mdli, i, cc}.fdmin = min(fd(:));
+				perft2{TEST,di, mdli, i, cc}.fdAv = mean(fd(:));
+				perft2{TEST,di, mdli, i, cc}.fdSum = sum(fd(:));
+				perft2{TEST,di, mdli, i, cc}.fdAvSD = std(mean(fd));
+				perft2{TEST,di, mdli, i, cc}.fdSDMean = mean(std(fd));
 
 
-				perft2{di, mdli, i, cc}.wlMax = max(w);
-				perft2{di, mdli, i, cc}.wlAv = mean(w);
-				perft2{di, mdli, i, cc}.wlmin = min(w);
-				perft2{di, mdli, i, cc}.wlSD = std(w);
+				perft2{TEST,di, mdli, i, cc}.wlMax = max(w);
+				perft2{TEST,di, mdli, i, cc}.wlAv = mean(w);
+				perft2{TEST,di, mdli, i, cc}.wlmin = min(w);
+				perft2{TEST,di, mdli, i, cc}.wlSD = std(w);
 			end
 		end
 				

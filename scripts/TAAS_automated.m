@@ -143,7 +143,7 @@ savetofile = 0;
 hpc.compare_vs_baseline = 1;
 hpc.sensor_noise = 0;
 
-test_iter = 2;%20;
+test_iter = 10;%20;
 
 tres = [];
 tres{test_iter, ndom, th_models, 3, wl_times} = [];
@@ -201,6 +201,27 @@ hpc.ctrl_MA = 1;
 hpc.iterative_fv = ~hpc.ctrl_MA;
 %}
 
+max_amb_T = (45+273.15);
+max_init_T = (85 + 273.15) - 15;
+max_elem_T = 55+273.15;
+
+test_T_step = (max_init_T - hpc.t_outside) /  (test_iter-1);
+err_ampl = 0.5;
+rand_T_init = rand(hpc.Ns,test_iter)*err_ampl*2 - err_ampl*ones(hpc.Ns,test_iter);
+init_cond = ones(hpc.Ns,1) * (hpc.t_outside:test_T_step:max_init_T);
+
+for i=-1:0
+    tr = init_cond(end+i,:) > max_amb_T;
+    init_cond(end+i,tr) = max_amb_T;
+end
+
+for i=-3:-2
+    tr = init_cond(end+i,:) > max_elem_T;
+    init_cond(end+i,tr) = max_elem_T;
+end
+
+init_cond = init_cond + rand_T_init
+
 %% 
 % Import the file
 cpth = pwd;
@@ -223,21 +244,32 @@ for i = 1:length(vars)
 	assignin('base', vars{i}, newData1.(vars{i}));
 end
 
+% Import the file
+fileToRead1 = strcat(cpth, separator_os, 'TAAS_Init_cond.mat');
+newData1 = load('-mat', fileToRead1);
+
+% Create new variables in the base workspace from those fields.
+vars = fieldnames(newData1);
+for i = 1:length(vars)
+	assignin('base', vars{i}, newData1.(vars{i}));
+end
+
+
 figid = 1;
 
 addpath('Controllers/');
 
 %%
-for tit=1:test_iter
-	%tvit = (60-25)/(test_iter-1)*(tit-1);
-	%hpc.t_init = (25+tvit+273.15)*ones(hpc.Ns,1); %temp_amb*ones(hpc.Ns,1);
-	%hpc.t_init(end) = min(hpc.t_init(end), 42+273.15);
+for tit=8:test_iter
+
+	hpc.t_init = init_cond(:,tit);
 
 for wli=1:wl_times
 	
 	tic
 		
 	bwl = 1;
+    tt = min(ceil(hpc.tsim / hpc.Ts_target)+1, (hpc.tsim/1e-4+1));
 	switch wli
 		case 1
 			%full vector

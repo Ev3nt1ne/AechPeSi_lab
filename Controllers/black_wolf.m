@@ -208,11 +208,21 @@ classdef black_wolf < mpc_hpc & CP
 			end
 			
 			% Choose Voltage
-			FD = diag(f_ref)*hc.VDom;
-			V = obj.compute_sharedV(hc, FD, obj.voltage_rule);
+			domain_paired = 0;
+			if (domain_paired)
+				FD = diag(f_ref)*hc.VDom;
+				V = obj.compute_sharedV(hc, FD, obj.voltage_rule);
+			else
+				fd = diag(f_ref)*ones(length(f_ref), 15);
+				V = hc.FV_table(sum(fd' > hc.FV_table(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue
+			end
 			F = f_ref;
 
-			input_mpc = F .* (hc.VDom*(V .* V));
+			if (domain_paired)
+				input_mpc = F .* (hc.VDom*(V .* V));
+			else
+				input_mpc = F .* (V .* V);
+			end
 
 			% TODO observer
 			Tobs = T;
@@ -265,6 +275,7 @@ classdef black_wolf < mpc_hpc & CP
 			obj.failed = obj.failed + ((sum(tt)>0) | (sum(obj.output_mpc<outmpc_min)>0));
 
 			% Bisection
+			V =[];
 			for vi=1:hc.vd
 				fp = f_ref.*hc.VDom(:,vi);
 				cidx = [1:1:hc.Nc]' .* (fp>0);
@@ -286,7 +297,7 @@ classdef black_wolf < mpc_hpc & CP
 				F(cidx) = Fc;
 
 				% TODO: Reverse Voltage choice, here again I use max.
-				V(vi) = hc.FV_table(sum(max(Fc) > hc.FV_table(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue
+				V(vi,1) = hc.FV_table(sum(max(Fc) > hc.FV_table(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue
 			end
 
 			%disp(obj.ex_count)
