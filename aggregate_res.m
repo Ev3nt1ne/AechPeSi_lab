@@ -10,7 +10,7 @@ alg_pos = 4;
 wl_pos = 5;
 
 % Main Aggregator metric: *test*/domain/model/*alg*/wl
-mam = test_pos;
+mam = dom_pos;
 
 %secondary Aggregator metric or Comparison metric (i.e. the one in the bars)
 scm = alg_pos;
@@ -30,22 +30,16 @@ end
 
 
 % Max Temp
-T_M = zeros(mdim,sdim);
-T_AvEv = zeros(mdim,sdim);
-T_AvEt = zeros(mdim,sdim);
-T_MEt = zeros(mdim,sdim);
-T_mEt = zeros(mdim,sdim);
-P_AvEp = zeros(mdim,sdim);
-P_MEp = zeros(mdim,sdim);
-P_AvEt = zeros(mdim,sdim);
-P_MEt = zeros(mdim,sdim);
-P_mEt = zeros(mdim,sdim);
-W_MFD = zeros(mdim,sdim);
-W_AvFD = zeros(mdim,sdim);
-W_mFD = zeros(mdim,sdim);
-W_MWL = zeros(mdim,sdim);
-W_AvWL = zeros(mdim,sdim);
-W_mWL = zeros(mdim,sdim);
+T_M = zeros(3, mdim,sdim);
+T_AvEv = zeros(3, mdim,sdim);
+T_AvEt = zeros(3, mdim,sdim);
+P_AvEp = zeros(3, mdim,sdim);
+P_MEp = zeros(3, mdim,sdim);
+P_AvEt = zeros(3, mdim,sdim);
+W_AvFD = zeros(3, mdim,sdim);
+W_MWL = zeros(3, mdim,sdim);
+W_AvWL = zeros(3, mdim,sdim);
+W_mWL = zeros(3, mdim,sdim);
 
 
 for m=1:mdim
@@ -56,50 +50,72 @@ for m=1:mdim
         aidx{scm} = s;
 
         % Max temp
-        T_M(m,s) = max(extractCell(tres, aidx, "temp", "Max"));
+        data = (extractCell(tres, aidx, "temp", "Max"));
+        T_M(1,m,s) = max(data);
+        T_M(2,m,s) = mean(data);
+        T_M(3,m,s) = min(data);
 
         % Avearge Exceeding Temp
-        T_AvEv(m,s) = mean(extractCell(tres, aidx, "temp", "exMn", "MeanAv"));
+        data = (extractCell(tres, aidx, "temp", "exMn", "MeanAv"));
+        T_AvEv(2,m,s) = mean(data);
+        T_AvEv(1,m,s) = max(data);
+        T_AvEv(3,m,s) = min(data);
 
         % Average Exceeding Temp time
         Et = (extractCell(tres, aidx, "temp", "exMn", "MeanTime"));
-        T_AvEt(m,s) = mean(Et);
-        T_MEt(m,s) = max(Et);
-        T_mEt(m,s) = min(Et);
+        T_AvEt(2,m,s) = mean(Et);
+        T_AvEt(1,m,s) = max(Et);
+        T_AvEt(3,m,s) = min(Et);
 
         %%% POWER
 
         % Average Exceeding Power 
-        P_AvEp(m,s) = mean(extractCell(tres, aidx, "power", "exAvP"));
+        data = (extractCell(tres, aidx, "power", "exAvP"));
+        P_AvEp(2,m,s) = mean(data);
+        P_AvEp(1,m,s) = max(data);
+        P_AvEp(3,m,s) = min(data);
 
         % 95P Exceeding Power 
-        P_MEp(m,s) = max(extractCell(tres, aidx, "power", "ex95P"));
+        data = (extractCell(tres, aidx, "power", "ex95P"));
+        P_MEp(1,m,s) = max(data);
+        P_MEp(2,m,s) = mean(data);
+        P_MEp(3,m,s) = min(data);
+
 
         % Average Exceeding Power time
         Et = (extractCell(tres, aidx, "power", "exTime"));
-        P_AvEt(m,s) = mean(Et);
-        P_MEt(m,s) = max(Et);
-        P_mEt(m,s) = min(Et);
+        P_AvEt(2,m,s) = mean(Et);
+        P_AvEt(1,m,s) = max(Et);
+        P_AvEt(3,m,s) = min(Et);
 
         %%% PERFORMANCE
 
         % fd norm
         l2nfd = (extractCell(tres, aidx, "perf", "fd", "l2norm"));
         % MAX
-        W_MFD(m,s) = max(l2nfd);
+        W_AvFD(1,m,s) = max(l2nfd);
         % Mean
-        W_AvFD(m,s) = mean(l2nfd);
+        W_AvFD(2,m,s) = mean(l2nfd);
         % min
-        W_mFD(m,s) = min(l2nfd);
+        W_AvFD(3,m,s) = min(l2nfd);
 
         % wl Max
-        W_MWL(m,s) = max(extractCell(tres, aidx, "perf", "wl", "Max"));
+        data = (extractCell(tres, aidx, "perf", "wl", "Max"));
+        W_MWL(1,m,s) = max(data);
+        W_MWL(2,m,s) = mean(data);
+        W_MWL(3,m,s) = min(data);
 
         % wl Mean
-        W_AvWL(m,s) = mean(extractCell(tres, aidx, "perf", "wl", "Av"));
+        data = (extractCell(tres, aidx, "perf", "wl", "Av"));
+        W_AvWL(2,m,s) = mean(data);
+        W_AvWL(1,m,s) = max(data);
+        W_AvWL(3,m,s) = min(data);
 
         % wl min
-        W_mWL(m,s) = min(extractCell(tres, aidx,  "perf", "wl", "min"));
+        data = (extractCell(tres, aidx,  "perf", "wl", "min"));
+        W_mWL(3,m,s) = min(data);
+        W_mWL(1,m,s) = max(data);
+        W_mWL(2,m,s) = mean(data);
 
     end
 end
@@ -107,7 +123,7 @@ end
 %% Plot
 
 f = figure();
-t = tiledlayout(3,2);
+t = tiledlayout(3,6);
 
 switch mam
     case test_pos
@@ -132,14 +148,23 @@ t.Padding = 'tight';
 %%% TEMP
 %%%%%%%%%%%%%%%%%%%%%%
 
-%%%%%%%%%%%
-% Exceeding Value
-nexttile;
 
-model_series = T_AvEv;
+%%%%%%%%%%%
+% Max Exceeding Value
+nexttile([1 3]);
+
 %TODO: FIX THIS
-err_high = T_M-mean(ctrl.T_target)+273.15;
-err_low = zeros(size(T_M));
+model_series = T_M - (mean(ctrl.T_target)-273.15);
+model_series(model_series<0) = 0;
+
+%model_series = T_AvEv;
+%TODO: FIX THIS
+%err_high = T_M-mean(ctrl.T_target)+273.15;
+%err_low = zeros(size(T_M));
+
+err_high = squeeze(model_series(1,:,:));
+err_low = squeeze(model_series(3,:,:));
+model_series = squeeze(model_series(2,:,:));
 
 err_high = err_high - model_series;
 err_low = model_series - err_low;
@@ -158,17 +183,19 @@ end
 errorbar(xc',model_series, err_low, err_high, 'k','linestyle','none');
 hold off
 
-title('Exceeding Temperature Value');
+title('Max Exceeding Temperature Value');
 xticklabels(xmaml);
 ylabel('[°C]');
 
 %%%%%%%%%%%
 % Exceeding time
-nexttile;
+nexttile([1 3]);
 
-model_series = T_AvEt/0.75*100;
-err_high = T_MEt/0.75*100;
-err_low = T_mEt/0.75*100;
+model_series = T_AvEt/2*100;
+
+err_high = squeeze(model_series(1,:,:));
+err_low = squeeze(model_series(3,:,:));
+model_series = squeeze(model_series(2,:,:));
 
 err_high = err_high - model_series;
 err_low = model_series - err_low;
@@ -198,11 +225,13 @@ ylabel('[%]');
 
 %%%%%%%%%%%
 % Exceeding Value
-nexttile;
+nexttile([1 3]);
 
 model_series = P_AvEp*100;
-err_high = P_MEp*100;
-err_low = zeros(size(P_AvEp));
+
+err_high = squeeze(model_series(1,:,:));
+err_low = squeeze(model_series(3,:,:));
+model_series = squeeze(model_series(2,:,:));
 
 err_high = err_high - model_series;
 err_low = model_series - err_low;
@@ -227,11 +256,13 @@ ylabel('[%]');
 
 %%%%%%%%%%%
 % Exceeding time
-nexttile;
+nexttile([1 3]);
 
 model_series = P_AvEt/1.5*100;
-err_high = P_MEt/1.5*100;
-err_low = P_mEt/1.5*100;
+
+err_high = squeeze(model_series(1,:,:));
+err_low = squeeze(model_series(3,:,:));
+model_series = squeeze(model_series(2,:,:));
 
 err_high = err_high - model_series;
 err_low = model_series - err_low;
@@ -261,11 +292,13 @@ ylabel('[%]');
 
 %%%%%%%%%%%
 % Norm
-nexttile;
+nexttile([1 2]);
 
 model_series = W_AvFD;
-err_high = W_MFD;
-err_low = W_mFD;
+
+err_high = squeeze(model_series(1,:,:));
+err_low = squeeze(model_series(3,:,:));
+model_series = squeeze(model_series(2,:,:));
 
 err_high = err_high - model_series;
 err_low = model_series - err_low;
@@ -284,17 +317,19 @@ end
 errorbar(xc',model_series, err_low, err_high, 'k','linestyle','none');
 hold off
 
-title('L2-Norm of Frequency Difference (min is better)');
+title('L2-Norm of Frequency Difference (less is better)');
 xticklabels(xmaml);
 ylabel('[]');
 
 %%%%%%%%%%%
-% WL
-nexttile;
+% WL Av
+nexttile([1 2]);
 
 model_series = W_AvWL;
-err_high = W_MWL;
-err_low = W_mWL;
+
+err_high = squeeze(model_series(1,:,:));
+err_low = squeeze(model_series(3,:,:));
+model_series = squeeze(model_series(2,:,:));
 
 err_high = err_high - model_series;
 err_low = model_series - err_low;
@@ -313,7 +348,38 @@ end
 errorbar(xc',model_series, err_low, err_high, 'k','linestyle','none');
 hold off
 
-title('Executed Workload');
+title('Cores Average Executed Workload');
+xticklabels(xmaml);
+ylabel('[%]');
+
+%%%%%%%%%%%
+% WL min
+nexttile([1 2]);
+
+model_series = W_mWL;
+
+err_high = squeeze(model_series(1,:,:));
+err_low = squeeze(model_series(3,:,:));
+model_series = squeeze(model_series(2,:,:));
+
+err_high = err_high - model_series;
+err_low = model_series - err_low;
+
+b = bar(model_series, 'grouped');
+hold on
+% Calculate the number of groups and number of bars in each group
+[ngroups,nbars] = size(model_series);
+
+% Get the x coordinate of the bars
+xc = nan(nbars, ngroups);
+for i = 1:nbars
+    xc(i,:) = b(i).XEndPoints;
+end
+% Plot the errorbars
+errorbar(xc',model_series, err_low, err_high, 'k','linestyle','none');
+hold off
+
+title('Cores minimum Executed Workload');
 xticklabels(xmaml);
 ylabel('[%]');
 
