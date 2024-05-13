@@ -10,10 +10,13 @@ alg_pos = 4;
 wl_pos = 5;
 
 % Main Aggregator metric: *test*/domain/model/*alg*/wl
-mam = dom_pos;
+mam = wl_pos;
 
 %secondary Aggregator metric or Comparison metric (i.e. the one in the bars)
 scm = alg_pos;
+
+% show values:
+show_tip_values = 1;
 
 % Vector dimension:
 vdim = size(tres);
@@ -123,7 +126,7 @@ end
 %% Plot
 
 f = figure();
-t = tiledlayout(3,6);
+t = tiledlayout(3,12);
 
 switch mam
     case test_pos
@@ -139,10 +142,27 @@ switch mam
         xmaml = {'MAX-WL', 'MULTI-WL', 'CLOUD-WL'};
 end
 
+switch scm
+    case test_pos
+        %TODO this
+        xt = round(median(init_cond)-273.15);
+        xsaml = split(int2str(xt), '  ');
+    case dom_pos
+        xsaml = {'1D', '4D', '9D', 'AD'};
+    case mod_pos
+        xsaml = {'Water', 'Air', 'Rack'};
+    case alg_pos
+        xsaml = {'FCA', 'EBA', 'VBA'};
+    case wl_pos
+        xsaml = {'MAX-WL', 'MULTI-WL', 'CLOUD-WL'};
+end
+
 x = 1:mdim;
 
 t.TileSpacing = 'compact';
 t.Padding = 'tight';
+
+Tit = [];
 
 %%%%%%%%%%%%%%%%%%%%%%
 %%% TEMP
@@ -151,7 +171,7 @@ t.Padding = 'tight';
 
 %%%%%%%%%%%
 % Max Exceeding Value
-nexttile([1 3]);
+nexttile([1 6]);
 
 %TODO: FIX THIS
 model_series = T_M - (mean(ctrl.T_target)-273.15);
@@ -170,6 +190,17 @@ err_high = err_high - model_series;
 err_low = model_series - err_low;
 
 b = bar(model_series, 'grouped');
+
+if show_tip_values
+for bi=1:sdim
+    xtips = b(bi).XEndPoints;
+    ytips = b(bi).YEndPoints;
+    labels = string(round(b(bi).YData,2));
+    text(xtips,ytips,labels,'HorizontalAlignment','center',...
+		    'VerticalAlignment','bottom');
+end
+end
+
 hold on
 % Calculate the number of groups and number of bars in each group
 [ngroups,nbars] = size(model_series);
@@ -183,14 +214,16 @@ end
 errorbar(xc',model_series, err_low, err_high, 'k','linestyle','none');
 hold off
 
-title('Max Exceeding Temperature Value');
+set(gca, 'YGrid', 'on', 'XGrid', 'off')
+Tit = [Tit title('Max Exceeding Temperature Value')];
 xticklabels(xmaml);
 ylabel('[°C]');
 
 %%%%%%%%%%%
 % Exceeding time
-nexttile([1 3]);
+nexttile([1 6]);
 
+%TODO fix this
 model_series = T_AvEt/2*100;
 
 err_high = squeeze(model_series(1,:,:));
@@ -201,6 +234,17 @@ err_high = err_high - model_series;
 err_low = model_series - err_low;
 
 b = bar(model_series, 'grouped');
+
+if show_tip_values
+for bi=1:sdim
+    xtips = b(bi).XEndPoints;
+    ytips = b(bi).YEndPoints;
+    labels = string(round(b(bi).YData,2));
+    text(xtips,ytips,labels,'HorizontalAlignment','center',...
+		    'VerticalAlignment','bottom');
+end
+end
+
 hold on
 % Calculate the number of groups and number of bars in each group
 [ngroups,nbars] = size(model_series);
@@ -214,7 +258,8 @@ end
 errorbar(xc',model_series, err_low, err_high, 'k','linestyle','none');
 hold off
 
-title('Exceeding Temperature Time Percentage');
+set(gca, 'YGrid', 'on', 'XGrid', 'off')
+Tit = [Tit title('Exceeding Temperature Time Percentage')];
 xticklabels(xmaml);
 ylabel('[%]');
 
@@ -225,7 +270,7 @@ ylabel('[%]');
 
 %%%%%%%%%%%
 % Exceeding Value
-nexttile([1 3]);
+nexttile([1 5]);
 
 model_series = P_AvEp*100;
 
@@ -237,6 +282,17 @@ err_high = err_high - model_series;
 err_low = model_series - err_low;
 
 b = bar(model_series, 'grouped');
+
+if show_tip_values
+for bi=1:sdim
+    xtips = b(bi).XEndPoints;
+    ytips = b(bi).YEndPoints;
+    labels = string(round(b(bi).YData,2));
+    text(xtips,ytips,labels,'HorizontalAlignment','center',...
+		    'VerticalAlignment','bottom');
+end
+end
+
 hold on
 % Calculate the number of groups and number of bars in each group
 [ngroups,nbars] = size(model_series);
@@ -250,14 +306,16 @@ end
 errorbar(xc',model_series, err_low, err_high, 'k','linestyle','none');
 hold off
 
-title('Ratio between Exceeding Power and Power Budget');
+set(gca, 'YGrid', 'on', 'XGrid', 'off')
+Tit = [Tit title('Ratio between Exceeding Power and Power Budget')];
 xticklabels(xmaml);
 ylabel('[%]');
 
 %%%%%%%%%%%
 % Exceeding time
-nexttile([1 3]);
+nexttile([1 5]);
 
+%TODO fix this
 model_series = P_AvEt/1.5*100;
 
 err_high = squeeze(model_series(1,:,:));
@@ -268,6 +326,17 @@ err_high = err_high - model_series;
 err_low = model_series - err_low;
 
 b = bar(model_series, 'grouped');
+
+if show_tip_values
+for bi=1:sdim
+    xtips = b(bi).XEndPoints;
+    ytips = b(bi).YEndPoints;
+    labels = string(round(b(bi).YData,2));
+    text(xtips,ytips,labels,'HorizontalAlignment','center',...
+		    'VerticalAlignment','bottom');
+end
+end
+
 hold on
 % Calculate the number of groups and number of bars in each group
 [ngroups,nbars] = size(model_series);
@@ -281,10 +350,10 @@ end
 errorbar(xc',model_series, err_low, err_high, 'k','linestyle','none');
 hold off
 
-title('Exceeding Power Time Percentage');
+set(gca, 'YGrid', 'on', 'XGrid', 'off')
+Tit = [Tit title('Exceeding Power Time Percentage')];
 xticklabels(xmaml);
 ylabel('[%]');
-
 
 %%%%%%%%%%%%%%%%%%%%%%
 %%% PERFORMANCE
@@ -292,7 +361,7 @@ ylabel('[%]');
 
 %%%%%%%%%%%
 % Norm
-nexttile([1 2]);
+nexttile([1 4]);
 
 model_series = W_AvFD;
 
@@ -304,6 +373,17 @@ err_high = err_high - model_series;
 err_low = model_series - err_low;
 
 b = bar(model_series, 'grouped');
+
+if show_tip_values
+for bi=1:sdim
+    xtips = b(bi).XEndPoints;
+    ytips = b(bi).YEndPoints;
+    labels = string(round(b(bi).YData,2));
+    text(xtips,ytips,labels,'HorizontalAlignment','center',...
+		    'VerticalAlignment','bottom');
+end
+end
+
 hold on
 % Calculate the number of groups and number of bars in each group
 [ngroups,nbars] = size(model_series);
@@ -317,13 +397,14 @@ end
 errorbar(xc',model_series, err_low, err_high, 'k','linestyle','none');
 hold off
 
-title('L2-Norm of Frequency Difference (less is better)');
+set(gca, 'YGrid', 'on', 'XGrid', 'off')
+Tit = [Tit title('L2-Norm of Frequency Difference \n (less is better)')];
 xticklabels(xmaml);
 ylabel('[]');
 
 %%%%%%%%%%%
 % WL Av
-nexttile([1 2]);
+nexttile([1 4]);
 
 model_series = W_AvWL;
 
@@ -335,6 +416,18 @@ err_high = err_high - model_series;
 err_low = model_series - err_low;
 
 b = bar(model_series, 'grouped');
+
+if show_tip_values
+for bi=1:sdim
+    xtips = b(bi).XEndPoints;
+    ytips = b(bi).YEndPoints;
+    labels = string(round(b(bi).YData,2));
+    text(xtips,ytips,labels,'HorizontalAlignment','center',...
+		    'VerticalAlignment','bottom');
+end
+end
+
+
 hold on
 % Calculate the number of groups and number of bars in each group
 [ngroups,nbars] = size(model_series);
@@ -348,13 +441,14 @@ end
 errorbar(xc',model_series, err_low, err_high, 'k','linestyle','none');
 hold off
 
-title('Cores Average Executed Workload');
+set(gca, 'YGrid', 'on', 'XGrid', 'off')
+Tit = [Tit title('Cores Average Executed Workload')];
 xticklabels(xmaml);
 ylabel('[%]');
 
 %%%%%%%%%%%
 % WL min
-nexttile([1 2]);
+nexttile([1 4]);
 
 model_series = W_mWL;
 
@@ -366,6 +460,17 @@ err_high = err_high - model_series;
 err_low = model_series - err_low;
 
 b = bar(model_series, 'grouped');
+
+if show_tip_values
+for bi=1:sdim
+    xtips = b(bi).XEndPoints;
+    ytips = b(bi).YEndPoints;
+    labels = string(round(b(bi).YData,2));
+    text(xtips,ytips,labels,'HorizontalAlignment','center',...
+		    'VerticalAlignment','bottom');
+end
+end
+
 hold on
 % Calculate the number of groups and number of bars in each group
 [ngroups,nbars] = size(model_series);
@@ -379,9 +484,28 @@ end
 errorbar(xc',model_series, err_low, err_high, 'k','linestyle','none');
 hold off
 
-title('Cores minimum Executed Workload');
+set(gca, 'YGrid', 'on', 'XGrid', 'off')
+Tit = [Tit title('Cores minimum Executed Workload')];
 xticklabels(xmaml);
 ylabel('[%]');
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%% LEGEND
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+lgd = legend();
+lgd.Layout.Tile = [];
+
+%
+%
+
+%fontsize(f, "increase");
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+
+
+for i=1:length(Tit)
+    Tit(i).FontSize = 16;
+end
 
 
 
