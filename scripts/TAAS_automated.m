@@ -202,7 +202,7 @@ hpc.iterative_fv = ~hpc.ctrl_MA;
 %}
 
 max_amb_T = (45+273.15);
-max_init_T = (85 + 273.15) - 15;
+max_init_T = (85 + 273.15) - 25;
 max_elem_T = 55+273.15;
 
 test_T_step = (max_init_T - hpc.t_outside) /  (test_iter-1);
@@ -220,7 +220,7 @@ for i=-3:-2
     init_cond(end+i,tr) = max_elem_T;
 end
 
-init_cond = init_cond + rand_T_init
+init_cond = init_cond + rand_T_init;
 
 %% 
 % Import the file
@@ -260,7 +260,7 @@ figid = 1;
 addpath('Controllers/');
 
 %%
-for tit=8:test_iter
+for tit=1:test_iter
 
 	hpc.t_init = init_cond(:,tit);
 
