@@ -12,8 +12,7 @@ colorplot = [ 0.9843    0.7059    0.6824;
 ];
 %}
 
-%TODO not working (Add folders and subfolders
-addpath = ('Libraries/DataViz-3.2.3.0/daviolinplot')
+addpath(genpath('Libraries/DataViz-3.2.3.0/daviolinplot'))
 
 colorplot = [0.8941    0.1020    0.1098;
     0.2157    0.4941    0.7216;
@@ -28,9 +27,6 @@ colorplot = [0.8941    0.1020    0.1098;
 mycolors = colorplot([2 5 3], :);
 mycolors = [];
 
-
-% TODO: At the moment I assumed you could not separate per algo or per test
-%       (since it does not make much sense)
 
 test_pos = 1;
 dom_pos = 2;
@@ -86,7 +82,7 @@ for m=1:mdim
         aidx{scm} = s;
 
         % Max temp
-        data = (extractCell(tres, aidx, "temp", "Max"));
+        data = (extractCell(tres, aidx, "temp", "exMn", "MaxExceed"));
         T_M(1,m,s) = max(data);
         T_M(2,m,s) = mean(data);
         T_M(3,m,s) = min(data);
@@ -98,7 +94,7 @@ for m=1:mdim
         T_AvEv(3,m,s) = min(data);
 
         % Average Exceeding Temp time
-        Et = (extractCell(tres, aidx, "temp", "exMn", "MeanTime"));
+        Et = (extractCell(tres, aidx, "temp", "exMn", "MeanTimeP"));
         T_AvEt(2,m,s) = mean(Et);
         T_AvEt(1,m,s) = max(Et);
         T_AvEt(3,m,s) = min(Et);
@@ -119,7 +115,7 @@ for m=1:mdim
 
 
         % Average Exceeding Power time
-        Et = (extractCell(tres, aidx, "power", "exTime"));
+        Et = (extractCell(tres, aidx, "power", "exTimeP"));
         P_AvEt(2,m,s) = mean(Et);
         P_AvEt(1,m,s) = max(Et);
         P_AvEt(3,m,s) = min(Et);
@@ -161,7 +157,6 @@ end
 f = figure();
 t = tiledlayout(3,12);
 
-%TODO this!
 switch mam
     case test_pos
         %TODO this
@@ -175,6 +170,7 @@ switch mam
         xmaml = {'Water', 'Air', 'Rack'};
         title_name = "Thermal Model";
     case alg_pos
+        xsaml = {'FCA', 'EBA', 'VBA'};
     case wl_pos
         xmaml = {'MAX-WL', 'MULTI-WL', 'CLOUD-WL'};
         title_name = "Workload Type";
@@ -213,12 +209,10 @@ Tit = [];
 % Max Exceeding Value
 nexttile([1 6]);
 
-%TODO: FIX THIS
-model_series = T_M - (mean(ctrl.T_target)-273.15);
+model_series = T_M;
 model_series(model_series<0) = 0;
 
 %model_series = T_AvEv;
-%TODO: FIX THIS
 %err_high = T_M-mean(ctrl.T_target)+273.15;
 %err_low = zeros(size(T_M));
 
@@ -266,8 +260,7 @@ ax.YAxis.FontSize = font_size_axes;
 % Exceeding time
 nexttile([1 6]);
 
-%TODO fix this
-model_series = T_AvEt/2*100;
+model_series = T_AvEt*100;
 
 err_high = squeeze(model_series(1,:,:));
 err_low = squeeze(model_series(3,:,:));
@@ -364,8 +357,7 @@ ax.YAxis.FontSize = font_size_axes;
 % Exceeding time
 nexttile([1 5]);
 
-%TODO fix this
-model_series = P_AvEt/1.5*100;
+model_series = P_AvEt*100;
 
 err_high = squeeze(model_series(1,:,:));
 err_low = squeeze(model_series(3,:,:));
@@ -581,7 +573,6 @@ end
 %%%%%%%%%% LEGEND
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%TODO 
 lgd = legend(xsaml);
 lgd.Layout.Tile = 22;
 lgd.FontSize = 18;
@@ -611,6 +602,7 @@ end
 T_M_d = [];
 T_AvEv_d = [];
 T_AvEt_d = [];
+T_Av_d = [];
 P_AvEp_d = [];
 P_MEp_d = [];
 P_AvEt_d = [];
@@ -623,7 +615,7 @@ for s=1:sdim
     aidx{scm} = s;
 
     % Max temp
-    data = (extractCell(tres, aidx, "temp", "Max"));
+    data = (extractCell(tres, aidx, "temp", "exMn", "MaxExceed"));
     T_M_d(:,s) = data;
 
     % Avearge Exceeding Temp
@@ -631,8 +623,11 @@ for s=1:sdim
     T_AvEv_d(:,s) = (data);
 
     % Average Exceeding Temp time
-    Et = (extractCell(tres, aidx, "temp", "exMn", "MeanTime"));
+    Et = (extractCell(tres, aidx, "temp", "exMn", "MeanTimeP"));
     T_AvEt_d(:,s) = Et;
+
+    data = (extractCell(tres, aidx, "temp", "Av"));
+    T_Av_d(:,s) = data;
 
     %%% POWER
 
@@ -645,7 +640,7 @@ for s=1:sdim
     P_MEp_d(:,s) = data;
 
     % Average Exceeding Power time
-    Et = (extractCell(tres, aidx, "power", "exTime"));
+    Et = (extractCell(tres, aidx, "power", "exTimeP"));
     P_AvEt_d(:,s) = Et;
 
     %%% PERFORMANCE
@@ -693,8 +688,7 @@ Tit = [];
 % Max Exceeding Value
 nexttile([1 6]);
 
-%TODO: FIX THIS
-model_series = T_M_d - (mean(ctrl.T_target)-273.15);
+model_series = T_M_d;
 model_series(model_series<0) = 0;
 
 daviolinplot(model_series(:),'groups',group_inx(:),'smoothing',smoothing_l,'xtlabels',xsaml);
@@ -712,8 +706,7 @@ ylim(ylf);
 % Exceeding time
 nexttile([1 6]);
 
-%TODO fix this
-model_series = T_AvEt_d/2*100;
+model_series = T_AvEt_d*100;
 
 daviolinplot(model_series(:),'groups',group_inx(:),'smoothing',smoothing_l,'xtlabels',xsaml);
 
@@ -752,8 +745,7 @@ ylim(ylf);
 % Exceeding time
 nexttile([1 6]);
 
-%TODO fix this
-model_series = P_AvEt_d/1.5*100;
+model_series = P_AvEt_d*100;
 
 daviolinplot(model_series(:),'groups',group_inx(:),'smoothing',smoothing_l,'xtlabels',xsaml);
 
@@ -863,16 +855,26 @@ end %show_violin
 
 %%
 
-mean(T_M_d- (mean(ctrl.T_target)-273.15))
-mean(T_AvEv_d)
-mean(T_AvEt_d/2*100)
-mean(P_AvEp_d*100)
-mean(P_MEp_d)
-mean(P_AvEt_d/1.5*100)
-mean(W_AvFD_d)
-mean(W_MWL_d)
-mean(W_AvWL_d)
-mean(W_mWL_d)
+disp(strcat("Temp: Max Exceeded (mean): ", num2str(mean(T_M_d))));
+disp(strcat("    SD: ", num2str(std(T_M_d))));
+disp(strcat("Temp: Avearage exceeded value (mean): ", num2str(mean(T_AvEv_d))));
+disp(strcat("    SD: ", num2str(std(T_AvEv_d))));
+disp(strcat("Temp: Avearage exceeded Time Percentage (mean): ", num2str(mean(T_AvEt_d*100))));
+disp(strcat("    SD: ", num2str(std(T_AvEt_d*100))));
+disp(strcat("Power: Avearage exceeded value Percentage (mean): ", num2str(mean(P_AvEp_d*100))));
+disp(strcat("    SD: ", num2str(std(P_AvEp_d*100))));
+disp(strcat("Power: Max exceeded value Percentage (mean): ", num2str(mean(P_MEp_d*100))));
+disp(strcat("    SD: ", num2str(std(P_MEp_d*100))));
+disp(strcat("Power: Max exceeded time Percentage (mean): ", num2str(mean(P_AvEt_d*100))));
+disp(strcat("    SD: ", num2str(std(P_AvEt_d*100))));
+disp(strcat("Perf: Normalized Norm of frequency difference (mean): ", num2str(mean(W_AvFD_d))));
+disp(strcat("    SD: ", num2str(std(W_AvFD_d))));
+disp(strcat("Perf: Max Workload Progression (mean): ", num2str(mean(W_MWL_d))));
+disp(strcat("    SD: ", num2str(std(W_MWL_d))));
+disp(strcat("Perf: Average Workload Progression (mean): ", num2str(mean(W_AvWL_d))));
+disp(strcat("    SD: ", num2str(std(W_AvWL_d))));
+disp(strcat("Perf: Min Workload Progression (mean): ", num2str(mean(W_mWL_d))));
+disp(strcat("    SD: ", num2str(std(W_mWL_d))));
 
 %lower target compliance
 data = mean(W_AvFD_d);
@@ -885,6 +887,12 @@ data = mean(W_AvFD_d);
 data = mean(W_AvWL_d);
 (data(1) - data(2))/data(2)*100
 (data(1) - data(3))/data(3)*100
+a1a = mean((W_AvWL_d(:,1) - W_AvWL_d(:,3))./W_AvWL_d(:,3)*100)
+a2a = mean((W_AvWL_d(:,1) - W_AvWL_d(:,2))./W_AvWL_d(:,2)*100)
+mean([a1a, a2a])
+a1a = max((W_AvWL_d(:,1) - W_AvWL_d(:,3))./W_AvWL_d(:,3)*100)
+a2a = max((W_AvWL_d(:,1) - W_AvWL_d(:,2))./W_AvWL_d(:,2)*100)
+max([a1a, a2a])
 
 %higher average wl
 data = mean(W_mWL_d);
@@ -892,14 +900,14 @@ data = mean(W_mWL_d);
 (data(1) - data(3))/data(3)*100
 
 %max temp
-data = max(T_M_d- (mean(ctrl.T_target)-273.15));
+data = max(T_M_d);
 data(2) / data(1)
 data(3) / data(1)
 (data(2) - data(1))/data(1)*100
 (data(3) - data(1))/data(1)*100
 
 %lower exceeded temp time
-data =mean(T_AvEt_d/2*100);
+data =mean(T_AvEt_d*100);
 (data(1) - data(2))/data(2)*100
 (data(1) - data(3))/data(3)*100
 (data(2) - data(1))/data(1)*100

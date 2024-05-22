@@ -12,6 +12,9 @@ function res = stats_analysis(obj,ctrl,x,u,f,v,w)
 	
 	pwct = max(round(size(ucp,1)/max(length(obj.tot_pw_budget)-1,1)),1);
 	pwtb = repelem(obj.tot_pw_budget(min(2, length(obj.tot_pw_budget)):end), pwct ,1);
+
+    maxPbudget = obj.core_max_power*obj.Nc;
+    ptime = sum(obj.tot_pw_budget < maxPbudget)*obj.Ts_target;
 	
 	% here it is difficult, because if I make it ceil, it will always be ok for
 	% pw budget going down, but never for power budget going up. If I take
@@ -43,6 +46,7 @@ function res = stats_analysis(obj,ctrl,x,u,f,v,w)
 	power.exKurt = kurtosis(pwgr);
 	%
 	power.exTime = sum( sum(ucp(1+sidx:end,:),2) > pwtb(1:end-sidx) ) *obj.Ts;
+    power.exTimeP = power.exTime / ptime;
 	
 	
 	%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -73,6 +77,8 @@ function res = stats_analysis(obj,ctrl,x,u,f,v,w)
 	temp.exCr.SkewAv = skewness(mean( exTC ));
 	temp.exCr.KurtAv = kurtosis(mean( exTC ));
 	%
+    temp.exCr.MaxExceed = temp.exCr.Max - crt;
+    %
 	exTn = (xcp-mnt) .* (xcp > mnt);
 	%exTn = exTn(exTn > 0);
 	if isempty(exTn)
@@ -85,6 +91,10 @@ function res = stats_analysis(obj,ctrl,x,u,f,v,w)
 	temp.exMn.StdAv = std(mean( exTn ));
 	temp.exMn.SkewAv = skewness(mean( exTn ));
 	temp.exMn.KurtAv = kurtosis(mean( exTn ));
+    %
+    %TODO not considering variable limit
+    %   I should do: max(t-mnt(t))
+    temp.exMn.MaxExceed = temp.exMn.Max - mnt;
 	%
 	temp.exCr.TotTime = sum(sum( xcp > crt) *obj.Ts);
 	temp.exCr.StdTime = std(sum( xcp > crt) *obj.Ts);
@@ -98,6 +108,8 @@ function res = stats_analysis(obj,ctrl,x,u,f,v,w)
 	% no need these two: I can divide per obj.Nc
 	temp.exCr.MeanTime = mean(sum( xcp > crt) *obj.Ts);
 	temp.exMn.MeanTime = mean(sum( xcp > mnt) *obj.Ts);
+    temp.exMn.MeanTimeP = temp.exMn.MeanTime / obj.tsim;
+    temp.exCr.MeanTimeP = temp.exCr.MeanTime / obj.tsim;
 	
 	
 	%%%%%%%%%%%%%%%%%%%%%%%%%
