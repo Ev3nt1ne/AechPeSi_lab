@@ -103,8 +103,8 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 
 	A = zeros(obj.Ns);
 	
-	for i=1:2*lNc
-		if (mod(i,2)>0)	%For each core:
+	for i=1:obj.full_model_layers*lNc
+		if (mod(i,obj.full_model_layers)==1)	%For each core:
 
 			% Core Position
 			ci = fix((i-1)/2)+1;
@@ -234,26 +234,29 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 					end
 
 				case 1				
-					obj.pw2therm_coeff = obj.pw2therm_coeff * 0.85;
+					obj.pw2therm_coeff = 0.85;
 					
 					C_si = C_si*1.1;
 					C_cu = C_cu*1.1;
 
 					g1=obj.gaussian_filter(max(obj.Nv, obj.Nh),2.5)*16;
 					%g1 = g1 + (1-0.025 - g1(1));
-					g1 = 1./g1 * 0.75;						
+					g1 = 1./g1 * 0.75;
+
+					lrow = irow - obj.extt_rows;
+					lcol = icol - obj.extl_cols;
 					
-					R_si_hn = R_si_hn * g1(irow,icol); % * 2.67;
-					R_si_hs = R_si_hs * g1(irow,icol); % * 2.67;
-					R_si_he = R_si_he * g1(irow,icol); % * 2.67;
-					R_si_hw = R_si_hw * g1(irow,icol); % * 2.67;							
+					R_si_hn = R_si_hn * g1(lrow,lcol); % * 2.67;
+					R_si_hs = R_si_hs * g1(lrow,lcol); % * 2.67;
+					R_si_he = R_si_he * g1(lrow,lcol); % * 2.67;
+					R_si_hw = R_si_hw * g1(lrow,lcol); % * 2.67;							
 
 					R_sicu_v = R_sicu_v / 2.2; %1.5;
 
-					R_cu_hn = R_cu_hn * g1(irow,icol) * 2; % * 4;
-					R_cu_hs = R_cu_hs * g1(irow,icol) * 2; % * 4;
-					R_cu_he = R_cu_he * g1(irow,icol) * 2; % * 4;
-					R_cu_hw = R_cu_hw * g1(irow,icol) * 2; % * 4;
+					R_cu_hn = R_cu_hn * g1(lrow,lcol) * 2; % * 4;
+					R_cu_hs = R_cu_hs * g1(lrow,lcol) * 2; % * 4;
+					R_cu_he = R_cu_he * g1(lrow,lcol) * 2; % * 4;
+					R_cu_hw = R_cu_hw * g1(lrow,lcol) * 2; % * 4;
 
 					%R_cual_v = R_cual_v; %* 1.5;% * 1.3;							
 					%R_sipcb_v = R_sipcb_v; % * 1.5;
@@ -269,17 +272,20 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 					%g1 = g1 + (1-0.025 - g1(1));
 					g1 = 1./g1 * 0.7;						
 					
-					R_si_hn = R_si_hn * g1(irow,icol); % * 2.67;
-					R_si_hs = R_si_hs * g1(irow,icol); % * 2.67;
-					R_si_he = R_si_he * g1(irow,icol); % * 2.67;
-					R_si_hw = R_si_hw * g1(irow,icol); % * 2.67;							
+					lrow = irow - obj.extt_rows;
+					lcol = icol - obj.extl_cols;
+					
+					R_si_hn = R_si_hn * g1(lrow,lcol); % * 2.67;
+					R_si_hs = R_si_hs * g1(lrow,lcol); % * 2.67;
+					R_si_he = R_si_he * g1(lrow,lcol); % * 2.67;
+					R_si_hw = R_si_hw * g1(lrow,lcol); % * 2.67;							
 
 					R_sicu_v = R_sicu_v / 1.2;
 
-					R_cu_hn = R_cu_hn * g1(irow,icol) * 2; % * 4;
-					R_cu_hs = R_cu_hs * g1(irow,icol) * 2; % * 4;
-					R_cu_he = R_cu_he * g1(irow,icol) * 2; % * 4;
-					R_cu_hw = R_cu_hw * g1(irow,icol) * 2; % * 4;
+					R_cu_hn = R_cu_hn * g1(lrow,lcol) * 2; % * 4;
+					R_cu_hs = R_cu_hs * g1(lrow,lcol) * 2; % * 4;
+					R_cu_he = R_cu_he * g1(lrow,lcol) * 2; % * 4;
+					R_cu_hw = R_cu_hw * g1(lrow,lcol) * 2; % * 4;
 
 					R_cual_v = R_cual_v / 1.5;% * 1.3;							
 					R_sipcb_v = R_sipcb_v / 1.5;
@@ -324,13 +330,18 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 		end
 		
 		%for j=1:2*lNc
+		%TODO: Here change all %2  and 2* / *2 with full_model_layers
+		%	if the name is too long, change it to fml
+		%IMPORTANT!!!!! the TODO ABOVE is important!... also test changes.
+		%	with the mod, check if it should be ==1, ==2, etc.
+		%		remove all >0 which are wrong
 			
 		% ==============
 		% diagonal terms
 		% ==============
 
 		%Silicon (die temp dyn) 
-		if (mod(i,2)>0)
+		if (mod(i,obj.full_model_layers)==1)
 			A(i,i) = -1/(R_sicu_v*C_si) -1/C_si * (1/R_si_he+1/R_si_hn+1/R_si_hw+1/R_si_hs) - 1/(C_si*R_sipcb_v) * obj.si_pcb_fact;
 			
 			%PCB:
@@ -378,7 +389,7 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 			   A(i,i+2)=1/(R_si_he*C_si); 
 			   A(i,i+2*lNv)=1/(R_si_hs*C_si);
 			   A(i,i-2*lNv)=1/(R_si_hn*C_si);
-			elseif (((mod(i+1,2*lNv)==0) && (i~=2*lNc-1) && (i~=2*lNv-1))) 
+			elseif ((mod(i+1,2*lNv)==0) && (i~=2*lNc-1) && (i~=2*lNv-1)) 
 			   A(i,i-2)=1/(R_si_hw*C_si); 
 			   A(i,i+2*lNv)=1/(R_si_hs*C_si);
 			   A(i,i-2*lNv)=1/(R_si_hn*C_si);
@@ -609,8 +620,8 @@ function [A, B] = create_model(obj, T, pdev, tm_ver)
 			if (tm_ver == 1) %|| (tm_ver == 2)
 				g2=obj.gaussian_filter(max(obj.Nv, obj.Nh),3)*16;
 				g2 = g2 + (1-0.01 - g2(1));
-				C_core = C_core / g2(irow-obj.extt_rows,icol-obj.extl_cols);% / 1.5;
-			end							
+				C_core = C_core / g2(irow,icol);% / 1.5;
+			end
 					
 			B(i,k) = 1/C_core * obj.pw2therm_coeff;
 		end

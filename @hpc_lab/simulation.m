@@ -48,7 +48,7 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	obj.init_compute_model(obj.Ad_true, obj.Bd_true);
 
 	%TODO
-	x = obj.t_init + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
+	x = obj.t_init;% + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
 	F = obj.F_min*ones(obj.Nc,1);
 	V = obj.V_min*ones(obj.vd,1);
 	process = ones(obj.Nc,1);
@@ -100,7 +100,16 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		cpvplot(s+1,:) = V;
 	end
 
-	wlop = obj.wl_index / (size(obj.wltrc,3)-1) * 100;
+	cmp = [];
+	if obj.compare_vs_baseline
+		if obj.pmc_need_update
+			warning("[HPC LAB] Error! You are not comparing with the baseline! You should run base_ideal_unr() or checkante!");
+		end
+		cmp = obj.perf_max_check;
+	else
+		cmp = size(obj.wltrc,3)-1;
+	end
+	wlop = obj.wl_index ./ cmp * 100;
 	ctrl = ctrl.cleanup_fnc(obj);
 
 	if show

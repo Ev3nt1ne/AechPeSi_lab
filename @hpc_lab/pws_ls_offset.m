@@ -47,7 +47,11 @@ function [lut, F, T] = pws_ls_offset(obj, Fslot, Tslot, add_temp )
 	%TODO parametrize
 	alp = 0.2995;
 	lut = zeros(length(T), length(F));
-	[h0, h1, h2] = obj.pws_ls_approx();
+	% Voltage
+	%[h0, h1, h2] = obj.pws_ls_approx([0.5 1.2], [20 90], 0.9, 1/3.497, 1.93, 1);
+	[h0, h1, h2] = obj.pws_ls_approx([0.5 1.2], [20 90], 0.9, [6.659 -1.979], -1.48, 1);
+	% Freq
+	%[h0, h1, h2] = obj.pws_ls_approx([obj.F_min obj.F_max], [20 90], 0.9, 0.4768, 0, 0);
 	for i=1:length(T)
 		for j=1:length(F)
 			ps = obj.ps_compute(V(j), T(i),1,0);
@@ -57,6 +61,9 @@ function [lut, F, T] = pws_ls_offset(obj, Fslot, Tslot, add_temp )
 			lut(i,j) = ps - linps;
 		end
 	end
-	
+
+	figure()
+	surf(T,V, lut);
+
 end
 

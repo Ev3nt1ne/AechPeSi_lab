@@ -19,7 +19,8 @@ classdef perf_model < handle
 		wl_mem_weigth = [0.95 0.15 0.05 0.20 0];				% memory boundness
 
 		quantum_us = 50;
-		quantum_F = 1; %GHz
+		quantum_F = 4.0; %GHz
+		mem_F = 0.4;
 	end
 
 	properties(Dependent)
@@ -34,7 +35,7 @@ classdef perf_model < handle
 	end
 	
 	methods
-		function obj = perf_model(inputArg1,inputArg2)
+		function obj = perf_model()
 			%PERF_MODEL Construct an instance of this class
 			%   Detailed explanation goes here
 			
@@ -82,7 +83,7 @@ classdef perf_model < handle
 			sp(primary_wl) = sp(primary_wl) + hmp;
 			
 		end
-		function wl_trace = generate_wl_trace(obj, Nc, ts, show)
+		function wl_trace = generate_wl_trace(obj, Nc, ts, F_max, show)
 			
 			if (nargin < 2) || isempty(Nc)
 				warning("[PM Error]: Nc missing or empty!");
@@ -109,8 +110,12 @@ classdef perf_model < handle
 			ipl = length(obj.wl_prob);
 			wl_trace = zeros(Nc,ipl, ll);
 
-			wl_min_exec_qt = ceil(obj.wl_min_exec_us / obj.quantum_us);
-			wl_mean_exec_qt = ceil(obj.wl_mean_exec_us / obj.quantum_us) - wl_min_exec_qt;
+			tmem = obj.mem_F / obj.quantum_F;
+			tF = F_max / obj.quantum_F;
+			memtdep = obj.wl_mem_weigth*tmem + (1-obj.wl_mem_weigth)*tF;
+
+			wl_min_exec_qt = ceil(obj.wl_min_exec_us .* memtdep / obj.quantum_us);
+			wl_mean_exec_qt = ceil(obj.wl_mean_exec_us .* memtdep / obj.quantum_us) - wl_min_exec_qt;
 			wl_mean_exec_qt(wl_mean_exec_qt<=0) = 0;
 
 			%check on normalization
@@ -285,7 +290,7 @@ classdef perf_model < handle
 		end
 		function [pwl, res] = quanta2wl(obj, wlp, instr, mem_instr_conv)
 			mem_wgt = sum(wlp.*obj.wl_mem_weigth,2).*(instr>0);
-			cinstr = instr.*(mem_wgt + (1-mem_wgt).*mem_instr_conv); %mem_wgt.*mem_instr_conv.*instr + (1-mem_wgt).*instr;
+			cinstr = instr.*((1-mem_wgt) + (mem_wgt).*mem_instr_conv); %mem_wgt.*mem_instr_conv.*instr + (1-mem_wgt).*instr;
 						
 			pwl = min(cinstr, obj.qt_storage); %obj.qt_storage./cinstr;
 			res = round(instr - pwl.*(instr./cinstr));

@@ -24,6 +24,7 @@ classdef power_model < handle
 		dyn_ceff_k {mustBeNumeric, mustBeNonempty, mustBeFinite, mustBeVector} ...
 			= [306.741, 694.866, 1235.452, 1651.217, 1600.92]*1e-3;
 
+
 		FV_table (:,3) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
 			= [0.50, 0.40, 1.3500;
 				0.55, 0.40, 1.6000;
@@ -40,6 +41,23 @@ classdef power_model < handle
 				1.10, 2.60, 3.4500;
 				1.15, 2.60, 3.5500;
 				1.20, 2.60, 3.6600];
+		%{
+		= [0.50, 0.40, 1.0500;
+				0.55, 0.40, 1.3500;
+				0.60, 1.35, 1.7000;
+				0.65, 1.35, 2.0000;
+				0.70, 1.35, 2.2000;
+				0.75, 1.60, 2.4500;
+				0.80, 1.80, 2.6500;
+				0.85, 1.80, 2.8500;
+				0.90, 2.00, 3.0500;
+				0.95, 2.00, 3.2000;
+				1.00, 2.00, 3.3500;
+				1.05, 2.60, 3.4500;
+				1.10, 2.60, 3.5500;
+				1.15, 2.60, 3.6000;
+				1.20, 2.60, 3.6600];
+		%}
 
 		pw_dev_per {mustBeNonnegative, mustBeNumeric, mustBeNonempty, mustBeFinite} ...
 			= 1;

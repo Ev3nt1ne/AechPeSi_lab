@@ -33,7 +33,7 @@ subplot(3, 3, [1:2, 4:5]);
 surf(T, V, res, 'EdgeAlpha', 0.6)
 hold;
 h = gca;
-surf([20 100], V, [Power_static(:), Power_static(:)], 'FaceColor', 'm', ... %"#A2142F", 
+surf([T(1) T(end)], V, [Power_static(:), Power_static(:)], 'FaceColor', 'm', ... %"#A2142F", 
 	'FaceAlpha', 0.6)
 
 view([-81.6598139306647 13.4415460949037]);

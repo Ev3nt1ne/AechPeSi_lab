@@ -28,6 +28,8 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 		graph_show = 1;
 		graph_save = 0;
 
+		compare_vs_baseline = 0;
+
 		core_pm;
 
 		%x_init;						% Initial Conditions 
@@ -36,12 +38,14 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 		%zrplot;						% Power Noise Plot
 		wltrc;						% Wokrload Trace
 
-		core_crit_temp = 358.15;	
+		%TODO: should rename these as: core_limit_temp and core_crit_temp
+		core_limit_temp = 358.15;
+		core_crit_temp = 368.15;
 
 		%% All Controllers
 		tot_pw_budget;
 		quad_pw_budget;
-		min_pw_red;		
+		min_pw_red;
 
 
 	end
@@ -75,6 +79,9 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 	 	B_s;
 
 		osunix;
+
+		perf_max_check;
+		pmc_need_update;
 	end
 
 
@@ -108,6 +115,9 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			else
 				obj.osunix = 0;
 			end
+
+			obj.perf_max_check = 100;
+			obj.pmc_need_update = 0;
 
 			obj.get_size(obj);
 		end		
@@ -169,6 +179,10 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 				end
 			end
 		end
+		function obj = taas_fix(obj, wl)
+			obj.pmc_need_update = 0;
+			obj.perf_max_check = wl;
+		end
 	end
 	methods(Static)
 		function totSize = get_size(class) 
@@ -182,6 +196,35 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			end
 			
 			disp(strcat("Size: ", num2str(totSize), " bytes")); 
+		end
+		function g=gaussian_filter(Filter_size, sigma)
+			%size=5; %filter size, odd number
+			size=Filter_size;
+			g=zeros(size,size); %2D filter matrix
+			%sigma=2; %standard deviation
+			%gaussian filter
+			for i=-(size-1)/2:(size-1)/2
+    			for j=-(size-1)/2:(size-1)/2
+        			x0=(size+1)/2; %center
+        			y0=(size+1)/2; %center
+        			x=i+x0; %row
+        			y=j+y0; %col
+        			g(y,x)=exp(-((x-x0)^2+(y-y0)^2)/2/sigma/sigma);
+    			end
+			end
+			%normalize gaussian filter
+			sum1=sum(g);
+			sum2=sum(sum1);
+			g=g/sum2;
+
+			%plot 3D
+			%g1=Gaussian_filter(50,2);
+			%g2=Gaussian_filter(50,7);
+			%g3=Gaussian_filter(50,11);
+			%figure(1);
+			%subplot(1,3,1);surf(g1);title('filter size = 50, sigma = 2');
+			%subplot(1,3,2);surf(g2);title('filter size = 50, sigma = 7');
+			%subplot(1,3,3);surf(g3);title('filter size = 50, sigma = 11');
 		end
 	end
 
@@ -305,7 +348,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 
 	%% Approximation
 	methods
-		[k0, k1, k2] = pws_ls_approx(obj)
+		[k0, k1, k2] = pws_ls_approx(obj, I, T, C, alp, alp_I0, using_voltage)
 		[lut, F, T] = pws_ls_offset(obj, Fslot, Tslot, add_temp )
 	end
 
@@ -347,8 +390,8 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			ax3=subplot(sbp,1,3);
 			plot(t, x(:,1:2:end-obj.add_states)-273.15);
 			grid on,xlabel('Time [s]'),ylabel('Cores (Si) [°C]'), hold on;
-			if max(max(x(:,1:2:end-1))) >= (obj.core_crit_temp-(0.1*(obj.core_crit_temp-273)))
-				yline(obj.core_crit_temp-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
+			if max(max(x(:,1:2:end-1))) >= (obj.core_limit_temp-(0.1*(obj.core_limit_temp-273)))
+				yline(obj.core_limit_temp-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
 			end
 			%
 			ax4=subplot(sbp,1,sbp);
@@ -479,20 +522,20 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			x1 = x1(2:end,:);
 			dim = size(x1,1);
 			%dim2 = dim
-			gr1=obj.C(1:obj.Nc,:)*sum(x1 > obj.core_crit_temp)';
-			tt1 = sum(x1 > obj.core_crit_temp);
+			gr1=obj.C(1:obj.Nc,:)*sum(x1 > obj.core_limit_temp)';
+			tt1 = sum(x1 > obj.core_limit_temp);
 			tt1(tt1==0) = 1;
-			gt1=obj.C(1:obj.Nc,:)*(sum( (x1 - obj.core_crit_temp) .* (x1 > obj.core_crit_temp)) ./ tt1 )';
+			gt1=obj.C(1:obj.Nc,:)*(sum( (x1 - obj.core_limit_temp) .* (x1 > obj.core_limit_temp)) ./ tt1 )';
 
 			if (nargin < 3) || isempty(x2)
 				BAR1 = [sum(obj.Ts*gr1)/obj.Nc 0];
 				BAR2 = [0 sum(gt1)/sum(tt1>1)];
 			else
 				x2 = x2(2:end,:);
-				gr2=obj.C(1:obj.Nc,:)*sum(x2 > obj.core_crit_temp)';
-				tt2 = sum(x2 > obj.core_crit_temp);
+				gr2=obj.C(1:obj.Nc,:)*sum(x2 > obj.core_limit_temp)';
+				tt2 = sum(x2 > obj.core_limit_temp);
 				tt2(tt2==0) = 1;
-				gt2=obj.C(1:obj.Nc,:)*(sum( (x2 - obj.core_crit_temp) .* (x2 > obj.core_crit_temp)) ./ tt2 )';
+				gt2=obj.C(1:obj.Nc,:)*(sum( (x2 - obj.core_limit_temp) .* (x2 > obj.core_limit_temp)) ./ tt2 )';
 				BAR1 = [sum(obj.Ts*gr1)/obj.Nc sum(obj.Ts*gr2)/obj.Nc 0 0 ];
 				BAR2 = [0 0 sum(gt1)/sum(tt1>1) sum(gt2)/sum(tt2>1)];
 			end			
@@ -562,7 +605,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			ylim([min(min(obj.t_init), ymlj)-273.15, yl(2)]);
 			ylabel('T_{Max} [°C]'),xlabel('Core'),grid on;
 			hold on;
-			plot(xlim, [obj.core_crit_temp obj.core_crit_temp]-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
+			plot(xlim, [obj.core_limit_temp obj.core_limit_temp]-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
 			
 			ylp = ylim;
 			
@@ -643,8 +686,8 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			movegui(fig, 'northeast');
 			
 			ax1 = subplot(3,4,[1:4]);
-			smref = round((size(f,1)-1)/(size(obj.frtrc,1)-1));
-			smf = round((size(obj.frtrc,1)-1)/(size(f,1)-1));
+			smref = round(max((size(f,1)-1),1)/max((size(obj.frtrc,1)-1),1));
+			smf = round(max((size(obj.frtrc,1)-1),1)/max((size(f,1)-1),1));
 			
 			gr = repelem(f(2:1:end,:),max(smf,1),1) - repelem(obj.frtrc(2:end,:),max(smref,1),1);
 			plot(obj.tsim*[0:(1/size(gr,1)):1]', [zeros(1,obj.Nc); gr]);
@@ -687,7 +730,21 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			grid on,xlabel('Total'), ylabel('Total Mean Difference [%]');
 			
 			% % %
-			gr = w / (size(obj.wltrc,3)-1) * 100;
+			cmp = [];
+			if obj.compare_vs_baseline
+				if obj.pmc_need_update
+					warning("[HPC LAB] Error! You are not comparing with the baseline! You should run base_ideal_unr() or checkante!");
+				end
+				cmp = obj.perf_max_check;
+			else
+				cmp = size(obj.wltrc,3)-1;
+			end
+			%this if() is for saveall() and other plot
+			if w <= 1.001
+				gr = w * 100;
+			else
+				gr = w ./ cmp * 100;
+			end
 			subplot(3,4,[9:10]);
 			b = bar(gr);
 			for pb = 1:length(b)
@@ -737,6 +794,66 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			%linkaxes([ax1,ax2,ax3],'x');
 			
 		end
+		function [] = saveall(obj, xop, uop, fop, vop, wop, path, name)
+			if nargin < 7 || (strlength(path)<1)
+				if isunix
+					path = "/tmp/MATLAB-Figures";
+				else
+					path = "C:\temp\MATLAB-Figures";
+				end
+			end
+			if nargin < 8 || (strlength(name)<1)
+				name = string(datetime('now','Format','dd-MMM-yyyy HH_mm_ss_SSS'));
+			end
+
+			if ~exist(path, 'dir')
+				mkdir(path);
+			end
+			if isunix
+				separator_os = "/";
+			else
+				separator_os = "\";
+			end
+			
+			fig = [];
+			namefig = "";
+			res = 1;
+
+			for i=1:5
+				switch i
+					case 1
+						fig = obj.xutplot(xop, uop);
+						namefig = "TP";
+						res = 1.5;
+					case 2
+						fig = obj.powerconstrplot(uop);
+						namefig = "Pw";
+						res = 1;
+					case 3
+						fig = obj.tempconstrplot(xop);
+						namefig = "T";
+						res = 1;
+					case 4
+						fig = obj.perfplot(fop, wop / 100 );
+						namefig = "Perf";
+						res = 1;
+					case 5 
+						fig = obj.fvplot(fop,vop);
+						namefig = "FV";
+						res = 1.5;
+				end
+				if ~isempty(fig)
+					path_name = strcat(path,separator_os,namefig, "-", name);
+					obj.savetofile(fig, path_name, res);
+				end
+			end %for
+		end %function
+	end
+
+	%% Result Analysis
+	methods
+		res = stats_analysis(obj,ctrl,x,u,f,v,w)
+		[wlres, wlop] = base_ideal_unr(obj)
 	end
 
 	%% Libraries
@@ -754,6 +871,23 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 				warning("[LAB Error]: VDom wrong input size.");
 				disp(strcat("[LAB] VDom required size:", num2str(cmp(2))));
 			end
+		end
+		function obj = set.compare_vs_baseline(obj, val)
+			if val && (~obj.compare_vs_baseline)
+				obj.pmc_need_update = 1;
+				obj.perf_max_check = size(obj.wltrc,3)-1;
+			end
+			obj.compare_vs_baseline = val;
+		end
+		function obj = set.frtrc(obj, val)
+			obj.pmc_need_update = 1;
+			obj.perf_max_check = size(obj.wltrc,3)-1;
+			obj.frtrc = val;
+		end
+		function obj = set.wltrc(obj, val)
+			obj.pmc_need_update = 1;
+			obj.perf_max_check = size(val,3)-1;
+			obj.wltrc = val;
 		end
 	end
 end

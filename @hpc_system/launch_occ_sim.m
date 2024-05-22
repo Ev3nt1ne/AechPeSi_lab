@@ -87,7 +87,7 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = launch_occ_sim(obj, Tall, 
 	Adl_true = obj.Ad_true;
 	Bdl_true = obj.Bd_true;
 	%
-	pid_target = obj.core_crit_temp;
+	pid_target = obj.core_limit_temp;
 	if robust
 		pid_target = pid_target - ones(obj.Nc, 1)*obj.T_margin;
 	end

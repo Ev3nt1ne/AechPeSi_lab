@@ -9,23 +9,27 @@ classdef Fuzzy < CP
 		pw_ad_adown = 0.02; %0.075; %0.025; %0.1;
 		pw_ad_achange = 0.5; %0.5;
 		pw_ad_steps = 20;
-		v_inc_steps; %Tper+3; %TODO:
-		v_dec_steps = 20;
-		v_hys_steps = 5; %15
+		%{
+		o_inc_steps; %Tper+3; %TODO:
+		o_dec_steps = 20;
+		o_hys_steps = 5; %15
+		%}
 		end
 
 	properties(SetAccess=protected, GetAccess=public)	
 		%global var
 		pw_ad_step_count = 0;
 		VCred;
-		Vn;
-		v_inc_st = 0;
-		v_dec_st = 0;
-		v_inc_step_count = 0; %v_inc_steps;
-		v_dec_step_count = 0; %v_dec_steps;
-		v_hys_act = 0;
-		v_hys_step_count = 0; %v_hys_steps;
+		%{
+		nOut;
+		o_inc_st = 0;
+		o_dec_st = 0;
+		o_inc_step_count = 0; %o_inc_steps;
+		o_dec_step_count = 0; %o_dec_steps;
+		o_hys_act = 0;
+		o_hys_step_count = 0; %o_hys_steps;
 		hys_p_count = 0;
+		%}
 		derT = 0;
 		T_old = 0;
 	end
@@ -42,19 +46,19 @@ classdef Fuzzy < CP
 		function [obj] = init_fnc(obj, hc, Nsim)
 			%TODO understand which one I actually really need
 			%TODO understand which needs to go out and which in
-			obj.v_inc_st = 0;
-			obj.v_dec_st = 0;
+			obj.o_inc_st = 0;
+			obj.o_dec_st = 0;
 			obj.pw_storage = 0;
 			obj.pw_adapt = 0;
 			obj.pw_old = [];
 			obj.pw_old{1} = 1*hc.Nc;
 			obj.pw_old{2} = 1*hc.Nc;
 			obj.pw_ad_step_count = 0;
-			obj.v_inc_step_count = 0; %v_inc_steps;
-			obj.v_dec_step_count = 0; %v_dec_steps;
-			obj.v_inc_steps = obj.Tper+3;
-			obj.v_hys_act = 0;
-			obj.v_hys_step_count = 0; %v_hys_steps;
+			obj.o_inc_step_count = 0; %o_inc_steps;
+			obj.o_dec_step_count = 0; %o_dec_steps;
+			obj.o_inc_steps = obj.Tper+3;
+			obj.o_hys_act = 0;
+			obj.o_hys_step_count = 0; %o_hys_steps;
 			obj.hys_p_count = 0;
 			obj.pbold = 0;
 			obj.pbc = 0;
@@ -63,11 +67,14 @@ classdef Fuzzy < CP
 			obj.T_old = hc.t_init(1);
 			obj.wl = [ones(hc.Nc,1) zeros(hc.Nc, hc.ipl -1)];
 			obj.VCred = zeros(hc.Nc,1);
-			obj.Vn = hc.V_min*ones(hc.vd,1);
-			obj.T_target = ones(hc.Nc, 1)*hc.core_crit_temp;
+			obj.nOut = hc.V_min*ones(hc.vd,1);
+			obj.T_target = ones(hc.Nc, 1)*hc.core_limit_temp;
 		end		
 		function [F,V, obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
 
+			if obj.ex_count >= 10*obj.Tper
+				obj.ex_count = 2*obj.Tper;
+			end
 			obj.ex_count = obj.ex_count + 1;
 
 			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
@@ -76,12 +83,12 @@ classdef Fuzzy < CP
 				obj.pbold = p_budget;
 				obj.pbc = 1;
 				obj.hys_p_count = 0;
-				obj.v_hys_act = 0;
-				obj.v_inc_st = 0;
-				obj.v_dec_st = 0;
-				obj.v_inc_step_count = 0; %v_inc_steps;
-				obj.v_dec_step_count = 0; %v_dec_steps;
-				obj.v_hys_step_count = 0;
+				obj.o_hys_act = 0;
+				obj.o_inc_st = 0;
+				obj.o_dec_st = 0;
+				obj.o_inc_step_count = 0; %o_inc_steps;
+				obj.o_dec_step_count = 0; %o_dec_steps;
+				obj.o_hys_step_count = 0;
 				obj.pw_ad_step_count = obj.pw_ad_steps;
 			else
 				obj.pbc = 0;
@@ -92,7 +99,7 @@ classdef Fuzzy < CP
 			T = pvt{hc.PVT_T};
 			process = pvt{hc.PVT_P};
 			
-			if (obj.ex_count>obj.Tper+1) && (mod(obj.ex_count,obj.Tper)==2)
+			if (mod(obj.ex_count,obj.Tper)==2) % && (obj.ex_count>obj.Tper+1)
 				obj.derT = T - obj.T_old;
 				obj.T_old = T;
 			end
@@ -115,7 +122,7 @@ classdef Fuzzy < CP
 
 			% Choose Voltage
 			FD = diag(f_ref)*hc.VDom;			
-			V = obj.cp_voltage_choice(hc, FD);
+			V = obj.compute_sharedV(hc, FD, obj.voltage_rule);
 			F = f_ref;
 
 			% Control Temperature:
@@ -140,7 +147,12 @@ classdef Fuzzy < CP
 			end
 			
 			VDred = min(diag(obj.VCred)*hc.VDom);
-			V = V + fix(VDred/2)'*0.05;
+			%VDred = VDred + (VDred > 0).*(0-VDred); %Saturation here is
+			%	way worse. Dunno Why.
+			V = V + fix(VDred/2)'*0.05; %fix is better than floor!!!
+			%V = V + floor(VDred/2)'*0.05;
+			%saturate V
+			V = V + (V < hc.V_min).*(hc.V_min-V);
 
 			%cap F:
 			% maybe remove?
@@ -158,7 +170,7 @@ classdef Fuzzy < CP
 				dompw = hc.VDom'*pu;
 				domT = ((hc.VDom'*T ./ sum(hc.VDom)') + max(T.*hc.VDom)' ) / 2; %here mean*2 / 3??
 				%TODO this T_target conversion is wrong!
-				[resdpw, ~] = obj.cp_pw_dispatcher(domT, hc.core_crit_temp, obj.T_target(1:hc.vd), delta_p, dompw, hc.min_pw_red); %todo: pid_target(1:obj.vd)
+				[resdpw, ~] = obj.cp_pw_dispatcher(domT, hc.core_limit_temp, obj.T_target(1:hc.vd), delta_p, dompw, hc.min_pw_red); %todo: pid_target(1:obj.vd)
 				deltapd = dompw-resdpw;
 				for vdi=1:hc.vd
 					pd = pu.*hc.VDom(:,vdi);
@@ -230,56 +242,56 @@ classdef Fuzzy < CP
 			end	
 
 			%% HYSTERESIS V-FILTER ACTIVATION
-			V_inc = (V > (obj.Vn+1e-3));
-			V_dec = (V < (obj.Vn-1e-3));
+			V_inc = (V > (obj.nOut+1e-3));
+			V_dec = (V < (obj.nOut-1e-3));
 			
-			obj.v_inc_st = obj.v_inc_st | V_inc;
-			obj.v_inc_step_count = (obj.v_inc_steps.*V_inc) + ((~V_inc).*(obj.v_inc_step_count - obj.v_inc_st));
+			obj.o_inc_st = obj.o_inc_st | V_inc;
+			obj.o_inc_step_count = (obj.o_inc_steps.*V_inc) + ((~V_inc).*(obj.o_inc_step_count - obj.o_inc_st));
 			
-			obj.v_inc_st = (obj.v_inc_step_count>0); % | v_dec_st;
+			obj.o_inc_st = (obj.o_inc_step_count>0); % | o_dec_st;
 			
-			obj.v_dec_st = obj.v_inc_st & ( obj.v_dec_st | V_dec);
-			%if v_dec_st
+			obj.o_dec_st = obj.o_inc_st & ( obj.o_dec_st | V_dec);
+			%if o_dec_st
 			%	s=s;
 			%end
-			%v_dec_step_count = (v_dec_steps.*V_dec) + ((~V_dec).*(v_dec_step_count - v_dec_st));
-			obj.v_dec_step_count = ((obj.v_dec_step_count>0).*(obj.v_dec_step_count-1)) + (obj.v_dec_step_count<=0).*(obj.v_dec_st.*obj.v_dec_steps);
+			%o_dec_step_count = (o_dec_steps.*V_dec) + ((~V_dec).*(o_dec_step_count - o_dec_st));
+			obj.o_dec_step_count = ((obj.o_dec_step_count>0).*(obj.o_dec_step_count-1)) + (obj.o_dec_step_count<=0).*(obj.o_dec_st.*obj.o_dec_steps);
 			
-			obj.v_dec_st = (obj.v_dec_step_count>0);
+			obj.o_dec_st = (obj.o_dec_step_count>0);
 			
-			v_hys_act_hold = obj.v_hys_act;
+			o_hys_act_hold = obj.o_hys_act;
 			
-			obj.v_hys_act = obj.v_hys_act | (obj.v_dec_st & V_inc);
+			obj.o_hys_act = obj.o_hys_act | (obj.o_dec_st & V_inc);
 			
 			%Initialize
-			obj.v_hys_step_count = ((obj.v_hys_step_count>0).*obj.v_hys_step_count) + (obj.v_hys_step_count<=0).*(obj.v_hys_act.*obj.v_hys_steps);
+			obj.o_hys_step_count = ((obj.o_hys_step_count>0).*obj.o_hys_step_count) + (obj.o_hys_step_count<=0).*(obj.o_hys_act.*obj.o_hys_steps);
 			%Reduce
 			%pull = (Ceff.*F.*(obj.VDom*V) + obj.leak_vdd/1000).*(obj.VDom*V) + d_p*obj.leak_process/1000;
 			v_hys_red = (i_pwm - p_budget) < -(p_budget*(0.125+obj.hys_p_count/10));
 			%(sum(pull) - p_budget + pw_adapt) < -6 ;
 			%(delta_p < (p_budget - 6)); %TODO: 6 depends on the #of cores, #of domains, and the ratio between the two.
 			%TODO: also depends on the power budget itself, and the PMAX, PMIN
-			obj.v_hys_step_count = (obj.v_hys_act & obj.v_hys_step_count) .* ...
-				(obj.v_hys_step_count - v_hys_red);
+			obj.o_hys_step_count = (obj.o_hys_act & obj.o_hys_step_count) .* ...
+				(obj.o_hys_step_count - v_hys_red);
 			
-			obj.v_hys_act = (obj.v_hys_step_count>0);
+			obj.o_hys_act = (obj.o_hys_step_count>0);
 			
-			obj.hys_p_count = obj.hys_p_count + (v_hys_act_hold ~= obj.v_hys_act) .* obj.v_hys_act;
+			obj.hys_p_count = obj.hys_p_count + (o_hys_act_hold ~= obj.o_hys_act) .* obj.o_hys_act;
 			
 			%{
-			ppap(s,[1:obj.vd]) = v_inc_st;
-			ppap(s,[obj.vd+1:obj.vd*2]) = v_inc_step_count;
-			ppap(s,[obj.vd*2+1:obj.vd*3]) = v_dec_st;
-			ppap(s,[obj.vd*3+1:obj.vd*4]) = v_dec_step_count;
-			ppap(s,[obj.vd*4+1:obj.vd*5]) = v_hys_act;
-			ppap(s,[obj.vd*5+1:obj.vd*6]) = v_hys_step_count;
+			ppap(s,[1:obj.vd]) = o_inc_st;
+			ppap(s,[obj.vd+1:obj.vd*2]) = o_inc_step_count;
+			ppap(s,[obj.vd*2+1:obj.vd*3]) = o_dec_st;
+			ppap(s,[obj.vd*3+1:obj.vd*4]) = o_dec_step_count;
+			ppap(s,[obj.vd*4+1:obj.vd*5]) = o_hys_act;
+			ppap(s,[obj.vd*5+1:obj.vd*6]) = o_hys_step_count;
 			ppap(s,[obj.vd*6+1:obj.vd*7]) = V_inc;
 			ppap(s,[obj.vd*7+1:obj.vd*8]) = V_dec;
 			%}		
 	
-			V = V.*((~obj.v_hys_act)|(V<=obj.Vn)) + obj.Vn.*(obj.v_hys_act & (V>obj.Vn));
+			V = V.*((~obj.o_hys_act)|(V<=obj.nOut)) + obj.nOut.*(obj.o_hys_act & (V>obj.nOut));
 			
-			obj.Vn = V;
+			obj.nOut = V;
 
 			%pwap(s) = pw_adapt;
 
