@@ -3,6 +3,8 @@ classdef black_wolf < mpc_hpc & CP
 	%   Detailed explanation goes here
 	properties
 		%alpha_wl = 0.4;				% Moving Average filter parameter for Workload
+
+        RE;
 	end
 	properties(SetAccess=protected, GetAccess=public)	
 		psac;
@@ -13,7 +15,6 @@ classdef black_wolf < mpc_hpc & CP
 		prevF;
 		prevV;
 		C2;
-
 	end
 	
 	methods
@@ -36,6 +37,7 @@ classdef black_wolf < mpc_hpc & CP
 			ot = sdpvar(1,1); %TODO: decide if single or with horizon
 			w = sdpvar(hc.Nc,1); %TODO: decide if single or with horizon
 			h0v = sdpvar(hc.Nc,1);
+            wSm = sdpvar(hc.Nc,1);
 
 			%sdpvar ly_xref;
 			ly_uref = sdpvar(hc.Nc,1);
@@ -82,7 +84,8 @@ classdef black_wolf < mpc_hpc & CP
 						constraints = [constraints, hc.Cc*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
 					%end
 					%if (~isinf(obj.usum(1)))
-						constraints = [constraints,sum(u{k}.*w*(h2+1) + h1*(hc.Cc*(x{k}-273.15)) + h0v+h0) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
+                        Pw = u{k}.*w*(h2+1) + h1*(hc.Cc*(x{k}-273.15)) + h0v+h0;
+						constraints = [constraints,sum(Pw) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
 						%TODO should I also add the "resulting" thing. i.e.
 						%	the above formula with x{k+1}?
 						%	maybe no, because I use horizon for this
@@ -96,6 +99,10 @@ classdef black_wolf < mpc_hpc & CP
 
 			for k = 1:obj.Nhzn
 				objective = objective + (u{k}-ly_uref)'*obj.R*(u{k}-ly_uref) + u{k}'*obj.R2*(u{k}) + x{k+1}'*obj.Q*x{k+1};
+                %energy
+                %at = (ly_uref./u{k}).*wSm;
+                %Ev = [Pw; at; h1*(hc.Cc*(x{k+1}-x{k})); (at-1)];
+                %objective = objective + Ev'*obj.RE*Ev;
 			end
 			
 			%ops = sdpsettings('verbose',1,'solver','quadprog', 'usex0',1);
@@ -106,11 +113,11 @@ classdef black_wolf < mpc_hpc & CP
 			ops.convertconvexquad = 0;
 			%ops.quadprog.MaxPCGIter = max(1, ops.quadprog.MaxPCGIter * 3);
 			ops.quadprog.MaxIter = 50;
-			obj.mpc_ctrl = optimizer(constraints,objective,ops,{x{1},w,ot,h0v,ly_uref,ly_usum},{u{1}, x{2}});
+			obj.mpc_ctrl = optimizer(constraints,objective,ops,{x{1},w,ot,h0v,wSm,ly_uref,ly_usum},{u{1}, x{2}});
 			obj.mpc_ctrl
 			
 		end %lin_mpc_setup
-		function uout = call_mpc(obj, x, w, ot, h0v, uref, usum)
+		function uout = call_mpc(obj, x, w, ot, h0v, wSm, uref, usum)
 			
 			%{
 			if nargin < 5 || ...
@@ -128,7 +135,7 @@ classdef black_wolf < mpc_hpc & CP
 			end
 			%}
 			
-			[uout, problem,~,~,optimizer_object] = obj.mpc_ctrl({x, w, ot, h0v, uref, usum});
+			[uout, problem,~,~,optimizer_object] = obj.mpc_ctrl({x, w, ot, h0v, wSm, uref, usum});
 
 			% Analyze error flags
 			%if problem
@@ -162,6 +169,9 @@ classdef black_wolf < mpc_hpc & CP
 			%[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(8, 16, 10);
 			obj.F0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
 			obj.T0v = ones(hpc_class.Nc, length(Tv))*diag(Tv);
+
+            %TODO: check if all the matrix are ok and defined, otherwise
+            %       fix them
 
 			obj = obj.setup_mpc(hpc_class);
 
@@ -257,7 +267,8 @@ classdef black_wolf < mpc_hpc & CP
 			% MPC
 			obj.xlplot(obj.ex_count+1,:) = 0;
 			mpc_pw_target = repmat(p_budget, obj.Nhzn,1+hc.vd);
-			res = obj.call_mpc(state_MPC, Ceff, hc.temp_amb*1000, h0v, input_mpc, mpc_pw_target);
+            wSm = obj.wl*(1-hc.wl_mem_weigth)';
+			res = obj.call_mpc(state_MPC, Ceff, hc.temp_amb*1000, h0v, wSm, input_mpc, mpc_pw_target);
 			tt = isnan(res{1});
 			% too complex to make it vectorial
 			%dp = res{1}(~tt);

@@ -35,14 +35,14 @@ alg_pos = 4;
 wl_pos = 5;
 
 % Main Aggregator metric: *test*/domain/model/*alg*/wl
-mam = wl_pos;
+mam = dom_pos;
 
 %secondary Aggregator metric or Comparison metric (i.e. the one in the bars)
 scm = alg_pos;
 
 % show values:
 show_tip_values = 1;
-show_violin = 0;
+show_violin = 1;
 font_size_tips = 10;
 font_size_tit = 18;
 font_size_axes = 12;
@@ -82,7 +82,7 @@ for m=1:mdim
         aidx{scm} = s;
 
         % Max temp
-        data = (extractCell(tres, aidx, "temp", "exMn", "MaxExceed"));
+        data = (extractCell(tres, aidx, "temp", "exMn", "Max"));
         T_M(1,m,s) = max(data);
         T_M(2,m,s) = mean(data);
         T_M(3,m,s) = min(data);
@@ -615,7 +615,7 @@ for s=1:sdim
     aidx{scm} = s;
 
     % Max temp
-    data = (extractCell(tres, aidx, "temp", "exMn", "MaxExceed"));
+    data = (extractCell(tres, aidx, "temp", "exMn", "Max"));
     T_M_d(:,s) = data;
 
     % Avearge Exceeding Temp
@@ -852,6 +852,10 @@ f2.Position = [1, 1, 1920*1,1080*1];
 exportgraphics(f2, 'violin.pdf', 'ContentType', 'vector');
 
 end %show_violin
+
+%%
+%extractCell(tres, aidx, "temp", "Max")
+%extractCell(tres, aidx, "temp", "exMn", "Max")
 
 %%
 

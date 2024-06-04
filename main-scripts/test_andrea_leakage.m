@@ -1,29 +1,44 @@
 
 
+T_step = 1;
+T_offset = [10 10];
 
-V = [0.5:0.05:1.2];
+%
+
+V = [];
+T = [];
+V = [hpc.V_min:hpc.V_discretization_step:hpc.V_max];
 d_p = 1;
-T = [20:1:100];
+T = [hpc.t_outside-T_offset(1):T_step:hpc.core_crit_temp+T_offset(2)];
 
-P = [hpc.static_pw_coeff hpc.exp_leak_coeff]/ 1000;
+kps = [hpc.leak_vdd_k, hpc.leak_temp_k, hpc.leak_process_k, ...
+					hpc.leak_exp_vdd_k, hpc.leak_exp_t_k, hpc.leak_exp_k];
+hpc.leak_exp_vdd_k = 0;
+hpc.leak_exp_t_k = 0;
+hpc.leak_exp_k = 0;
 
-Power_static = V*P(1) + d_p*P(3);
-maxT = 125+273.15;
+Power_static = hpc.ps_compute(V,T(1),d_p,0);
+
+hpc.leak_exp_vdd_k = kps(4);
+hpc.leak_exp_t_k = kps(5);
+hpc.leak_exp_k = kps(6);
 
 res = [];
-plance = [];
+plane = [];
 for i=1:length(T)
-	res(:,i) = (Power_static .* exp(V*P(4) + T(i)*P(5) - P(6)))'*0.95 + 0.05;
+	res(:,i) = hpc.ps_compute(V,T(i),d_p,0)';%*0.95 + 0.05;
 	plane(:,i) = Power_static;
 end
 
 F = hpc.FV_table( [sum(V>hpc.FV_table(:,1))+1]',3);
 
-ci = hpc.ceff_pw_coeff / 1000;
+ci = hpc.dyn_ceff_k;
 Ceff_low = [1 zeros(1,hpc.ipl-1)] * ci';
 Ceff_high = [zeros(1,hpc.ipl-1) 1] * ci';
 Power_dyn_low = Ceff_low .* F .* (V' .* V');
 Power_dyn_high = Ceff_high .* F .* (V' .* V');
+
+T = T - 273.15;
 
 %%
 fig = figure()
@@ -119,11 +134,11 @@ view(90,0)
 subplot(3, 3, [6, 9]);
 
 surf(T, V, res, 'FaceAlpha',1, 'EdgeAlpha', 0.6);%0.6)
-hold;
+hold on;
 
 h = gca;
-surf([20 100], V, [Power_dyn_low(:), Power_dyn_low(:)], 'FaceColor', 'y', 'FaceAlpha', 0.8);
-surf([20 100], V, [Power_dyn_high(:), Power_dyn_high(:)], 'FaceColor', 'r', 'FaceAlpha', 0.8);
+surf([T(1) T(end)], V, [Power_dyn_low(:), Power_dyn_low(:)], 'FaceColor', 'y', 'FaceAlpha', 0.8);
+surf([T(1) T(end)], V, [Power_dyn_high(:), Power_dyn_high(:)], 'FaceColor', 'r', 'FaceAlpha', 0.8);
 xlb = xlabel('Temperature [°C]');
 set(xlb,'rotation',-35)
 ylb = ylabel('Voltage [V]');
@@ -139,8 +154,10 @@ ylim([V(1) V(end)]);
 
 %%figure()
 
+lij = 14;
+
 subplot(3, 3, 8);
-surf([20 100], V(end-lij: end), [Power_dyn_high(end-lij:end), Power_dyn_high(end-lij:end)], 'FaceColor', 'r', 'FaceAlpha', 0.3, 'EdgeAlpha', 0.2);
+surf([T(1) T(end)], V(end-lij: end), [Power_dyn_high(end-lij:end), Power_dyn_high(end-lij:end)], 'FaceColor', 'r', 'FaceAlpha', 0.3, 'EdgeAlpha', 0.2);
 hold on;
 surf(T, V, res, 'FaceAlpha',1, 'EdgeAlpha', 0.6);%0.6)
 
@@ -150,9 +167,9 @@ surf(T, V, res, 'FaceAlpha',1, 'EdgeAlpha', 0.6);%0.6)
 
 h = gca;
 
-lij = 14;
 
-surf([20 100], V, [Power_dyn_low(:), Power_dyn_low(:)], 'FaceColor', 'y', 'FaceAlpha', 0.8, 'EdgeAlpha', 0.3);
+
+surf([T(1) T(end)], V, [Power_dyn_low(:), Power_dyn_low(:)], 'FaceColor', 'y', 'FaceAlpha', 0.8, 'EdgeAlpha', 0.3);
 
 %{
 for i=1:length(Power_dyn_high)
