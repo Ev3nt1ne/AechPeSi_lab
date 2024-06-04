@@ -77,7 +77,7 @@ function res = stats_analysis(obj,ctrl,x,u,f,v,w)
 	temp.exCr.SkewAv = skewness(mean( exTC ));
 	temp.exCr.KurtAv = kurtosis(mean( exTC ));
 	%
-    temp.exCr.MaxExceed = temp.exCr.Max - crt;
+    %temp.exCr.MaxExceed = temp.exCr.Max - crt;
     %
 	exTn = (xcp-mnt) .* (xcp > mnt);
 	%exTn = exTn(exTn > 0);
@@ -94,7 +94,7 @@ function res = stats_analysis(obj,ctrl,x,u,f,v,w)
     %
     %TODO not considering variable limit
     %   I should do: max(t-mnt(t))
-    temp.exMn.MaxExceed = temp.exMn.Max - mnt;
+    %temp.exMn.MaxExceed = temp.exMn.Max - mnt;
 	%
 	temp.exCr.TotTime = sum(sum( xcp > crt) *obj.Ts);
 	temp.exCr.StdTime = std(sum( xcp > crt) *obj.Ts);

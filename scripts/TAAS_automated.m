@@ -143,7 +143,7 @@ savetofile = 0;
 hpc.compare_vs_baseline = 1;
 hpc.sensor_noise = 0;
 
-test_iter = 10;%20;
+test_iter = 2; %10;%20;
 
 tres = [];
 tres{test_iter, ndom, th_models, 3, wl_times} = [];
