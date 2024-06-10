@@ -6,7 +6,8 @@ classdef mpc_hpc < controller
 		%% MPC Controller
 		Q;
 		R;
-		R2;
+		Rs;
+        Rt;
 		Nhzn = 3;
 		Ctx;
 		Ctu;

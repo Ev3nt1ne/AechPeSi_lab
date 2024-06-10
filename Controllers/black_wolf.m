@@ -4,13 +4,15 @@ classdef black_wolf < mpc_hpc & CP
 	properties
 		%alpha_wl = 0.4;				% Moving Average filter parameter for Workload
 
-        RE;
+        %RE;
 	end
 	properties(SetAccess=protected, GetAccess=public)	
 		psac;
 		psoff_lut;
 		F0v;
 		T0v;
+        Pm_max;
+        Pm_min;
 
 		prevF;
 		prevV;
@@ -98,7 +100,9 @@ classdef black_wolf < mpc_hpc & CP
 			objective = 0;
 
 			for k = 1:obj.Nhzn
-				objective = objective + (u{k}-ly_uref)'*obj.R*(u{k}-ly_uref) + u{k}'*obj.R2*(u{k}) + x{k+1}'*obj.Q*x{k+1};
+				objective = objective + (u{k}-ly_uref)'*obj.Rt*(u{k}-ly_uref) + u{k}'*obj.Rs*(u{k}) + ...
+                        ((x{k+1}-hc.t_outside)/(obj.T_target-hc.t_outside))'*obj.Q*((x{k+1}-hc.t_outside)/(obj.T_target-hc.t_outside)) + ...
+                        ((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm)'*obj.R*((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm);
                 %energy
                 %at = (ly_uref./u{k}).*wSm;
                 %Ev = [Pw; at; h1*(hc.Cc*(x{k+1}-x{k})); (at-1)];
@@ -170,6 +174,10 @@ classdef black_wolf < mpc_hpc & CP
 			obj.F0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
 			obj.T0v = ones(hpc_class.Nc, length(Tv))*diag(Tv);
 
+            %todo?
+            obj.Pm_max = hpc_class.F_max*hpc_class.V_max^2;		
+            obj.Pm_min = hpc_class.F_min*hpc_class.V_min^2;
+
             %TODO: check if all the matrix are ok and defined, otherwise
             %       fix them
 
@@ -187,8 +195,7 @@ classdef black_wolf < mpc_hpc & CP
 			obj.prevF = hpc_class.F_min*ones(hpc_class.Nc,1);
 			obj.prevV = hpc_class.V_min*ones(hpc_class.vd,1);
 			%TODO
-			obj.output_mpc = 1*ones(hpc_class.Nc,1);
-			
+			obj.output_mpc = 1*ones(hpc_class.Nc,1);	
 
 		end
 		function [F,V,obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
@@ -327,10 +334,10 @@ classdef black_wolf < mpc_hpc & CP
 				
 			figure();
 			%plot(obj.Ts*sim_mul*[1:Nsim]', pceff(2:end,:)*20+293, 'g'); hold on;
-			plot(t1, cpxplot(2:end,:) - 273.15, 'b'); hold on; grid on;
-			plot(t2, [NaN*ones(1,size(obj.tmpc,2)); (obj.tmpc(2:end-1,:) - 273.15)], 'm'); hold on;
-			%plot(t2, [(obj.tmpc(2+2:end,:) - 273); NaN*ones(2,size(obj.tmpc,2))], 'm'); hold on;
-			%plot(t2, obj.tmpc(2:end,:) - 273.15, 'm'); hold on;
+			%plot(t1, cpxplot(2:end,:) - 273.15, 'b'); hold on; grid on;
+			%plot(t2, [NaN*ones(1,size(obj.tmpc,2)); (obj.tmpc(2:end-1,:) - 273.15)], 'm'); hold on;
+			plot(t1, [(cpxplot(2+2:end,:) - 273.15); NaN*ones(2,size(obj.tmpc,2))], 'b'); hold on;
+			plot(t2, obj.tmpc(2:end,:) - 273.15, 'm');
 			xlabel("Time [s]");
 			ylabel("Temperature [T]");
 		end
