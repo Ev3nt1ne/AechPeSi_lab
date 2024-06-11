@@ -68,10 +68,10 @@ classdef black_wolf < mpc_hpc & CP
 
 					%TODO: Ct I did only for y, and only for max
 					if (~isinf(obj.umin))
-						%constraints = [constraints, u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k}-273.15)) + h0 >= obj.umin];
+						constraints = [constraints, u{k}.*w*(h2+1) + h1*(hc.Cc(1:hc.Nc,:)*(x{k}-273.15)) + h0 >= obj.umin];
 					end
-					if (~isinf(obj.uMax))
-						%constraints = [constraints, u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k}-273.15)) + h0 <= obj.uMax - obj.Ctu(k,:)'];
+					if (~isinf(obj.umax))
+						constraints = [constraints, u{k}.*w*(h2+1) + h1*(hc.Cc(1:hc.Nc,:)*(x{k}-273.15)) + h0 <= obj.umax - obj.Ctu(k,:)'];
 					end
 					if (~isinf(obj.xmin))
 						%constraints = [constraints, x{k+1} >= obj.xmin];
@@ -116,7 +116,7 @@ classdef black_wolf < mpc_hpc & CP
 			ops.quadprog.TolFun = 1e-3;
 			ops.convertconvexquad = 0;
 			%ops.quadprog.MaxPCGIter = max(1, ops.quadprog.MaxPCGIter * 3);
-			ops.quadprog.MaxIter = 50;
+			ops.quadprog.MaxIter = 200;%50;
 			obj.mpc_ctrl = optimizer(constraints,objective,ops,{x{1},w,ot,h0v,wSm,ly_uref,ly_usum},{u{1}, x{2}});
 			obj.mpc_ctrl
 			
@@ -168,7 +168,7 @@ classdef black_wolf < mpc_hpc & CP
 			% Freq
 			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([hpc_class.F_min hpc_class.F_max], [20 90], 0.9, 0.2995, 0, 0);
 			%TODO parametrize
-			[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(8, 8, 10);
+			[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(obj, 8, 8, 1);
 			%obj.psoff_lut=0; Fv=1; Tv=1;
 			%[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(8, 16, 10);
 			obj.F0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
@@ -177,6 +177,9 @@ classdef black_wolf < mpc_hpc & CP
             %todo?
             obj.Pm_max = hpc_class.F_max*hpc_class.V_max^2;		
             obj.Pm_min = hpc_class.F_min*hpc_class.V_min^2;
+
+            obj.umin = obj.Pm_min;
+            obj.umax = obj.Pm_max;
 
             %TODO: check if all the matrix are ok and defined, otherwise
             %       fix them
@@ -270,6 +273,10 @@ classdef black_wolf < mpc_hpc & CP
 			end
 			
 			%state_MPC = Tobs;
+
+            if obj.ex_count == 120
+                aa = 1;
+            end
 
 			% MPC
 			obj.xlplot(obj.ex_count+1,:) = 0;

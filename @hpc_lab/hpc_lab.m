@@ -349,7 +349,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 	%% Approximation
 	methods
 		[k0, k1, k2] = pws_ls_approx(obj, I, T, C, alp, alp_I0, using_voltage)
-		[lut, F, T] = pws_ls_offset(obj, Fslot, Tslot, add_temp )
+		[lut, F, T] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 	end
 
 	%% Graphs
