@@ -79,6 +79,15 @@ classdef cp_mpc < mpc_hpc & CP
 			        constraints = [constraints, x{k+1} == obj.Ad_ctrl*x{k}+Bu*u{k}+Bd*ot];
 			        constraints = [constraints, hc.Cc*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
 			        constraints = [constraints,sum(u{k}) <= ly_usum - sum(obj.Ctu(k,:),2)];
+
+                    %TODO: Ct I did only for y, and only for max
+					if (~isinf(obj.umin))
+						constraints = [constraints, u{k} >= obj.umin];
+					end
+					if (~isinf(obj.umax))
+						constraints = [constraints, u{k} <= obj.umax - obj.Ctu(k,:)'];
+					end
+
 				    objective = objective + (u{k}-ly_uref)'*obj.Rt*(u{k}-ly_uref) + u{k}'*obj.Rs*(u{k}) + x{k+1}'*obj.Q*x{k+1};
                 end
             end
@@ -251,6 +260,9 @@ classdef cp_mpc < mpc_hpc & CP
                 nnzE = nnz(obj.Bd_ctrl);
                 disp(sprintf('sparsifying B by x%f.  nnz(B) goes from %d to %d.',nnzS/nnzE, nnzS, nnzE));
             end
+
+            obj.umin = hpc_class.core_min_power;
+            obj.umax = hpc_class.core_max_power;
 
 			obj = obj.setup_mpc(hpc_class);
 

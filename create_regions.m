@@ -2,11 +2,22 @@
 
 function [table, cas] = create_regions(A, B, V, N, show)
 
+    % N = number of regions
+    % V = Value Map
+    % A = vector1
+    % B = vector2
+    
+    % Table of the regions based on A and B
+    % cas = centroids of the regions 
+
 	if (nargin < 5) || isempty(show)
 		show = 0;
 	end
 
-	maxIterations = 1000;
+	maxIterations = 2500;
+
+    A = A(:).';
+    B = B(:).';
 	
 	Y = (ones(length(A),length(B)).*B);
 	X = (ones(length(B),length(A)).*A)';
@@ -68,6 +79,7 @@ function [table, cas] = create_regions(A, B, V, N, show)
 	cas = cas(1:N,:);
 
 	if show
+        figure();
 		% Assign color based on the assignments
 		colormap(parula(max(finalAssignments(:))));
 	

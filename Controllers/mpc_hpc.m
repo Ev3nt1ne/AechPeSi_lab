@@ -14,7 +14,7 @@ classdef mpc_hpc < controller
 		Cty;
 		
 		umin;
-		uMax;
+		umax;
 		xmin;
 		xMax;
 		ymin;
