@@ -331,7 +331,8 @@ end
 			[obj.Ac_nom, obj.Bc_nom] = obj.create_model(obj.temp_amb, 0, tm_ver);
 			[obj.Ac_true, obj.Bc_true] = obj.create_model(obj.temp_amb, 1, tm_ver);
 			
-			if rank([obj.C(1:obj.Nc,:);obj.C(1:obj.Nc,:)*obj.Ac_nom;obj.C(1:obj.Nc,:)*obj.Ac_nom*obj.Ac_nom]) == obj.Ns
+			%if rank([obj.C(1:obj.Nc,:);obj.C(1:obj.Nc,:)*obj.Ac_nom;obj.C(1:obj.Nc,:)*obj.Ac_nom*obj.Ac_nom]) == obj.Ns
+            if rank([obj.C;obj.C*obj.Ac_nom;obj.C*obj.Ac_nom*obj.Ac_nom]) == obj.Ns
 			%This is not working
 			%(rank(obsv(obj.Ac_nom, obj.C)) == obj.Ns)
 				disp("The system is Observable!")

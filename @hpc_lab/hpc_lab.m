@@ -32,10 +32,10 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 
 		core_pm;
 
-		%x_init;						% Initial Conditions 
+		%x_init;					% Initial Conditions 
 		%urplot;						% Input Reference Plot
 		frtrc;						% Freq Reference Trace
-		%zrplot;						% Power Noise Plot
+		%zrplot;					% Power Noise Plot
 		wltrc;						% Wokrload Trace
 
 		%TODO: should rename these as: core_limit_temp and core_crit_temp
