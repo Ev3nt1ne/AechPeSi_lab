@@ -1,4 +1,4 @@
-function [lut, F, T] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
+function [lut, Vs, Ts] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 %PWS_LS_OFFSET Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -12,7 +12,7 @@ function [lut, F, T] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 	tmax = obj.core_crit_temp + add_temp;
 	
     %Initially I need to craft a value table/surface
-    tsloti = 100;
+    tsloti = 60;
     %vsloti = 30;
 
     % T:
@@ -41,12 +41,8 @@ function [lut, F, T] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 		end
     end
 
-    if show
-        figure()
-	    surf(T,V, lut');
-    end
-
     % Min regions
+    %{
     N = Vslot*Tslot;
 	[table, cas] = create_regions(T, V, lut, N, show);
 
@@ -54,25 +50,38 @@ function [lut, F, T] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
     for i=1:N
         vtb(table==i) = cas(i,3);
     end
+    %}
 
-    vtb
+    vtb = lut;
 
     %matrix of initial variance:
         % do not need it
     %repeat until I have the exact number of columns and rows:
+    %row_dim = size(vtb, 1) -2;
+    %col_dim = size(vtb, 2) -2;
     row_dim = size(vtb, 1);
     col_dim = size(vtb, 2);
-    og_row_dim = row_dim;
-    og_col_dim = col_dim;            
+    og_row_dim = size(vtb, 1);
+    og_col_dim = size(vtb, 2);            
+    %cidx = [1 1:col_dim col_dim];
+    %ridx = [1 1:row_dim row_dim];
     cidx = 1:col_dim;
     ridx = 1:row_dim;
 
+    sequential_merging = zeros(row_dim+col_dim-(Vslot+Tslot), 2);
+    sequential_merging_i = zeros(row_dim+col_dim-(Vslot+Tslot), 2);
+    sm_idx = 1;
+
+    %test with random
+    %vtb = rand(size(vtb))*20-10;
+
     while ((row_dim > Tslot) || (col_dim > Vslot))
-        storedVar = 1000;
+        storedVar = (og_row_dim)*(og_col_dim)*10;
         mergeCR = [0 0];
     
         B = [];
         if (col_dim > Vslot)
+            ldx = ridx;
         for i=1:(col_dim-1)
             idx = cidx;
             idx(idx>i) = idx(idx>i)-1;
@@ -81,13 +90,15 @@ function [lut, F, T] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
             %idx(idx==(i+1)) = [];
             A = 0;
             for j=1:(col_dim-1)
-                A = A + ...
-                    var(vtb(:,idx==j), 0, "all")/(og_row_dim*sum(idx==j));
+                for k=1:row_dim
+                    A = A + ...
+                        var(vtb(ldx==k,idx==j), 0, "all"); %/(og_row_dim*sum(idx==j));
+                end
             end
     
-            A = A/(col_dim-1);
+            A = A/((col_dim-1)*row_dim);
     
-            B = [B A];
+            %B = [B A];
             
             if (A < storedVar)
                 storedVar = A;
@@ -96,18 +107,21 @@ function [lut, F, T] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
         end
         end %if
         if (row_dim > Tslot)
+            ldx = cidx;
         for i=1:(row_dim-1)
             idx = ridx;
             idx(idx>i) = idx(idx>i)-1;
             A = 0;
             for j=1:(row_dim-1)
-                A = A + ...
-                    var(vtb(idx==j,:)', 0, "all")/(og_col_dim*sum(idx==j));
+                for k=1:col_dim
+                    A = A + ...
+                        var(vtb(idx==j,ldx==k)', 0, "all"); %/(og_col_dim*sum(idx==j));
+                end
             end
             
-            A = A/(row_dim-1);
+            A = A/((row_dim-1)*col_dim);
     
-            B = [B A];
+            %B = [B A];
     
             if (A < storedVar)
                 storedVar = A;
@@ -115,6 +129,14 @@ function [lut, F, T] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
             end        
         end
         end %if
+
+        sequential_merging(sm_idx,:) = mergeCR;
+        alk1 = find(ridx==mergeCR(1),1,"last");
+        alk1(isempty(alk1)) = 0;
+        alk2 = find(cidx==mergeCR(2),1,"last");
+        alk2(isempty(alk2)) = 0;
+        sequential_merging_i(sm_idx,:) = [alk1 alk2];
+        sm_idx = sm_idx+1;
     
         col_dim = col_dim - (mergeCR(2)>0);
         row_dim = row_dim - (mergeCR(1)>0);
@@ -124,19 +146,64 @@ function [lut, F, T] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 
     end %while
 
-    hold on;
-
-    for i=2:row_dim
-        lltt = min(find(ridx==i));
-        plot3(T(lltt)*ones(size(V)), V, lut(lltt, :), 'LineWidth', 2.5)
+    Vs = zeros(Vslot-1,1);
+    Ts = zeros(Tslot-1,1);
+    for i=1:(row_dim-1)
+        lltt = find(ridx==i,1,"last");
+        Ts(i) = T(lltt);
+    end
+    for i=1:(col_dim-1)
+        lltt = find(cidx==i,1,"last");
+        Vs(i) = V(lltt);
     end
 
-    for i=2:col_dim
-        lltt = min(find(cidx==i));
-        plot3(T, V(lltt)*ones(size(T)), lut(:,lltt), 'LineWidth', 2.5)
-    end
+    if show
+        figure();
+        surf(T,V,vtb');
 
-    aas = 1;
+        hold on;
+
+        for i=1:(row_dim-1)
+            lltt = find(ridx==i,1,"last");
+            plot3(T(lltt)*ones(size(V)), V, vtb(lltt, :), 'LineWidth', 3.5);
+        end
+   
+        for i=1:(col_dim-1)
+            lltt = find(cidx==i,1,"last");
+            plot3(T, V(lltt)*ones(size(T)), vtb(:,lltt), 'LineWidth', 3.5);
+        end
+
+        %{
+        figure();
+
+        hold on;
+
+        colorplot = [0.8941    0.1020    0.1098;
+            0.2157    0.4941    0.7216;
+            0.3020    0.6863    0.2902;
+            0.5961    0.3059    0.6392;
+            1.0000    0.4980         0;
+            1.0000    1.0000    0.2000;
+            0.6510    0.3373    0.1569;
+            0.9686    0.5059    0.7490;
+            0.6000    0.6000    0.6000;];
+    
+        plltt = 1;
+        for i=1:row_dim
+            lltt = find(ridx==i,1,"last");
+            surf(T(plltt:lltt)', V, vtb(plltt:lltt, :)', 'FaceColor', colorplot(mod(i, size(colorplot,1)),:),'FaceAlpha',0.5, 'EdgeColor', 'none' );
+            plltt = lltt;
+        end
+   
+        plltt = 1;
+        for i=1:col_dim
+            lltt = find(cidx==i,1,"last");
+            surf(T, V(plltt:lltt), vtb(:,plltt:lltt)', 'EdgeColor', colorplot(mod(i, size(colorplot,1)),:), 'FaceAlpha',0,'LineWidth', 3.5 );
+            plltt = lltt;
+        end
+        %}
+    end
+        
 end
 
 
