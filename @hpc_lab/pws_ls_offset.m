@@ -149,12 +149,26 @@ function [lut, Vs, Ts] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
     Vs = zeros(Vslot-1,1);
     Ts = zeros(Tslot-1,1);
     for i=1:(row_dim-1)
-        lltt = find(ridx==i,1,"last");
-        Ts(i) = T(lltt);
+        lidx = find(ridx==i,1,"last");
+        Ts(i) = T(lidx);
     end
     for i=1:(col_dim-1)
-        lltt = find(cidx==i,1,"last");
-        Vs(i) = V(lltt);
+        lidx = find(cidx==i,1,"last");
+        Vs(i) = V(lidx);
+    end
+
+    lut = zeros(Tslot, Vslot);
+
+    plridx = 1;
+    for i=1:row_dim
+        lridx = find(ridx==i,1,"last");
+        plcidx = 1;
+        for j=1:col_dim
+            lcidx = find(cidx==j,1,"last");
+            lut(i, j) = mean(vtb(plridx:lridx, plcidx:lcidx), "all");
+            plcidx = lcidx+1;
+        end
+        plridx = lridx+1;
     end
 
     if show
@@ -163,14 +177,29 @@ function [lut, Vs, Ts] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 
         hold on;
 
+        Tpl = zeros(Tslot, 1);
+        Tpl(1) = (T(1)+Ts(1))/2;
+        Tpl(end) = (T(end)+Ts(end))/2;
+        for i=2:row_dim-1
+            Tpl(i) = (Ts(i-1)+Ts(i)) / 2; 
+        end
+        Vpl = zeros(Vslot, 1);
+        Vpl(1) = (V(1)+Vs(1))/2;
+        Vpl(end) = (V(end)+Vs(end))/2;
+        for i=2:col_dim-1
+            Vpl(i) = (Vs(i-1)+Vs(i)) / 2; 
+        end
+
+        surf(Tpl, Vpl, lut','FaceAlpha',0.6);
+
         for i=1:(row_dim-1)
-            lltt = find(ridx==i,1,"last");
-            plot3(T(lltt)*ones(size(V)), V, vtb(lltt, :), 'LineWidth', 3.5);
+            lidx = find(ridx==i,1,"last");
+            plot3(T(lidx)*ones(size(V)), V, vtb(lidx, :), 'LineWidth', 3.5);
         end
    
         for i=1:(col_dim-1)
-            lltt = find(cidx==i,1,"last");
-            plot3(T, V(lltt)*ones(size(T)), vtb(:,lltt), 'LineWidth', 3.5);
+            lidx = find(cidx==i,1,"last");
+            plot3(T, V(lidx)*ones(size(T)), vtb(:,lidx), 'LineWidth', 3.5);
         end
 
         %{
@@ -188,18 +217,18 @@ function [lut, Vs, Ts] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
             0.9686    0.5059    0.7490;
             0.6000    0.6000    0.6000;];
     
-        plltt = 1;
+        plidx = 1;
         for i=1:row_dim
-            lltt = find(ridx==i,1,"last");
-            surf(T(plltt:lltt)', V, vtb(plltt:lltt, :)', 'FaceColor', colorplot(mod(i, size(colorplot,1)),:),'FaceAlpha',0.5, 'EdgeColor', 'none' );
-            plltt = lltt;
+            lidx = find(ridx==i,1,"last");
+            surf(T(plidx:lidx)', V, vtb(plidx:lidx, :)', 'FaceColor', colorplot(mod(i, size(colorplot,1)),:),'FaceAlpha',0.5, 'EdgeColor', 'none' );
+            plidx = lidx;
         end
    
-        plltt = 1;
+        plidx = 1;
         for i=1:col_dim
-            lltt = find(cidx==i,1,"last");
-            surf(T, V(plltt:lltt), vtb(:,plltt:lltt)', 'EdgeColor', colorplot(mod(i, size(colorplot,1)),:), 'FaceAlpha',0,'LineWidth', 3.5 );
-            plltt = lltt;
+            lidx = find(cidx==i,1,"last");
+            surf(T, V(plidx:lidx), vtb(:,plidx:lidx)', 'EdgeColor', colorplot(mod(i, size(colorplot,1)),:), 'FaceAlpha',0,'LineWidth', 3.5 );
+            plidx = lidx;
         end
         %}
     end
