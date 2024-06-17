@@ -9,7 +9,7 @@ classdef black_wolf < mpc_hpc & CP
 	properties(SetAccess=protected, GetAccess=public)	
 		psac;
 		psoff_lut;
-		F0v;
+		V0v;
 		T0v;
         Pm_max;
         Pm_min;
@@ -17,6 +17,8 @@ classdef black_wolf < mpc_hpc & CP
 		prevF;
 		prevV;
 		C2;
+
+        Pw_diff;
 	end
 	
 	methods
@@ -168,10 +170,10 @@ classdef black_wolf < mpc_hpc & CP
 			% Freq
 			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([hpc_class.F_min hpc_class.F_max], [20 90], 0.9, 0.2995, 0, 0);
 			%TODO parametrize
-			[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(obj, 8, 8, 1);
+			[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(obj, 5, 3, 1);
 			%obj.psoff_lut=0; Fv=1; Tv=1;
 			%[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(8, 16, 10);
-			obj.F0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
+			obj.V0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
 			obj.T0v = ones(hpc_class.Nc, length(Tv))*diag(Tv);
 
             %todo?
@@ -190,6 +192,7 @@ classdef black_wolf < mpc_hpc & CP
 			obj.xlplot(1,:) = hpc_class.t_init;
 
 			obj.tmpc = zeros(Nsim+1, hpc_class.Ns);
+            obj.Pw_diff = zeros(Nsim+1, 1);
 
 			obj.ex_count = 0;
 			obj.failed = 0;
@@ -217,14 +220,16 @@ classdef black_wolf < mpc_hpc & CP
 			Ceff = obj.wl * (hc.dyn_ceff_k)';
 
 			%TODO here hc.Cc
-			[~, Tidx] = min(abs(obj.T0v - hc.Cc*T),[],2);
+			%[~, Tidx] = min(abs(obj.T0v - hc.Cc*T),[],2);
+            Tidx = sum(obj.T0v < hc.Cc*T,2)+1;
 			% before overwriting F
-			[~, Fidx] = min(abs(obj.F0v - obj.prevF),[],2);
+			%[~, Vidx] = min(abs(obj.V0v - obj.prevV),[],2);
+            Vidx = sum(obj.V0v < hc.VDom*obj.prevV,2)+1;
 			
 			h0v = zeros(hc.Nc, 1);
 			for i=1:hc.Nc
 				atidx = min(Tidx(i)+0, 9);
-				h0v(i,1) = obj.psoff_lut(atidx, Fidx(i));
+				h0v(i,1) = obj.psoff_lut(atidx, Vidx(i));
 			end
 			
 			% Choose Voltage
@@ -269,7 +274,7 @@ classdef black_wolf < mpc_hpc & CP
 				%Here it does not change a lot if I add stuff. Fixeing it to 9 does not
 				%solve the overhead problem.
 				atidx = min(Tidx(i)+0, 9);
-				h0v(i,1) = obj.psoff_lut(atidx, Fidx(i));
+				h0v(i,1) = obj.psoff_lut(atidx, Vidx(i));
 			end
 			
 			%state_MPC = Tobs;
