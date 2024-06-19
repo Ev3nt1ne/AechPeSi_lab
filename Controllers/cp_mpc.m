@@ -332,13 +332,13 @@ classdef cp_mpc < mpc_hpc & CP
 			pu = Ceff.*F.*(hc.VDom*(V.*V)) + (hc.leak_vdd_k.*(hc.VDom*V) + process*hc.leak_process_k).*pex;
 
 			% TODO observer
-			Tobs = T;			
+			obj.Tobs = T;			
 
 			% MPC
 			obj.xlplot(obj.ex_count+1,:) = 0;
 			%mpc_pw_target = repmat(p_budget, obj.Nhzn,1+hc.vd);
-			%res = obj.call_mpc(Tobs, hc.temp_amb*1000, pu, mpc_pw_target);
-			res = obj.call_mpc(Tobs, hc.temp_amb*1000, pu, p_budget);
+			%res = obj.call_mpc(obj.Tobs, hc.temp_amb*1000, pu, mpc_pw_target);
+			res = obj.call_mpc(obj.Tobs, hc.temp_amb*1000, pu, p_budget);
 			tt = isnan(res{1});
 			% too complex to make it vectorial
 			%dp = res{1}(~tt);

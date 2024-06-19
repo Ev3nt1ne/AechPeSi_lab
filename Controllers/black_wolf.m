@@ -70,10 +70,10 @@ classdef black_wolf < mpc_hpc & CP
 
 					%TODO: Ct I did only for y, and only for max
 					if (~isinf(obj.umin))
-						constraints = [constraints, u{k}.*w*(h2+1) + h1*(hc.Cc(1:hc.Nc,:)*(x{k}-273.15)) + h0 >= obj.umin];
+						constraints = [constraints, u{k}.*(w+h2) + h1*(hc.Cc(1:hc.Nc,:)*(x{k}-273.15)) + h0 + h0v >= obj.umin];
 					end
 					if (~isinf(obj.umax))
-						constraints = [constraints, u{k}.*w*(h2+1) + h1*(hc.Cc(1:hc.Nc,:)*(x{k}-273.15)) + h0 <= obj.umax - obj.Ctu(k,:)'];
+						constraints = [constraints, u{k}.*(w+h2) + h1*(hc.Cc(1:hc.Nc,:)*(x{k}-273.15)) + h0 + h0v<= obj.umax - obj.Ctu(k,:)'];
 					end
 					if (~isinf(obj.xmin))
 						%constraints = [constraints, x{k+1} >= obj.xmin];
@@ -88,7 +88,7 @@ classdef black_wolf < mpc_hpc & CP
 						constraints = [constraints, hc.Cc*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
 					%end
 					%if (~isinf(obj.usum(1)))
-                        Pw = u{k}.*w*(h2+1) + h1*(hc.Cc*(x{k}-273.15)) + h0v+h0;
+                        Pw = u{k}.*(w+h2) + h1*(hc.Cc*(x{k}-273.15)) + h0v+h0;
 						constraints = [constraints,sum(Pw) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
 						%TODO should I also add the "resulting" thing. i.e.
 						%	the above formula with x{k+1}?
@@ -157,12 +157,6 @@ classdef black_wolf < mpc_hpc & CP
 			disc = obj.discreate_system(hpc_class, obj.Ts_ctrl);
 			obj.Ad_ctrl = disc.A;
 			obj.Bd_ctrl = disc.B;
-			
-			obj.C2 = eye(hpc_class.Ns);
-			for k=2:hpc_class.full_model_layers
-				obj.C2([k:hpc_class.full_model_layers:end]) = 0;
-			end
-			obj.C2([end-hpc_class.add_states+1:end], :) = 0;
 
 			% Voltage
 			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([0.5 1.2], [20 90], 0.9, 1/3.497, 1.93, 1);
@@ -170,9 +164,7 @@ classdef black_wolf < mpc_hpc & CP
 			% Freq
 			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([hpc_class.F_min hpc_class.F_max], [20 90], 0.9, 0.2995, 0, 0);
 			%TODO parametrize
-			[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(obj, 5, 3, 1);
-			%obj.psoff_lut=0; Fv=1; Tv=1;
-			%[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(8, 16, 10);
+			[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(obj, 5, 4, 1);
 			obj.V0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
 			obj.T0v = ones(hpc_class.Nc, length(Tv))*diag(Tv);
 
@@ -200,8 +192,23 @@ classdef black_wolf < mpc_hpc & CP
 			obj.lNsim = Nsim;
 			obj.prevF = hpc_class.F_min*ones(hpc_class.Nc,1);
 			obj.prevV = hpc_class.V_min*ones(hpc_class.vd,1);
+            obj.Tobs = hpc_class.temp_amb*ones(hpc_class.Ns,1);
 			%TODO
 			obj.output_mpc = 1*ones(hpc_class.Nc,1);	
+
+            % Observer
+            % create the dicrete system
+            %sys = ss(obj.Ad_ctrl, obj.Bd_ctrl, obj.C, zeros(size(obj.C,1), ...
+            %    size(obj.Bd_ctrl,2)), obj.Ts_ctrl);
+            %To use kalman, you must provide a model sys that has an input 
+            %   for the noise w. Thus, sys is not the same as Plant, because 
+            %   Plant takes the input un = u + w. You can construct sys by 
+            %   creating a summing junction for the noise input.
+            %sys = sys*[1 1];
+            %For this example, assume both noise sources have unit covariance 
+            %   and are not correlated (N = 0).
+            %[kalmf,L,P] = kalman(sys,Q,R,N);
+            [obj.LK, P, Z] = dlqe(obj.Ad_ctrl, obj.Gw, obj.C, obj.Qcov, obj.Rcov);
 
 		end
 		function [F,V,obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
@@ -213,6 +220,7 @@ classdef black_wolf < mpc_hpc & CP
 			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
 			p_budget = hc.tot_pw_budget(min(target_index, length(hc.tot_pw_budget)));
 			T = pvt{hc.PVT_T};
+            Tc = T(1:hc.Nc);
 			process = pvt{hc.PVT_P};
 
 			% Process Workload
@@ -221,7 +229,7 @@ classdef black_wolf < mpc_hpc & CP
 
 			%TODO here hc.Cc
 			%[~, Tidx] = min(abs(obj.T0v - hc.Cc*T),[],2);
-            Tidx = sum(obj.T0v < hc.Cc*T,2)+1;
+            Tidx = sum(obj.T0v < Tc,2)+1;
 			% before overwriting F
 			%[~, Vidx] = min(abs(obj.V0v - obj.prevV),[],2);
             Vidx = sum(obj.V0v < hc.VDom*obj.prevV,2)+1;
@@ -250,7 +258,7 @@ classdef black_wolf < mpc_hpc & CP
 			end
 
 			% TODO observer
-			Tobs = T;
+			%below?
 
 			% TODO: here I could use the "real" formula A*x + B*u, where u
 			%	is given by the identified model (so Pd+Ps*exp() with 
@@ -259,17 +267,20 @@ classdef black_wolf < mpc_hpc & CP
 			%	model which seems to me as too simplicistic
 			power_mpc = obj.output_mpc.*Ceff + ...
 				(hc.VDom*obj.prevV*hc.leak_vdd_k + hc.leak_process_k*process).* ...
-				exp(hc.leak_exp_vdd_k*hc.VDom*obj.prevV + (hc.Cc*Tobs-273.15)*hc.leak_exp_t_k + hc.leak_exp_k);
+				exp(hc.leak_exp_vdd_k*hc.VDom*obj.prevV + (Tc-273.15)*hc.leak_exp_t_k + hc.leak_exp_k);
 			
-			%state_MPC = (obj.Ad_ctrl + obj.C2*obj.psac(2))*Tobs-(obj.C2*obj.psac(2)*273.15*ones(hc.Ns,1)) + ...
+			%state_MPC = (obj.Ad_ctrl + obj.C2*obj.psac(2))*obj.Tobs-(obj.C2*obj.psac(2)*273.15*ones(hc.Ns,1)) + ...
 			%	(obj.Bd_ctrl(:,1:hc.Nc)+(hc.Cc'*obj.psac(3)))*(obj.output_mpc.*Ceff)+obj.Bd_ctrl(:,hc.Nc+1:end)*(1000*hc.temp_amb) + hc.Cc'*(obj.psac(1) + h0v);
 
-			state_MPC = obj.Ad_ctrl*Tobs + obj.Bd_ctrl*[power_mpc; 1000*hc.temp_amb];
+			%state_MPC = obj.Ad_ctrl*obj.Tobs + obj.Bd_ctrl*[power_mpc; 1000*hc.temp_amb];
+            obj.Tobs = (obj.Ad_ctrl - obj.LK*obj.C)*obj.Tobs + obj.Bd_ctrl*[power_mpc; 1000*hc.temp_amb] + obj.LK*T;
+            state_MPC = obj.Tobs;
 
 			%TBD is it needed?
 			%Update T0v
 			%TODO here hc.Cc
-			[~, Tidx] = min(abs(obj.T0v - hc.Cc*state_MPC),[],2);
+			%[~, Tidx] = min(abs(obj.T0v - hc.Cc*state_MPC),[],2);
+            Tidx = sum(obj.T0v < hc.Cc*state_MPC,2)+1;
 			for i=1:hc.Nc
 				%Here it does not change a lot if I add stuff. Fixeing it to 9 does not
 				%solve the overhead problem.
@@ -277,7 +288,7 @@ classdef black_wolf < mpc_hpc & CP
 				h0v(i,1) = obj.psoff_lut(atidx, Vidx(i));
 			end
 			
-			%state_MPC = Tobs;
+			%state_MPC = obj.Tobs;
 
             if obj.ex_count == 120
                 aa = 1;
@@ -331,7 +342,7 @@ classdef black_wolf < mpc_hpc & CP
 			end
 
 			%disp(obj.ex_count)
-			%toto = [hc.Cc*Tobs - 273.15, hc.Cc*state_MPC- 273.15, hc.Cc*res{2} - 273.15, pp, obj.output_mpc, obj.prevF, F, hc.VDom*V,  i_wl*(hc.dyn_ceff_k)'];
+			%toto = [hc.Cc*obj.Tobs - 273.15, hc.Cc*state_MPC- 273.15, hc.Cc*res{2} - 273.15, pp, obj.output_mpc, obj.prevF, F, hc.VDom*V,  i_wl*(hc.dyn_ceff_k)'];
 			%toto = ["T0", "T1", "T2-mpc", "prevMPC T0-T1", "mpc T1-T2", "prev F T0-T1", "F T1-T2", "V T1-T2", "wl T-1 - T0"; toto]
 
 			obj.prevF = F;
