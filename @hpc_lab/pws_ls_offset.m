@@ -1,4 +1,4 @@
-function [lut, Vs, Ts] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
+function [lut, Vs, Ts, M_var] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 %PWS_LS_OFFSET Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -6,13 +6,13 @@ function [lut, Vs, Ts] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 		show = 0;
     end
 
-    add_temp = 5;
+    add_temp = 0;
 
 	tmin = obj.t_outside;
 	tmax = obj.core_crit_temp + add_temp;
 	
     %Initially I need to craft a value table/surface
-    tsloti = 60;
+    tsloti = round(tmax-tmin);
     %vsloti = 30;
 
     % T:
@@ -24,6 +24,10 @@ function [lut, Vs, Ts] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 	%V = obj.FV_table((sum(F>obj.FV_table(:,3))+1 ),1 );
     F = obj.FV_table(:,3);
     V = obj.FV_table(:,1);
+
+    %T = T(1:end-1);
+    %F = F(1:end-1);
+    %V = V(1:end-1);
 
     h0 = ctrl.psac(1);
     h1 = ctrl.psac(2);
@@ -57,16 +61,23 @@ function [lut, Vs, Ts] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
     %matrix of initial variance:
         % do not need it
     %repeat until I have the exact number of columns and rows:
-    %row_dim = size(vtb, 1) -2;
-    %col_dim = size(vtb, 2) -2;
-    row_dim = size(vtb, 1);
-    col_dim = size(vtb, 2);
+    exc_ext = 1;
+    if exc_ext
+        row_dim = size(vtb, 1) -2;
+        col_dim = size(vtb, 2) -2;
+    else
+        row_dim = size(vtb, 1);
+        col_dim = size(vtb, 2);
+    end
     og_row_dim = size(vtb, 1);
-    og_col_dim = size(vtb, 2);            
-    %cidx = [1 1:col_dim col_dim];
-    %ridx = [1 1:row_dim row_dim];
-    cidx = 1:col_dim;
-    ridx = 1:row_dim;
+    og_col_dim = size(vtb, 2);
+    if exc_ext
+        cidx = [1 1:col_dim col_dim];
+        ridx = [1 1:row_dim row_dim];
+    else
+        cidx = 1:col_dim;
+        ridx = 1:row_dim;
+    end
 
     sequential_merging = zeros(row_dim+col_dim-(Vslot+Tslot), 2);
     sequential_merging_i = zeros(row_dim+col_dim-(Vslot+Tslot), 2);
@@ -79,7 +90,7 @@ function [lut, Vs, Ts] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
         storedVar = (og_row_dim)*(og_col_dim)*10;
         mergeCR = [0 0];
     
-        B = [];
+        %B = [];
         if (col_dim > Vslot)
             ldx = ridx;
         for i=1:(col_dim-1)
@@ -158,6 +169,7 @@ function [lut, Vs, Ts] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
     end
 
     lut = zeros(Tslot, Vslot);
+    M_var = size(lut);
 
     plridx = 1;
     for i=1:row_dim
@@ -166,6 +178,7 @@ function [lut, Vs, Ts] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
         for j=1:col_dim
             lcidx = find(cidx==j,1,"last");
             lut(i, j) = mean(vtb(plridx:lridx, plcidx:lcidx), "all");
+            M_var(i,j) = var(vtb(plridx:lridx, plcidx:lcidx), 0, "all");
             plcidx = lcidx+1;
         end
         plridx = lridx+1;
