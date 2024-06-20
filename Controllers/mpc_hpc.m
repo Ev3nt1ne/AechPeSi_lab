@@ -6,14 +6,15 @@ classdef mpc_hpc < controller
 		%% MPC Controller
 		Q;
 		R;
-		R2;
+		Rs;
+        Rt;
 		Nhzn = 3;
 		Ctx;
 		Ctu;
 		Cty;
 		
 		umin;
-		uMax;
+		umax;
 		xmin;
 		xMax;
 		ymin;
@@ -24,8 +25,13 @@ classdef mpc_hpc < controller
 			= 1e-3;			% Observer Ts
 
 		Obs_poles = [0.8 0.1];		% Poles of the Luemberg Observer
+        Qcov;
+        Rcov;
+        Gw;
 
 		save_solver_stats = 0;
+
+        LK;
 
 	end
 
@@ -40,6 +46,7 @@ classdef mpc_hpc < controller
 		xlplot;
 		tmpc;
 		output_mpc;
+        Tobs;
 
 		solver_stats;
 	end

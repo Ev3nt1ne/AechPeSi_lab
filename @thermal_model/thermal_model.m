@@ -331,13 +331,36 @@ end
 			[obj.Ac_nom, obj.Bc_nom] = obj.create_model(obj.temp_amb, 0, tm_ver);
 			[obj.Ac_true, obj.Bc_true] = obj.create_model(obj.temp_amb, 1, tm_ver);
 			
-			if rank([obj.C(1:obj.Nc,:);obj.C(1:obj.Nc,:)*obj.Ac_nom;obj.C(1:obj.Nc,:)*obj.Ac_nom*obj.Ac_nom]) == obj.Ns
-			%This is not working
-			%(rank(obsv(obj.Ac_nom, obj.C)) == obj.Ns)
-				disp("The system is Observable!")
+			%rank+obsv is not working: 1) rank considers low numbers 0
+                % one could use rank(sym(obsv() ) ), but this would take a
+                % really long amount of time for large systems! -> crash
+                % Matlab
+            logic_res = 0;
+            sure_obs = 0;
+            if obj.Ns <= 36
+                logic_res = rank(sym(obsv(obj.Ac_nom, obj.C))) == obj.Ns;
+                sure_obs = 1;
+            else
+                OM = [obj.C(1:obj.Nc,:); 
+                      obj.C(1:obj.Nc,:)*obj.Ac_nom;
+                      obj.C(1:obj.Nc,:)*obj.Ac_nom*obj.Ac_nom;
+                      obj.C(1:obj.Nc,:)*(obj.Ac_nom)^3;
+                      obj.C(1:obj.Nc,:)*(obj.Ac_nom)^4];
+                logic_res = rank(sym(OM)) == obj.Ns;
+                sure_obs = 0;
+            end
+			if logic_res            
+				disp("[Therm] The system is Observable!")
 				obj.observable = 1;
-			else
-				disp("MAY be NOT Observable!")
+                % observability gramian
+                ogrm = gram(ss(obj.Ac_nom, obj.Bc_nom, obj.C, obj.D), 'o');
+                disp(strcat("[Therm] Observability Gramian det: ", num2str(det(ogrm))));
+            else
+                if sure_obs
+                    disp("[Therm] The System is NOT Observable!")
+                else
+				    disp("[Therm] MAY be NOT Observable!")
+                end                
 				obj.observable = 0;
 			end
 		end

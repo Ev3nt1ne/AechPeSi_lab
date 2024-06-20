@@ -74,6 +74,8 @@ classdef power_model < handle
 		%
 		F_discretization_step (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
 			= 0.05;	
+        V_discretization_step (1,1) {mustBeNonnegative, mustBeNumeric, mustBeFinite} ...
+			= 0.05;	
 
 		% Power Noise
 		%TODO 
@@ -155,7 +157,10 @@ classdef power_model < handle
 			dim = length(F);
 
 			tt = dim > 1;
-			npw = obj.pw_dev_per(1:dim) * (tt && noise) + ~(tt && noise);
+            lien = min(length(obj.pw_dev_per), dim);
+            tt = tt & (dim <= length(obj.pw_dev_per));
+			npw = obj.pw_dev_per(1:lien) * (tt && noise) + ~(tt && noise);
+            npw = npw(mod(0:dim-1,numel(npw))+1);
 			
 			Ceff = instr * obj.dyn_ceff_k' .* npw;
 			pd = Ceff .* F .* (V .* V);

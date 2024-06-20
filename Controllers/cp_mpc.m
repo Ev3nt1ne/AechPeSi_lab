@@ -73,13 +73,22 @@ classdef cp_mpc < mpc_hpc & CP
                 constraints = [constraints, x{2} == obj.Ad_ctrl*x{1}+Bu*u+Bd*ot];
 			    constraints = [constraints, hc.Cc*x{2} <= obj.T_target - obj.Cty(1,:)'];
 			    constraints = [constraints,sum(u) <= ly_usum - sum(obj.Ctu(1,:),2)];
-				objective = objective + (u-ly_uref)'*obj.R*(u-ly_uref) + u'*obj.R2*(u) + x{2}'*obj.Q*x{2};
+				objective = objective + (u-ly_uref)'*obj.Rt*(u-ly_uref) + u'*obj.Rs*(u) + x{2}'*obj.Q*x{2};
             else
 			    for k = 1 : obj.Nhzn
 			        constraints = [constraints, x{k+1} == obj.Ad_ctrl*x{k}+Bu*u{k}+Bd*ot];
 			        constraints = [constraints, hc.Cc*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
 			        constraints = [constraints,sum(u{k}) <= ly_usum - sum(obj.Ctu(k,:),2)];
-				    objective = objective + (u{k}-ly_uref)'*obj.R*(u{k}-ly_uref) + u{k}'*obj.R2*(u{k}) + x{k+1}'*obj.Q*x{k+1};
+
+                    %TODO: Ct I did only for y, and only for max
+					if (~isinf(obj.umin))
+						constraints = [constraints, u{k} >= obj.umin];
+					end
+					if (~isinf(obj.umax))
+						constraints = [constraints, u{k} <= obj.umax - obj.Ctu(k,:)'];
+					end
+
+				    objective = objective + (u{k}-ly_uref)'*obj.Rt*(u{k}-ly_uref) + u{k}'*obj.Rs*(u{k}) + x{k+1}'*obj.Q*x{k+1};
                 end
             end
 			
@@ -252,6 +261,9 @@ classdef cp_mpc < mpc_hpc & CP
                 disp(sprintf('sparsifying B by x%f.  nnz(B) goes from %d to %d.',nnzS/nnzE, nnzS, nnzE));
             end
 
+            obj.umin = hpc_class.core_min_power;
+            obj.umax = hpc_class.core_max_power;
+
 			obj = obj.setup_mpc(hpc_class);
 
 			obj.xlplot = zeros(Nsim+1, hpc_class.Ns);
@@ -320,13 +332,13 @@ classdef cp_mpc < mpc_hpc & CP
 			pu = Ceff.*F.*(hc.VDom*(V.*V)) + (hc.leak_vdd_k.*(hc.VDom*V) + process*hc.leak_process_k).*pex;
 
 			% TODO observer
-			Tobs = T;			
+			obj.Tobs = T;			
 
 			% MPC
 			obj.xlplot(obj.ex_count+1,:) = 0;
 			%mpc_pw_target = repmat(p_budget, obj.Nhzn,1+hc.vd);
-			%res = obj.call_mpc(Tobs, hc.temp_amb*1000, pu, mpc_pw_target);
-			res = obj.call_mpc(Tobs, hc.temp_amb*1000, pu, p_budget);
+			%res = obj.call_mpc(obj.Tobs, hc.temp_amb*1000, pu, mpc_pw_target);
+			res = obj.call_mpc(obj.Tobs, hc.temp_amb*1000, pu, p_budget);
 			tt = isnan(res{1});
 			% too complex to make it vectorial
 			%dp = res{1}(~tt);
@@ -389,10 +401,10 @@ classdef cp_mpc < mpc_hpc & CP
 				
 			figure();
 			%plot(obj.Ts*sim_mul*[1:Nsim]', pceff(2:end,:)*20+293, 'g'); hold on;
-			plot(t1, cpxplot(2:end,:) - 273, 'b'); hold on; grid on;
-			plot(t2, [NaN*ones(1,size(obj.tmpc,2)); (obj.tmpc(2:end-1,:) - 273)], 'm'); hold on;
-			%plot(t2, [(obj.tmpc(2+2:end,:) - 273); NaN*ones(2,size(obj.tmpc,2))], 'm'); hold on;
-			%plot(t2, obj.tmpc(2:end,:) - 273.15, 'm'); hold on;
+			%plot(t1, cpxplot(2:end,:) - 273, 'b'); hold on; grid on;
+			%plot(t2, [NaN*ones(1,size(obj.tmpc,2)); (obj.tmpc(2:end-1,:) - 273)], 'm'); hold on;
+			plot(t1, [(cpxplot(2+2:end,:) - 273); NaN*ones(2,size(obj.tmpc,2))], 'b'); hold on;
+			plot(t2, obj.tmpc(2:end,:) - 273.15, 'm'); hold on;
 			xlabel("Time [s]");
 			ylabel("Temperature [T]");
 		end
