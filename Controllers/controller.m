@@ -41,10 +41,10 @@ classdef controller < handle
 	end
 
 	methods(Abstract=true)
-		[obj] = init_fnc(obj, hpc_class, Nsim)
-		[F,V,obj] = ctrl_fnc(obj, hpc_class, target_index, pvt, i_pwm, i_wl)
-		[obj] = cleanup_fnc(obj, hpc_class)
-		[obj] = plot_fnc(obj, hpc_class, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
+		[obj] = init_fnc(obj, hpc, Nsim)
+		[F,V,obj] = ctrl_fnc(obj, target_index, pvt, i_pwm, i_wl)
+		[obj] = cleanup_fnc(obj)
+		[obj] = plot_fnc(obj, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
 	end
 
 	methods(Static)
@@ -56,10 +56,7 @@ classdef controller < handle
 			%maxfv = sum(f.*exp(softmax_alpha*f)) / sum(exp(softmax_alpha*f));
 			
 			r = ( (max(f)*vdd_alpha + vdd_offset)^2*Ci.*f + ks1*(max(f)*vdd_alpha+vdd_offset)*ones(length(f),1) + ks2) - pu;
-		end
-		function [disc] = discreate_system(hc, ts)
-			disc = c2d(ss(hc.Ac_nom, hc.Bc_nom, hc.C, hc.D), ts);
-		end
+        end
 		function res = bisection(lim_inf, lim_sup, fnc, args, it, tolx, tolf)
 
 			N = length(lim_inf);
@@ -89,22 +86,35 @@ classdef controller < handle
 				c_lim_inf = c_lim_inf + (sn==so).*(res-c_lim_inf);
 				c_lim_sup = c_lim_sup + (sn~=so).*(res-c_lim_sup);				
 			end
-		end
-		function [voltage_choice] = compute_sharedV(hpc_class, Ft, vrule)
-			voltage_choice = hpc_class.V_min*ones(hpc_class.vd,1);
-			for v=1:hpc_class.vd
-				extrV = sum( Ft(:,v) > (hpc_class.FV_table(:,3) + [zeros(hpc_class.FV_levels-1,1); inf])', 2);
-				%vote_cast(:,v) = extrV(nonzeros(hpc_class.VDom(:,v).*[1:hpc_class.Nc]')) + 1;
-				vote_cast = extrV(nonzeros(hpc_class.VDom(:,v).*[1:hpc_class.Nc]')) + 1;
-				voltage_choice(v,1) = hpc_class.FV_table(round(prctile(vote_cast,vrule)),1);
+        end
+        function [FMax] = V2FM(FVT, V)
+            dimV = length(V);
+            FMax = FVT(sum(V > ones(dimV,1)*FVT(:,1)'+1e-6, 2) + 1, 3);
+        end
+        function [VMax] = F2VM(FVT, F)
+            dimV = length(F);
+            VMax = FVT(sum(F > ones(dimV,1)*FVT(:,3)'+1e-6, 2) + 1, 1);
+        end
+        function [voltage_choice] = find_dom_sharedV(FVT, Ft, vrule)
+            lvd = size(Ft,2);
+            lNc = size(Ft,1);
+            lFVlev = size(FVT,1);
+            voltage_choice = -1*ones(lvd,1);
+            comp_mat = (FVT(:,3) + [1e-6*ones(lFVlev-1,1); inf])';
+            lvdom = Ft>0;
+			for v=1:lvd
+				extrV = sum( Ft(:,v) > comp_mat, 2);
+				%vote_cast(:,v) = extrV(nonzeros(obj.VDom(:,v).*[1:obj.Nc]')) + 1;
+				vote_cast = extrV(nonzeros(lvdom(:,v).*[1:lNc]')) + 1;
+				voltage_choice(v,1) = FVT(round(prctile(vote_cast,vrule)),1);
 			end
 			%if size(vote_cast,1) == 1
 				%problem: matrix become array and prctile does not work anymore
 			%	vote_cast(2,:) = vote_cast;
 			%end
-			%voltage_choice = hpc_class.FV_table(round(prctile(vote_cast,obj.voltage_rule)),1);
-		end
-	end
+			%voltage_choice = obj.FV_table(round(prctile(vote_cast,obj.voltage_rule)),1);
+        end   
+    end
 
 	%% Dependent Variables
 	methods

@@ -350,7 +350,17 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 	methods
 		[k0, k1, k2] = pws_ls_approx(obj, I, T, C, alp, alp_I0, using_voltage)
 		[lut, F, T, M_var] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
-	end
+    end
+
+    %% Populate Controllers
+    methods
+        function [A,B] = ctrl_discrete_therm_mat(obj, ts)
+            disc = c2d(ss(obj.Ac_nom, obj.Bc_nom, obj.C, obj.D), ts);
+            A = disc.A;
+            B = disc.B;
+        end
+
+    end
 
 	%% Graphs
 	methods(Static)
