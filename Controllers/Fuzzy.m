@@ -13,8 +13,10 @@ classdef Fuzzy < CP
 		o_inc_steps; %Tper+3; %TODO:
 		o_dec_steps = 20;
 		o_hys_steps = 5; %15
-		%}
-		end
+        %}
+        Tsensor_amplitude;
+        Fdiscretization_step;
+	end
 
 	properties(SetAccess=protected, GetAccess=public)	
 		%global var
@@ -35,24 +37,29 @@ classdef Fuzzy < CP
 	end
 	
 	methods
-		function obj = Fuzzy()
+		function obj = Fuzzy(hpc)
 			%FUZZY Construct an instance of this class
 			%   Detailed explanation goes here
 			
-
+         %%% Object Initialization %%
+         % Call superclass constructor before accessing object
+         % You cannot conditionalize this statement
+         obj = obj@CP(hpc);
 			% 
 		end
 
 		function [obj] = init_fnc(obj, hc, Nsim)
 			%TODO understand which one I actually really need
 			%TODO understand which needs to go out and which in
+            obj.initialize(hc, Nsim);
+
 			obj.o_inc_st = 0;
 			obj.o_dec_st = 0;
 			obj.pw_storage = 0;
 			obj.pw_adapt = 0;
 			obj.pw_old = [];
-			obj.pw_old{1} = 1*hc.Nc;
-			obj.pw_old{2} = 1*hc.Nc;
+			obj.pw_old{1} = 1*obj.lNc;
+			obj.pw_old{2} = 1*obj.lNc;
 			obj.pw_ad_step_count = 0;
 			obj.o_inc_step_count = 0; %o_inc_steps;
 			obj.o_dec_step_count = 0; %o_dec_steps;
@@ -63,24 +70,21 @@ classdef Fuzzy < CP
 			obj.pbold = 0;
 			obj.pbc = 0;
 			obj.ex_count = 0;
-			obj.derT = zeros(hc.Nc,1);
-			obj.T_old = hc.t_init(1);
-			obj.wl = [ones(hc.Nc,1) zeros(hc.Nc, hc.ipl -1)];
-			obj.VCred = zeros(hc.Nc,1);
-			obj.nOut = hc.V_min*ones(hc.vd,1);
-			obj.T_target = ones(hc.Nc, 1)*hc.core_limit_temp;
+			obj.derT = zeros(obj.lNc,1);
+			obj.T_old = obj.T_amb;
+			obj.wl = [ones(obj.lNc,1) zeros(obj.lNc, obj.lipl -1)];
+			obj.VCred = zeros(obj.lNc,1);
+			obj.nOut = obj.lVmin*ones(obj.lvd,1);
 		end		
-		function [F,V, obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
+		function [F,V, obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl)
 
 			if obj.ex_count >= 10*obj.Tper
 				obj.ex_count = 2*obj.Tper;
 			end
 			obj.ex_count = obj.ex_count + 1;
 
-			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
-			p_budget = hc.tot_pw_budget(min(target_index, length(hc.tot_pw_budget)));
-			if p_budget~=obj.pbold
-				obj.pbold = p_budget;
+			if pwbdg~=obj.pbold
+				obj.pbold = pwbdg;
 				obj.pbc = 1;
 				obj.hys_p_count = 0;
 				obj.o_hys_act = 0;
@@ -96,8 +100,8 @@ classdef Fuzzy < CP
 				obj.pw_ad_step_count = (obj.pw_ad_step_count<0)*0 + (obj.pw_ad_step_count>=0)*obj.pw_ad_step_count;
 			end
 
-			T = pvt{hc.PVT_T};
-			process = pvt{hc.PVT_P};
+			T = pvt{obj.PVT_T};
+			process = pvt{obj.PVT_P};
 			
 			if (mod(obj.ex_count,obj.Tper)==2) % && (obj.ex_count>obj.Tper+1)
 				obj.derT = T - obj.T_old;
@@ -108,7 +112,7 @@ classdef Fuzzy < CP
 
 			% Process Workload
 			obj.wl = obj.wl*(1-obj.alpha_wl) + i_wl*obj.alpha_wl;
-			Ceff = obj.wl * (hc.dyn_ceff_k)';
+			Ceff = obj.wl * (obj.pw_ceff)';
 
 			% Process Power Budget
 			% (?)
@@ -121,8 +125,8 @@ classdef Fuzzy < CP
 			obj.pw_old{1} = obj.pw_old{2};
 
 			% Choose Voltage
-			FD = diag(f_ref)*hc.VDom;			
-			V = obj.compute_sharedV(hc, FD, obj.voltage_rule);
+			FD = diag(f_ref)*obj.lVDom;
+			V = obj.find_dom_sharedV(obj.lFVT, FD, obj.voltage_rule);
 			F = f_ref;
 
 			% Control Temperature:
@@ -130,7 +134,7 @@ classdef Fuzzy < CP
 				Tband = [45.0 65.0 80.0 85 ];
 				Tband = Tband + 273.15;
 				derBand = [0 0.5 1.0 2.0];
-				derBand = derBand + hc.sensor_noise*hc.sensor_noise_amplitude(hc.PVT_T)/2;
+				derBand = derBand + obj.Tsensor_amplitude/2;
 				redmat =	[2	2	1	0	-1;
 						 	2	1	1	0	-1;
 						 	1	1	0	-1	-2;
@@ -146,40 +150,41 @@ classdef Fuzzy < CP
 				obj.VCred = obj.VCred + (obj.VCred > 0).*(0-obj.VCred);
 			end
 			
-			VDred = min(diag(obj.VCred)*hc.VDom);
+			VDred = min(diag(obj.VCred)*obj.lVDom);
 			%VDred = VDred + (VDred > 0).*(0-VDred); %Saturation here is
 			%	way worse. Dunno Why.
 			V = V + fix(VDred/2)'*0.05; %fix is better than floor!!!
 			%V = V + floor(VDred/2)'*0.05;
 			%saturate V
-			V = V + (V < hc.V_min).*(hc.V_min-V);
+			V = V + (V < obj.lVmin).*(obj.lVmin-V);
 
 			%cap F:
 			% maybe remove?
-			fmaxi = hc.FV_table(sum(hc.VDom * V > ones(hc.Nc,1)*hc.FV_table(:,1)', 2) + 1, 3);
+            fmaxi = obj.V2FM(obj.lFVT, obj.lVDom * V);
 			F = F + (F>fmaxi).*(fmaxi - F);
-			F = F + hc.VDom*(mod(VDred,2).*sign(VDred))'*0.05;
+			F = F + obj.lVDom*(mod(VDred,2).*sign(VDred))'*0.05;
 
 			% Compute Power
-			pu = (Ceff.*F.*(hc.VDom*V) + hc.leak_vdd_k).*(hc.VDom*V) + process*hc.leak_process_k;
+			pu = (Ceff.*F.*(obj.lVDom*V) + obj.pw_stat_lin(1)).*(obj.lVDom*V) + ...
+                process*obj.pw_stat_lin(3);
 			
 			% DispatchPower
 			%TODO, quad power budget dispatching
-			delta_p = sum(pu) - p_budget + obj.pw_adapt;
+			delta_p = sum(pu) - pwbdg + obj.pw_adapt;
 			if (delta_p > 0)
-				dompw = hc.VDom'*pu;
-				domT = ((hc.VDom'*T ./ sum(hc.VDom)') + max(T.*hc.VDom)' ) / 2; %here mean*2 / 3??
+				dompw = obj.lVDom'*pu;
+				domT = ((obj.lVDom'*T ./ sum(obj.lVDom)') + max(T.*obj.lVDom)' ) / 2; %here mean*2 / 3??
 				%TODO this T_target conversion is wrong!
-				[resdpw, ~] = obj.cp_pw_dispatcher(domT, hc.core_limit_temp, obj.T_target(1:hc.vd), delta_p, dompw, hc.min_pw_red); %todo: pid_target(1:obj.vd)
+				[resdpw, ~] = obj.cp_pw_dispatcher(domT, obj.core_Tcrit, obj.T_target(1:obj.lvd), delta_p, dompw, obj.lPmin); %todo: pid_target(1:obj.vd)
 				deltapd = dompw-resdpw;
-				for vdi=1:hc.vd
-					pd = pu.*hc.VDom(:,vdi);
+				for vdi=1:obj.lvd
+					pd = pu.*obj.lVDom(:,vdi);
 					pd = pd(pd>0);
-					cd = Ceff.*hc.VDom(:,vdi);
+					cd = Ceff.*obj.lVDom(:,vdi);
 					cd = cd(cd>0);
-					cidx = [1:1:hc.Nc]' .* hc.VDom(:,vdi);
+					cidx = [1:1:obj.lNc]' .* obj.lVDom(:,vdi);
 					cidx = cidx(cidx>0);
-					[pd, ~] = obj.cp_pw_dispatcher_c(cd,deltapd(vdi), pd, hc.min_pw_red);
+					[pd, ~] = obj.cp_pw_dispatcher_c(cd,deltapd(vdi), pd, obj.lPmin);
 					pu(cidx) = pd;
 				end
 				%pw_storage = pw_storage + pws;	
@@ -187,28 +192,28 @@ classdef Fuzzy < CP
 
 			if sum(isempty(pu)) || sum(pu<=0)
 				disp("error, something wrong");
-				F = hc.F_min * ones(hc.Nc,1);
-				V = hc.V_min * ones(hc.vd,1);
+				F = obj.lFmin * ones(obj.lNc,1);
+				V = obj.lVmin * ones(obj.lvd,1);
 				%TODO should I trigger some other cleanup?
 				return;
 			end
 
 			% Compute Freq
 			%% Newton-Rapson		
-			for vi=1:hc.vd
-				fp = f_ref.*hc.VDom(:,vi);	
-				cidx = [1:1:hc.Nc]' .* (fp>0);
+			for vi=1:obj.lvd
+				fp = f_ref.*obj.lVDom(:,vi);	
+				cidx = [1:1:obj.lNc]' .* (fp>0);
 				cidx = cidx(cidx>0);
 				lim_sup = fp(fp>0);		
-				lim_inf = hc.F_min*ones(sum(hc.VDom(:,vi)),1);
-				pup = pu.*hc.VDom(:,vi);
+				lim_inf = obj.lFmin*ones(sum(obj.lVDom(:,vi)),1);
+				pup = pu.*obj.lVDom(:,vi);
 				pup = pup(pup>0);
-				Cip = Ceff.*hc.VDom(:,vi);
+				Cip = Ceff.*obj.lVDom(:,vi);
 				Cip = Cip(Cip>0);
-				d_pk = (process*hc.leak_process_k).*hc.VDom(:,vi);
+				d_pk = (process*obj.pw_stat_lin(3)).*obj.lVDom(:,vi);
 				d_pk = d_pk(d_pk>0);
-				xi = obj.pw_function(lim_inf, pup, Cip, hc.leak_vdd_k,d_pk);			
-				xs = obj.pw_function(lim_sup, pup, Cip, hc.leak_vdd_k,d_pk);
+				xi = obj.pw_function(lim_inf, pup, Cip, obj.pw_stat_lin(1),d_pk);			
+				xs = obj.pw_function(lim_sup, pup, Cip, obj.pw_stat_lin(1),d_pk);
 				
 				fo = zeros(length(cidx),1);
 				
@@ -221,8 +226,8 @@ classdef Fuzzy < CP
 				
 				for nri=1:16
 					fo = (c_lim_inf+c_lim_sup)/2;
-					xs = obj.pw_function(fo, pup, Cip, hc.leak_vdd_k,d_pk);
-					if (sum(abs(xs)) <= 1e-3*length(cidx)) || (sum(abs(c_lim_sup-fo))<= hc.F_discretization_step*length(cidx))
+					xs = obj.pw_function(fo, pup, Cip, obj.pw_stat_lin(1),d_pk);
+					if (sum(abs(xs)) <= 1e-3*length(cidx)) || (sum(abs(c_lim_sup-fo))<= obj.Fdiscretization_step*length(cidx))
 						break;
 					end
 					sn = xs>0;
@@ -234,11 +239,11 @@ classdef Fuzzy < CP
 				end
 				
 				%discretize
-				if hc.F_discretization_step > 0
-					fo = round(fo/hc.F_discretization_step) * hc.F_discretization_step;
+				if obj.Fdiscretization_step > 0
+					fo = round(fo/obj.Fdiscretization_step) * obj.Fdiscretization_step;
 				end
 				F(cidx) = fo;
-				V(vi) = hc.FV_table(sum(max(fo) > hc.FV_table(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue
+				V(vi) = obj.F2VM(obj.lFVT,max(fo));
 			end	
 
 			%% HYSTERESIS V-FILTER ACTIVATION
@@ -267,9 +272,9 @@ classdef Fuzzy < CP
 			obj.o_hys_step_count = ((obj.o_hys_step_count>0).*obj.o_hys_step_count) + (obj.o_hys_step_count<=0).*(obj.o_hys_act.*obj.o_hys_steps);
 			%Reduce
 			%pull = (Ceff.*F.*(obj.VDom*V) + obj.leak_vdd/1000).*(obj.VDom*V) + d_p*obj.leak_process/1000;
-			v_hys_red = (i_pwm - p_budget) < -(p_budget*(0.125+obj.hys_p_count/10));
-			%(sum(pull) - p_budget + pw_adapt) < -6 ;
-			%(delta_p < (p_budget - 6)); %TODO: 6 depends on the #of cores, #of domains, and the ratio between the two.
+			v_hys_red = (i_pwm - pwbdg) < -(pwbdg*(0.125+obj.hys_p_count/10));
+			%(sum(pull) - pwbdg + pw_adapt) < -6 ;
+			%(delta_p < (pwbdg - 6)); %TODO: 6 depends on the #of cores, #of domains, and the ratio between the two.
 			%TODO: also depends on the power budget itself, and the PMAX, PMIN
 			obj.o_hys_step_count = (obj.o_hys_act & obj.o_hys_step_count) .* ...
 				(obj.o_hys_step_count - v_hys_red);
@@ -300,19 +305,19 @@ classdef Fuzzy < CP
 	
 			% Process Freq
 			%	Check vs maxF, Temp hysteresis, etc.
-			fmaxi = hc.FV_table(sum(hc.VDom * V > ones(hc.Nc,1)*hc.FV_table(:,1)'+1e-6, 2) + 1, 3);
+			fmaxi = obj.V2FM(obj.lFVT, obj.lVDom * V);
 			F = F + (F>fmaxi).*(fmaxi - F);
-			F = F + (F<hc.F_min).*(hc.F_min*ones(hc.Nc,1) - F);
+			F = F + (F<obj.lFmin).*(obj.lFmin*ones(obj.lNc,1) - F);
 			
 			%TEST: TODO REMOVE
-			pu = (Ceff.*F.*(hc.VDom*V) + hc.leak_vdd_k).*(hc.VDom*V) + process*hc.leak_process_k;
+			pu = (Ceff.*F.*(obj.lVDom*V) + obj.pw_stat_lin(1)).*(obj.lVDom*V) + process*obj.pw_stat_lin(3);
 			obj.pw_old{2} = sum(pu);
 
 
 		end
-		function [obj] = cleanup_fnc(obj, hc)
+		function [obj] = cleanup_fnc(obj)
 		end
-		function [obj] = plot_fnc(obj, hc, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
+		function [obj] = plot_fnc(obj, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
 		end
 
 		function [pu, pw_storage] = cp_pw_dispatcher_c(obj, Ceff, delta_p, ipu, min_pw_red)

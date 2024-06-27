@@ -127,7 +127,7 @@ classdef power_model < handle
 					error("[PM] Dimension missmatch in power model noise and number of cores.")
 				end				
 			end
-		end
+        end
 	end
 
 	methods

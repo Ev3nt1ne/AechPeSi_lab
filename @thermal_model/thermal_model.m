@@ -106,6 +106,9 @@ classdef thermal_model < handle
 		sensors_active {mustBeNonnegative, mustBeNumericOrLogical, mustBeVector} ...
 			= [0 0 0 0];
 
+        core_limit_temp = 358.15;
+		core_crit_temp = 368.15;
+
 end
 
 	properties(Dependent)
@@ -217,7 +220,22 @@ end
 			obj.create_model_deviation();
 			obj.model_init();
 		end
-	end
+        function [A,B] = ctrl_discrete_therm_mat(obj, ts)
+            disc = c2d(ss(obj.Ac_nom, obj.Bc_nom, obj.C, obj.D), ts);
+            A = disc.A;
+            B = disc.B;
+        end
+        function [Adc, Bdc, Cc, ...
+                    lNc, lNh, lNv, ...
+                    core_crit_limit] = thermal_give_model(obj, ts)
+            [Adc, Bdc] = obj.ctrl_discrete_therm_mat(ts);
+            Cc = obj.Cc;
+            lNc = obj.Nc;
+            lNh = obj.Nh;
+            lNv = obj.Nv;
+            core_crit_limit = obj.core_crit_temp;
+        end
+    end
 
 	%% Models
 	methods(Static)

@@ -38,14 +38,10 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 		%zrplot;					% Power Noise Plot
 		wltrc;						% Wokrload Trace
 
-		%TODO: should rename these as: core_limit_temp and core_crit_temp
-		core_limit_temp = 358.15;
-		core_crit_temp = 368.15;
-
 		%% All Controllers
 		tot_pw_budget;
 		quad_pw_budget;
-		min_pw_red;
+		%min_pw_red;
 
 
 	end
@@ -139,12 +135,31 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 					error("[LAB] VDom has not the correct dimension");
 				end				
 			end
-		end
-		function obj = default_VDom_config(obj)			
-			vddone = 0;
+        end
+        %Move This:
+        function [pw_stat_lin, pw_stat_exp, pw_dyn, pw_ceff, ...
+                    core_Pmin, core_Pmax, ...
+                    lvd, lVDom] = power_give_model(obj)
+            pw_stat_lin = [obj.leak_vdd_k, obj.leak_temp_k, obj.leak_process_k];
+            pw_stat_exp = [obj.leak_exp_vdd_k, obj.leak_exp_t_k, obj.leak_exp_k];
+            pw_dyn = [];
+            pw_ceff = obj.dyn_ceff_k;
+            core_Pmin = obj.core_min_power;
+            core_Pmax = obj.core_max_power;
+            
+            lvd = obj.vd;
+            lVDom = obj.VDom;
+        end
+        function [FVT] = give_fvtable(obj)
+            FVT = obj.FV_table;
+        end
+		%TODO: not working, need to fix!
+        function obj = default_VDom_config(obj)
+            %above part need to be tested
 			vNh = obj.Nh;
 			vNv = obj.Nv;
 			cuts = [1 1];
+            vddone = (cuts(1)+1)*(cuts(2)+1); %0
 			while (vddone < obj.vd)
 			
 				fr = vNh>vNv;
@@ -161,10 +176,12 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 					break;
 				end
 			
-				vddone = (cuts(1))*(cuts(2));
+				vddone = (cuts(1)+1)*(cuts(2)+1);
 			end
 			
-			steps = floor([obj.Nh, obj.Nv] ./ cuts);
+            % this needs to be fixed, problably you should define a
+            %   sequence of cuts and then have a cut index
+			steps = floor([obj.Nh, obj.Nv] ./ (cuts+1));
 			tbfd = vddone > obj.vd;
 			
 			obj.VDom = zeros(obj.Nc, obj.vd);
@@ -174,7 +191,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 					%fixing odd vd
 					dom = dom + (dom>1)*tbfd*(-1);
 					dom = dom*(dom<=obj.vd) + obj.vd*(dom>obj.vd);
-					idx = (i + (j-1)*obj.Nh);
+					idx = (i-1)*obj.Nv + j; %(i + (j-1)*obj.Nh);
 					obj.VDom(idx, dom) = 1;
 				end
 			end
@@ -353,14 +370,8 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
     end
 
     %% Populate Controllers
-    methods
-        function [A,B] = ctrl_discrete_therm_mat(obj, ts)
-            disc = c2d(ss(obj.Ac_nom, obj.Bc_nom, obj.C, obj.D), ts);
-            A = disc.A;
-            B = disc.B;
-        end
-
-    end
+    %methods
+    %end
 
 	%% Graphs
 	methods(Static)

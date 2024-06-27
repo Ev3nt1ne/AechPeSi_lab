@@ -154,9 +154,7 @@ classdef black_wolf < mpc_hpc & CP
 	methods
 		function [obj] = init_fnc(obj, hpc_class, Nsim)
 
-			disc = obj.discreate_system(hpc_class, obj.Ts_ctrl);
-			obj.Ad_ctrl = disc.A;
-			obj.Bd_ctrl = disc.B;
+			[obj.Ad_ctrl, obj.Bd_ctrl] = hpc_class.ctrl_discrete_therm_mat(obj.Ts_ctrl);
 
 			% Voltage
 			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([0.5 1.2], [20 90], 0.9, 1/3.497, 1.93, 1);
@@ -244,7 +242,7 @@ classdef black_wolf < mpc_hpc & CP
 			domain_paired = 0;
 			if (domain_paired)
 				FD = diag(f_ref)*hc.VDom;
-				V = obj.compute_sharedV(hc, FD, obj.voltage_rule);
+				V = obj.find_dom_sharedV(hc.FV_table, FD, obj.voltage_rule);
 			else
 				fd = diag(f_ref)*ones(length(f_ref), 15);
 				V = hc.FV_table(sum(fd' > hc.FV_table(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue

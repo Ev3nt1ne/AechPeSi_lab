@@ -10,6 +10,8 @@ classdef controller < handle
 		C {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
 			= [1];
 
+        T_amb = 25 + 273.15;
+
 	end
 
 	properties(Dependent)
@@ -19,14 +21,45 @@ classdef controller < handle
 
 	properties(SetAccess=protected, GetAccess=public)	
 		osunix;
+
+        ex_count = 0;
+		lNsim;
+
 		Ad_ctrl;
 		Bd_ctrl;
-		ex_count = 0;
-		lNsim;
+        Cc;
+        lNc;
+        lNh;
+        lNv
+        lNs;
+        core_Tcrit;
+
+        lvd;
+        lVDom;
+        lipl;
+        pw_stat_lin;
+        pw_stat_exp;
+        pw_dyn;
+        pw_ceff;
+        lPmin;
+        lPmax;
+
+        lFVT;
+        lFmin;
+        lFmax;
+        lVmin;
+        lVmax;
+
+    end
+
+    properties(SetAccess=immutable, GetAccess=public)
+        PVT_T = 3;
+        PVT_V = 2;
+        PVT_P = 1;
 	end
 	
 	methods
-		function obj = controller()
+		function obj = controller(hpc)
 			%CONTROLLERS Construct an instance of this class
 			%   Detailed explanation goes here
 			%obj.Property1 = inputArg1 + inputArg2;
@@ -34,15 +67,38 @@ classdef controller < handle
 				obj.osunix = 1;
 			else
 				obj.osunix = 0;
-			end
+            end
 
-		end
-		
+            obj = obj.initialize(hpc, []);
+
+        end
+
+        function obj = initialize(obj, hpc, Nsim)
+
+            obj.ex_count = 0;
+		    obj.lNsim = Nsim;
+
+            [obj.Ad_ctrl, obj.Bd_ctrl, obj.Cc, ...
+                obj.lNc, obj.lNh, obj.lNv, ...
+                obj.core_Tcrit] = hpc.thermal_give_model(obj.Ts_ctrl);
+            obj.lNs = length(obj.Ad_ctrl);
+
+            [obj.pw_stat_lin, obj.pw_stat_exp, obj.pw_dyn, obj.pw_ceff, ...
+                obj.lPmin, obj.lPmax, ...
+                obj.lvd, obj.lVDom] = hpc.power_give_model();
+            obj.lipl = length(obj.pw_ceff);
+    
+            obj.lFVT = hpc.give_fvtable();
+            obj.lFmin = obj.lFVT(1,3);
+            obj.lFmax = obj.lFVT(end,3);
+            obj.lVmin = obj.lFVT(1,1);
+            obj.lVmax = obj.lFVT(end,1);
+        end		
 	end
 
 	methods(Abstract=true)
 		[obj] = init_fnc(obj, hpc, Nsim)
-		[F,V,obj] = ctrl_fnc(obj, target_index, pvt, i_pwm, i_wl)
+		[F,V,obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl)
 		[obj] = cleanup_fnc(obj)
 		[obj] = plot_fnc(obj, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
 	end
@@ -89,18 +145,18 @@ classdef controller < handle
         end
         function [FMax] = V2FM(FVT, V)
             dimV = length(V);
-            FMax = FVT(sum(V > ones(dimV,1)*FVT(:,1)'+1e-6, 2) + 1, 3);
+            FMax = FVT(sum(V > ones(dimV,1)*FVT(:,1)'+1e-6, 2) + 1, 3); %+1e-6 to fix matlab issue
         end
         function [VMax] = F2VM(FVT, F)
             dimV = length(F);
-            VMax = FVT(sum(F > ones(dimV,1)*FVT(:,3)'+1e-6, 2) + 1, 1);
+            VMax = FVT(sum(F > ones(dimV,1)*FVT(:,3)'+1e-6, 2) + 1, 1); %+1e-6 to fix matlab issue
         end
         function [voltage_choice] = find_dom_sharedV(FVT, Ft, vrule)
             lvd = size(Ft,2);
             lNc = size(Ft,1);
             lFVlev = size(FVT,1);
             voltage_choice = -1*ones(lvd,1);
-            comp_mat = (FVT(:,3) + [1e-6*ones(lFVlev-1,1); inf])';
+            comp_mat = (FVT(:,3) + [1e-6*ones(lFVlev-1,1); inf])'; %+1e-6 to fix matlab issue
             lvdom = Ft>0;
 			for v=1:lvd
 				extrV = sum( Ft(:,v) > comp_mat, 2);

@@ -17,13 +17,21 @@ classdef cp_mpc < mpc_hpc & CP
 
         cutoffA;                         % sparsify cutoff for discretized state-to-state evolution matrix
         cutoffB;                         % "        "      for discretized input-to-state "         "
+
+        Fdiscretization_step;
 	end
 	
 	methods
-		function obj = cp_mpc()
+		function obj = cp_mpc(hpc)
 			%CP_MPC Construct an instance of this class
 			%   Detailed explanation goes here
-			
+
+            %%% Object Initialization %%
+            % Call superclass constructor before accessing object
+            % You cannot conditionalize this statement
+            obj = obj@CP(hpc);
+            obj = obj@mpc_hpc();
+		
             obj.ops = osqp.default_settings();
             obj.ops.warm_start = 0;
             obj.cutoffA = 0;
@@ -33,28 +41,28 @@ classdef cp_mpc < mpc_hpc & CP
 	end
 
 	methods
-		function obj = setup_mpc(obj, hc)
+		function obj = setup_mpc(obj)
 			
 			% It's good practice to start by clearing YALMIPs internal database 
 			% Every time you call sdpvar etc, an internal database grows larger
 			yalmip('clear')
 
-            obj.dimx = hc.Ns;
-            obj.dimu = hc.Nc;
-			x = sdpvar(repmat(hc.Ns,1,obj.Nhzn+1),repmat(1,1,obj.Nhzn+1));
+            obj.dimx = obj.lNs;
+            obj.dimu = obj.lNc;
+			x = sdpvar(repmat(obj.lNs,1,obj.Nhzn+1),repmat(1,1,obj.Nhzn+1));
             if obj.Nhzn == 1
-                u = sdpvar(hc.Nc,1);
+                u = sdpvar(obj.lNc,1);
             else
-			    u = sdpvar(repmat(hc.Nc,1,obj.Nhzn),repmat(1,1,obj.Nhzn));
+			    u = sdpvar(repmat(obj.lNc,1,obj.Nhzn),repmat(1,1,obj.Nhzn));
             end
 			
 			ot = sdpvar(1,1); %assume ambient temperatre horizon independent
 
-			ly_uref = sdpvar(hc.Nc,1);
+			ly_uref = sdpvar(obj.lNc,1);
             ly_usum = sdpvar(1,1); % total power budget
 
-			Bu = obj.Bd_ctrl(:,1:hc.Nc);
-			Bd = obj.Bd_ctrl(:,hc.Nc+1:end);
+			Bu = obj.Bd_ctrl(:,1:obj.lNc);
+			Bd = obj.Bd_ctrl(:,obj.lNc+1:end);
 					
 			constraints = [];
 			objective = 0;
@@ -66,18 +74,18 @@ classdef cp_mpc < mpc_hpc & CP
                 constraints = [constraints, x{1} == 273+80];
                 constraints = [constraints, ot == 273+25];
                 constraints = [constraints, ly_uref == 18];
-                constraints = [constraints, ly_usum == 17*hc.Nc];
+                constraints = [constraints, ly_usum == 17*obj.lNc];
             end
             
             if obj.Nhzn == 1
                 constraints = [constraints, x{2} == obj.Ad_ctrl*x{1}+Bu*u+Bd*ot];
-			    constraints = [constraints, hc.Cc*x{2} <= obj.T_target - obj.Cty(1,:)'];
+			    constraints = [constraints, obj.Cc*x{2} <= obj.T_target - obj.Cty(1,:)'];
 			    constraints = [constraints,sum(u) <= ly_usum - sum(obj.Ctu(1,:),2)];
 				objective = objective + (u-ly_uref)'*obj.Rt*(u-ly_uref) + u'*obj.Rs*(u) + x{2}'*obj.Q*x{2};
             else
 			    for k = 1 : obj.Nhzn
 			        constraints = [constraints, x{k+1} == obj.Ad_ctrl*x{k}+Bu*u{k}+Bd*ot];
-			        constraints = [constraints, hc.Cc*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
+			        constraints = [constraints, obj.Cc*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
 			        constraints = [constraints,sum(u{k}) <= ly_usum - sum(obj.Ctu(k,:),2)];
 
                     %TODO: Ct I did only for y, and only for max
@@ -107,10 +115,10 @@ classdef cp_mpc < mpc_hpc & CP
 			%ops.usex0 = 1;
 			%{
 			for i=1:(obj.Nhzn+1)
-				assign(x{i}, (273.15+25)*ones(hc.Ns,1));
+				assign(x{i}, (273.15+25)*ones(obj.lNs,1));
 			end
 			for i=1:(obj.Nhzn)
-				assign(u{i}, (2)*ones(hc.Nc,1));
+				assign(u{i}, (2)*ones(obj.lNc,1));
 			end
 			%}
 
@@ -241,11 +249,9 @@ classdef cp_mpc < mpc_hpc & CP
 
 	%TODO don't know if these go here!!! or inside MPC!
 	methods
-		function [obj] = init_fnc(obj, hpc_class, Nsim)
+		function [obj] = init_fnc(obj, hc, Nsim)
 
-			disc = obj.discreate_system(hpc_class, obj.Ts_ctrl);
-			obj.Ad_ctrl = disc.A;
-			obj.Bd_ctrl = disc.B;
+			 obj.initialize(hc, Nsim);
 
             % sparsify
             if obj.cutoffA ~= 0
@@ -261,54 +267,50 @@ classdef cp_mpc < mpc_hpc & CP
                 disp(sprintf('sparsifying B by x%f.  nnz(B) goes from %d to %d.',nnzS/nnzE, nnzS, nnzE));
             end
 
-            obj.umin = hpc_class.core_min_power;
-            obj.umax = hpc_class.core_max_power;
+            obj.umin = obj.lPmin;
+            obj.umax = obj.lPmax;
 
-			obj = obj.setup_mpc(hpc_class);
+			obj = obj.setup_mpc();
 
-			obj.xlplot = zeros(Nsim+1, hpc_class.Ns);
-			obj.xlplot(1,:) = hpc_class.t_init;
+			obj.xlplot = zeros(Nsim+1, obj.lNs);
+			obj.xlplot(1,:) = obj.T_amb*ones(obj.lNs,1);
 
-			obj.tmpc = zeros(Nsim+1, hpc_class.Ns);
+			obj.tmpc = zeros(Nsim+1, obj.lNs);
 
-			obj.ex_count = 0;
 			obj.failed = 0;
-			obj.wl = [ones(hpc_class.Nc,1) zeros(hpc_class.Nc, hpc_class.ipl -1)];
-			obj.lNsim = Nsim;	
+			obj.wl = [ones(obj.lNc,1) zeros(obj.lNc, obj.lipl -1)];
 
 			obj.pw_storage = 0;
 			obj.pw_adapt = 0;
 			obj.pw_old = [];
-			obj.pw_old{1} = 1*hpc_class.Nc;
-			obj.pw_old{2} = 1*hpc_class.Nc;
+			obj.pw_old{1} = 1*obj.lNc;
+			obj.pw_old{2} = 1*obj.lNc;
 
 			obj.pbold = 0;
 			obj.pbc = 0;
 
-			obj.wl = [ones(hpc_class.Nc,1) zeros(hpc_class.Nc, hpc_class.ipl -1)];
+			obj.wl = [ones(obj.lNc,1) zeros(obj.lNc, obj.lipl -1)];
 
-			obj.T_target = ones(hpc_class.Nc, 1)*hpc_class.core_limit_temp;
+			obj.T_target = ones(obj.lNc, 1)*obj.core_Tcrit;
 
-			obj.f_ma = zeros(hpc_class.Nc,1);
+			obj.f_ma = zeros(obj.lNc,1);
 
 			%TODO
-			obj.output_mpc = 1*ones(hpc_class.Nc,1);
+			obj.output_mpc = 1*ones(obj.lNc,1);
 
 			obj.solver_stats = [];
 
 		end
-		function [F,V,obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
+		function [F,V,obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl)
 
 			obj.ex_count = obj.ex_count + 1;
 
-			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
-			p_budget = hc.tot_pw_budget(min(target_index, length(hc.tot_pw_budget)));
-			T = pvt{hc.PVT_T};
-			process = pvt{hc.PVT_P};
+			T = pvt{obj.PVT_T};
+			process = pvt{obj.PVT_P};
 
 			% Process Workload
 			obj.wl = obj.wl*(1-obj.alpha_wl) + i_wl*obj.alpha_wl;
-			Ceff = obj.wl * (hc.dyn_ceff_k)';
+			Ceff = obj.wl * (obj.pw_ceff)';
 						
 			% Process Power Budget
 			% (?)
@@ -318,27 +320,27 @@ classdef cp_mpc < mpc_hpc & CP
 			obj.pw_old{1} = obj.pw_old{2};
 			
 			% Choose Voltage
-			FD = diag(f_ref-obj.f_ma)*hc.VDom;
-			V = obj.compute_sharedV(hc, FD, obj.voltage_rule);
+			FD = diag(f_ref-obj.f_ma)*obj.lVDom;
+			V = obj.find_dom_sharedV(obj.lFVT, FD, obj.voltage_rule);
 			F = f_ref;
 
 			% Compute Power
-			if hc.leak_exp
+			if isempty(obj.pw_stat_exp)
+                pex = 1;
+            else
 				maxT = 125+273.15;
-				pex = exp(hc.VDom*V*hc.leak_exp_vdd_k + (min(hc.Cc*T,ones(hc.Nc,1)*maxT)-273.15)*hc.leak_exp_t_k + ones(hc.Nc,1)*hc.leak_exp_k);
-			else
-				pex = 1;
+				pex = exp(obj.lVDom*V*obj.pw_stat_exp(1) + (min(obj.Cc*T,ones(obj.lNc,1)*maxT)-273.15)*obj.pw_stat_exp(2) + ones(obj.lNc,1)*obj.pw_stat_exp(3));		
 			end
-			pu = Ceff.*F.*(hc.VDom*(V.*V)) + (hc.leak_vdd_k.*(hc.VDom*V) + process*hc.leak_process_k).*pex;
+			pu = Ceff.*F.*(obj.lVDom*(V.*V)) + (obj.pw_stat_lin(1).*(obj.lVDom*V) + process*obj.pw_stat_lin(1)).*pex;
 
 			% TODO observer
 			obj.Tobs = T;			
 
 			% MPC
 			obj.xlplot(obj.ex_count+1,:) = 0;
-			%mpc_pw_target = repmat(p_budget, obj.Nhzn,1+hc.vd);
-			%res = obj.call_mpc(obj.Tobs, hc.temp_amb*1000, pu, mpc_pw_target);
-			res = obj.call_mpc(obj.Tobs, hc.temp_amb*1000, pu, p_budget);
+			%mpc_pw_target = repmat(pwbdg, obj.Nhzn,1+obj.lvd);
+			%res = obj.call_mpc(obj.Tobs, obj.T_amb*1000, pu, mpc_pw_target);
+			res = obj.call_mpc(obj.Tobs, obj.T_amb*1000, pu, pwbdg);
 			tt = isnan(res{1});
 			% too complex to make it vectorial
 			%dp = res{1}(~tt);
@@ -356,27 +358,27 @@ classdef cp_mpc < mpc_hpc & CP
 			obj.failed = obj.failed + ((sum(tt)>0) | (sum(obj.output_mpc<outmpc_min)>0));
 
 			% Compute Freq
-			if hc.leak_exp
+			if isempty(obj.pw_stat_exp)
+                pex = 1;
+            else
 				maxT = 125+273.15;
-				pex = exp(hc.VDom*V*hc.leak_exp_vdd_k + (min(hc.Cc*res{2},ones(hc.Nc,1)*maxT)-273.15)*hc.leak_exp_t_k + ones(hc.Nc,1)*hc.leak_exp_k);
-			else
-				pex = 1;
-			end
-			F_og = (obj.output_mpc - (hc.leak_vdd_k.*(hc.VDom*V) + process*hc.leak_process_k).*pex) ./ (hc.VDom*(V.*V)) ./ Ceff;
+				pex = exp(obj.lVDom*V*obj.pw_stat_exp(1) + (min(obj.Cc*T,ones(obj.lNc,1)*maxT)-273.15)*obj.pw_stat_exp(2) + ones(obj.lNc,1)*obj.pw_stat_exp(3));		
+            end
+			F_og = (obj.output_mpc - (obj.pw_stat_lin(1).*(obj.lVDom*V) + process*obj.pw_stat_lin(3)).*pex) ./ (obj.lVDom*(V.*V)) ./ Ceff;
 
 			% Process Freq
 			%	Check vs maxF, Temp hysteresis, etc.					
 			fmaxi = f_ref+0.001;
 			F = F_og + (F_og>fmaxi).*(fmaxi - F_og);
-			F = F + (F<hc.F_min).*(hc.F_min*ones(hc.Nc,1) - F);
+			F = F + (F<obj.lFmin).*(obj.lFmin*ones(obj.lNc,1) - F);
 			% discretize
-			if hc.F_discretization_step > 0
-				F = fix(F/hc.F_discretization_step) * hc.F_discretization_step;
+			if obj.Fdiscretization_step > 0
+				F = fix(F/obj.Fdiscretization_step) * obj.Fdiscretization_step;
 			end
 			%	Check vs maxF, Temp hysteresis, etc.
-			fmaxi = hc.FV_table(sum(hc.VDom * V > ones(hc.Nc,1)*hc.FV_table(:,1)'+1e-6, 2) + 1, 3);
+			fmaxi = obj.V2FM(obj.lFVT, obj.lVDom * V);
 			F = F + (F>fmaxi).*(fmaxi - F);
-			F = F + (F<hc.F_min).*(hc.F_min*ones(hc.Nc,1) - F);
+			F = F + (F<obj.lFmin).*(obj.lFmin*ones(obj.lNc,1) - F);
 	
 			%if powerbudget has changed || freq changed
 			% interpolate a parabola
@@ -384,19 +386,19 @@ classdef cp_mpc < mpc_hpc & CP
 			% f_MA = f_ref - f_app --> sat 0
 			%	Sat 0 is a choice, without we have TurboBoost!
 			%TODO Turbo boosting is not working!
-			turbo_boost = zeros(hc.Nc,1);
+			turbo_boost = zeros(obj.lNc,1);
 			tt = (f_ref - F_og)>-turbo_boost;
 			obj.f_ma = obj.f_ma*(1-obj.alpha_ma) + obj.alpha_ma*(tt.*(f_ref - F_og) + ~tt.*0); %This is 0 and not turbo_boost!
 			
 			%TEST: TODO REMOVE
-			pu = Ceff.*F.*(hc.VDom*(V.*V)) + (hc.leak_vdd_k.*(hc.VDom*V) + process*hc.leak_process_k).*pex;
+			pu = Ceff.*F.*(obj.lVDom*(V.*V)) + (obj.pw_stat_lin(1).*(obj.lVDom*V) + process*obj.pw_stat_lin(3)).*pex;
 			obj.pw_old{2} = sum(pu);
 
 		end
 
-		function [obj] = cleanup_fnc(obj, hpc_class)
+		function [obj] = cleanup_fnc(obj)
 		end
-		function [obj] = plot_fnc(obj, hc, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
+		function [obj] = plot_fnc(obj, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
 			disp(strcat('[CTRL][MPC] number of times the optimization algorithm failed: ',int2str(obj.failed), '/', int2str(obj.lNsim)));
 				
 			figure();

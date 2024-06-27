@@ -93,7 +93,9 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 			pvt{obj.PVT_P} = process;
 			pvt{obj.PVT_V} = [];
 			pvt{obj.PVT_T} = T;
-			[F, V, ctrl] = ctrl.ctrl_fnc(obj, target_index, pvt, ctrl_pwm, ctrl_wl);
+            f_ref = obj.frtrc(min(target_index, size(obj.frtrc,1)),:)';
+			pwbdg = obj.tot_pw_budget(min(target_index, length(obj.tot_pw_budget)));
+			[F, V, ctrl] = ctrl.ctrl_fnc(f_ref, pwbdg, pvt, ctrl_pwm, ctrl_wl);
 		%end
 
 		cpfplot(s+1,:) = F;
@@ -110,7 +112,7 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		cmp = size(obj.wltrc,3)-1;
 	end
 	wlop = obj.wl_index ./ cmp * 100;
-	ctrl = ctrl.cleanup_fnc(obj);
+	ctrl = ctrl.cleanup_fnc();
 
 	if show
 		% Pause because it is bugged on Linux
@@ -128,7 +130,7 @@ function [cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		t1 = obj.Ts*[1:Nsim*sys_mul]';
 		t2 = obj.Ts*sys_mul*[1:Nsim]';
 
-		ctrl = ctrl.plot_fnc(obj, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop);
+		ctrl = ctrl.plot_fnc(t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop);
 	end
 
 end

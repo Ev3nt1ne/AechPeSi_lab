@@ -56,9 +56,14 @@ classdef CP < controller
 	end
 	
 	methods
-		function obj = CP()
+		function obj = CP(hpc)
 			%CP Construct an instance of this class
 			%   Detailed explanation goes here
+
+            %%% Object Initialization %%
+            % Call superclass constructor before accessing object
+            % You cannot conditionalize this statement
+            obj = obj@controller(hpc);
 			
 		end
 		function [obj] = init_fnc(obj, hc, Nsim)
@@ -128,7 +133,7 @@ classdef CP < controller
 			% Choose Voltage
 			obj.f_ma(obj.f_ma<0) = 0; %saturate F_MA
 			FD = diag(f_ref - obj.f_ma)*hc.VDom;			
-			V = obj.compute_sharedV(hc, FD, obj.voltage_rule);
+			V = obj.find_dom_sharedV(hc.FV_table, FD, obj.voltage_rule);
 			F = f_ref;
 
 			% Compute Power

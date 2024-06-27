@@ -1,4 +1,4 @@
-classdef mpc_hpc < controller
+classdef mpc_hpc < handle %< controller
 	%MPC Summary of this class goes here
 	%   Detailed explanation goes here
 	
@@ -67,7 +67,7 @@ classdef mpc_hpc < controller
 			try
 				osqp;
 			catch
-				if obj.osunix
+				if isunix
 					%{
 					LIBCURL_PATH = "/lib/x86_64-linux-gnu/";
 					path1 = getenv('LD_LIBRARY_PATH');			  % Store existing path
