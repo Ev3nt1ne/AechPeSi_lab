@@ -5,6 +5,9 @@ classdef black_wolf < mpc_hpc & CP
 		%alpha_wl = 0.4;				% Moving Average filter parameter for Workload
 
         %RE;
+        Fdiscretization_step;
+        lwl_mem;
+
 	end
 	properties(SetAccess=protected, GetAccess=public)	
 		psac;
@@ -22,58 +25,59 @@ classdef black_wolf < mpc_hpc & CP
 	end
 	
 	methods
-		function obj = black_wolf()
+		function obj = black_wolf(hpc)
 			%UNTITLED Construct an instance of this class
 			%   Detailed explanation goes here
+            obj = obj@CP(hpc);
 		end		
 	end
 
 	methods
-		function obj = setup_mpc(obj, hc)
+		function obj = setup_mpc(obj)
 			
 			% It's good practice to start by clearing YALMIPs internal database 
 			% Every time you call sdpvar etc, an internal database grows larger
 			yalmip('clear')
 
-			x = sdpvar(repmat(hc.Ns,1,obj.Nhzn+1),repmat(1,1,obj.Nhzn+1));
-			u = sdpvar(repmat(hc.Nc,1,obj.Nhzn),repmat(1,1,obj.Nhzn));
+			x = sdpvar(repmat(obj.lNs,1,obj.Nhzn+1),repmat(1,1,obj.Nhzn+1));
+			u = sdpvar(repmat(obj.lNc,1,obj.Nhzn),repmat(1,1,obj.Nhzn));
 			
 			ot = sdpvar(1,1); %TODO: decide if single or with horizon
-			w = sdpvar(hc.Nc,1); %TODO: decide if single or with horizon
-			h0v = sdpvar(hc.Nc,1);
-            wSm = sdpvar(hc.Nc,1);
+			w = sdpvar(obj.lNc,1); %TODO: decide if single or with horizon
+			h0v = sdpvar(obj.lNc,1);
+            wSm = sdpvar(obj.lNc,1);
 
 			%sdpvar ly_xref;
-			ly_uref = sdpvar(hc.Nc,1);
+			ly_uref = sdpvar(obj.lNc,1);
 			%sdpvar ly_yref;
-			ly_usum = sdpvar(obj.Nhzn,hc.vd+1);
+			ly_usum = sdpvar(obj.Nhzn,obj.lvd+1);
 			%ly_Cty = dpvar(repmat(obj.Nout,1,obj.Nhzn),repmat(1,1,obj.Nhzn));
 			
 			h0 = obj.psac(1);
 			h1 = obj.psac(2);
 			h2 = obj.psac(3);
 
-			if length(h0) < hc.Nc
-				h0 = ones(hc.Nc,1)*h0;
+			if length(h0) < obj.lNc
+				h0 = ones(obj.lNc,1)*h0;
 			end
 
-			Bu = obj.Bd_ctrl(:,1:hc.Nc);
-			Bd = obj.Bd_ctrl(:,hc.Nc+1:end);
+			Bu = obj.Bd_ctrl(:,1:obj.lNc);
+			Bd = obj.Bd_ctrl(:,obj.lNc+1:end);
 					
 			constraints = [];
-			%constraints = [x{2} == (Adl_mpc + C2*h1)*x{1}-(C2*h1*273.15*ones(hc.Ns,1))+(Bu+(hc.Cc'*h2))*(u0*w)+Bd*ot + hc.Cc*(h0 + h0v)];
+			%constraints = [x{2} == (Adl_mpc + C2*h1)*x{1}-(C2*h1*273.15*ones(obj.lNs,1))+(Bu+(obj.Cc'*h2))*(u0*w)+Bd*ot + obj.Cc*(h0 + h0v)];
 
 			for k = 1 : obj.Nhzn
-					%constraints = [constraints, x{k+1} == (obj.Ad_ctrl + obj.C2*h1)*x{k}-(obj.C2*h1*273.15*ones(hc.Ns,1))+(Bu+(hc.Cc'*h2))*(u{k}.*w)+Bd*ot + hc.Cc'*(h0 + h0v)];
-					constraints = [constraints, x{k+1} == (obj.Ad_ctrl + Bu*diag(h1)*hc.Cc)*x{k}-(Bu*diag(h1*273.15)*hc.Cc*ones(hc.Ns,1)) ...
-									+ Bu*(u{k}.*(w+h2)) + Bd*ot + Bu*h0 + hc.Cc'*h0v];
+					%constraints = [constraints, x{k+1} == (obj.Ad_ctrl + obj.C2*h1)*x{k}-(obj.C2*h1*273.15*ones(obj.lNs,1))+(Bu+(obj.Cc'*h2))*(u{k}.*w)+Bd*ot + obj.Cc'*(h0 + h0v)];
+					constraints = [constraints, x{k+1} == (obj.Ad_ctrl + Bu*diag(h1)*obj.Cc)*x{k}-(Bu*diag(h1*273.15)*obj.Cc*ones(obj.lNs,1)) ...
+									+ Bu*(u{k}.*(w+h2)) + Bd*ot + Bu*h0 + obj.Cc'*h0v];
 
 					%TODO: Ct I did only for y, and only for max
 					if (~isinf(obj.umin))
-						constraints = [constraints, u{k}.*(w+h2) + h1*(hc.Cc(1:hc.Nc,:)*(x{k}-273.15)) + h0 + h0v >= obj.umin];
+						constraints = [constraints, u{k}.*(w+h2) + h1*(obj.Cc(1:obj.lNc,:)*(x{k}-273.15)) + h0 + h0v >= obj.umin];
 					end
 					if (~isinf(obj.umax))
-						constraints = [constraints, u{k}.*(w+h2) + h1*(hc.Cc(1:hc.Nc,:)*(x{k}-273.15)) + h0 + h0v<= obj.umax - obj.Ctu(k,:)'];
+						constraints = [constraints, u{k}.*(w+h2) + h1*(obj.Cc(1:obj.lNc,:)*(x{k}-273.15)) + h0 + h0v<= obj.umax - obj.Ctu(k,:)'];
 					end
 					if (~isinf(obj.xmin))
 						%constraints = [constraints, x{k+1} >= obj.xmin];
@@ -85,10 +89,10 @@ classdef black_wolf < mpc_hpc & CP
 						%constraints = [constraints, obj.C)*x{k+} >= obj.ymin];
 					end
 					%if (~isinf(obj.yMax))
-						constraints = [constraints, hc.Cc*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
+						constraints = [constraints, obj.Cc*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
 					%end
 					%if (~isinf(obj.usum(1)))
-                        Pw = u{k}.*(w+h2) + h1*(hc.Cc*(x{k}-273.15)) + h0v+h0;
+                        Pw = u{k}.*(w+h2) + h1*(obj.Cc*(x{k}-273.15)) + h0v+h0;
 						constraints = [constraints,sum(Pw) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
 						%TODO should I also add the "resulting" thing. i.e.
 						%	the above formula with x{k+1}?
@@ -103,11 +107,11 @@ classdef black_wolf < mpc_hpc & CP
 
 			for k = 1:obj.Nhzn
 				objective = objective + (u{k}-ly_uref)'*obj.Rt*(u{k}-ly_uref) + u{k}'*obj.Rs*(u{k}) + ...
-                        ((x{k+1}-hc.t_outside)/(obj.T_target-hc.t_outside))'*obj.Q*((x{k+1}-hc.t_outside)/(obj.T_target-hc.t_outside)) + ...
+                        ((x{k+1}-obj.T_amb)/(obj.T_target-obj.T_amb))'*obj.Q*((x{k+1}-obj.T_amb)/(obj.T_target-obj.T_amb)) + ...
                         ((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm)'*obj.R*((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm);
                 %energy
                 %at = (ly_uref./u{k}).*wSm;
-                %Ev = [Pw; at; h1*(hc.Cc*(x{k+1}-x{k})); (at-1)];
+                %Ev = [Pw; at; h1*(obj.Cc*(x{k+1}-x{k})); (at-1)];
                 %objective = objective + Ev'*obj.RE*Ev;
 			end
 			
@@ -152,23 +156,23 @@ classdef black_wolf < mpc_hpc & CP
 
 	%TODO don't know if these go here!!! or inside MPC!
 	methods
-		function [obj] = init_fnc(obj, hpc_class, Nsim)
+		function [obj] = init_fnc(obj, hc, Nsim)
 
-			[obj.Ad_ctrl, obj.Bd_ctrl] = hpc_class.ctrl_discrete_therm_mat(obj.Ts_ctrl);
+			obj.initialize(hc, Nsim);
 
 			% Voltage
-			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([0.5 1.2], [20 90], 0.9, 1/3.497, 1.93, 1);
-			[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([0.5 1.2], [20 90], 0.9, [6.659 -1.979], -1.48, 1);
+			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([0.5 1.2], [20 90], 0.9, 1/3.497, 1.93, 1);
+			[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([0.5 1.2], [20 90], 0.9, [6.659 -1.979], -1.48, 1);
 			% Freq
-			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hpc_class.pws_ls_approx([hpc_class.F_min hpc_class.F_max], [20 90], 0.9, 0.2995, 0, 0);
+			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([obj.lFmin obj.lFmax], [20 90], 0.9, 0.2995, 0, 0);
 			%TODO parametrize
-			[obj.psoff_lut, Fv, Tv] = hpc_class.pws_ls_offset(obj, 5, 4, 1);
-			obj.V0v = ones(hpc_class.Nc, length(Fv))*diag(Fv);
-			obj.T0v = ones(hpc_class.Nc, length(Tv))*diag(Tv);
+			[obj.psoff_lut, Fv, Tv] = hc.pws_ls_offset(obj, 5, 4, 1);
+			obj.V0v = ones(obj.lNc, length(Fv))*diag(Fv);
+			obj.T0v = ones(obj.lNc, length(Tv))*diag(Tv);
 
             %todo?
-            obj.Pm_max = hpc_class.F_max*hpc_class.V_max^2;		
-            obj.Pm_min = hpc_class.F_min*hpc_class.V_min^2;
+            obj.Pm_max = obj.lFmax*obj.lVmax^2;		
+            obj.Pm_min = obj.lFmin*obj.lVmin^2;
 
             obj.umin = obj.Pm_min;
             obj.umax = obj.Pm_max;
@@ -176,23 +180,23 @@ classdef black_wolf < mpc_hpc & CP
             %TODO: check if all the matrix are ok and defined, otherwise
             %       fix them
 
-			obj = obj.setup_mpc(hpc_class);
+			obj = obj.setup_mpc();
 
-			obj.xlplot = zeros(Nsim+1, hpc_class.Ns);
-			obj.xlplot(1,:) = hpc_class.t_init;
+			obj.xlplot = zeros(Nsim+1, obj.lNs);
+			obj.xlplot(1,:) = obj.T_amb*ones(obj.lNs,1);
 
-			obj.tmpc = zeros(Nsim+1, hpc_class.Ns);
+			obj.tmpc = zeros(Nsim+1, obj.lNs);
             obj.Pw_diff = zeros(Nsim+1, 1);
 
 			obj.ex_count = 0;
 			obj.failed = 0;
-			obj.wl = [ones(hpc_class.Nc,1) zeros(hpc_class.Nc, hpc_class.ipl -1)];
+			obj.wl = [ones(obj.lNc,1) zeros(obj.lNc, obj.lipl -1)];
 			obj.lNsim = Nsim;
-			obj.prevF = hpc_class.F_min*ones(hpc_class.Nc,1);
-			obj.prevV = hpc_class.V_min*ones(hpc_class.vd,1);
-            obj.Tobs = hpc_class.temp_amb*ones(hpc_class.Ns,1);
+			obj.prevF = obj.lFmin*ones(obj.lNc,1);
+			obj.prevV = obj.lVmin*ones(obj.lvd,1);
+            obj.Tobs = obj.T_amb*ones(obj.lNs,1);
 			%TODO
-			obj.output_mpc = 1*ones(hpc_class.Nc,1);	
+			obj.output_mpc = 1*ones(obj.lNc,1);	
 
             % Observer
             % create the dicrete system
@@ -209,31 +213,28 @@ classdef black_wolf < mpc_hpc & CP
             [obj.LK, P, Z] = dlqe(obj.Ad_ctrl, obj.Gw, obj.C, obj.Qcov, obj.Rcov);
 
 		end
-		function [F,V,obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
+		function [F,V,obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl)
 
 			obj.ex_count = obj.ex_count + 1;
 
 			%pp = obj.output_mpc;
-
-			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
-			p_budget = hc.tot_pw_budget(min(target_index, length(hc.tot_pw_budget)));
-			T = pvt{hc.PVT_T};
-            Tc = T(1:hc.Nc);
-			process = pvt{hc.PVT_P};
+			T = pvt{obj.PVT_T};
+            Tc = T(1:obj.lNc);
+			process = pvt{obj.PVT_P};
 
 			% Process Workload
 			obj.wl = obj.wl*(1-obj.alpha_wl) + i_wl*obj.alpha_wl;
-			Ceff = obj.wl * (hc.dyn_ceff_k)';
+			Ceff = obj.wl * (obj.pw_ceff)';
 
-			%TODO here hc.Cc
-			%[~, Tidx] = min(abs(obj.T0v - hc.Cc*T),[],2);
+			%TODO here obj.Cc
+			%[~, Tidx] = min(abs(obj.T0v - obj.Cc*T),[],2);
             Tidx = sum(obj.T0v < Tc,2)+1;
 			% before overwriting F
 			%[~, Vidx] = min(abs(obj.V0v - obj.prevV),[],2);
-            Vidx = sum(obj.V0v < hc.VDom*obj.prevV,2)+1;
+            Vidx = sum(obj.V0v < obj.lVDom*obj.prevV,2)+1;
 			
-			h0v = zeros(hc.Nc, 1);
-			for i=1:hc.Nc
+			h0v = zeros(obj.lNc, 1);
+			for i=1:obj.lNc
 				atidx = min(Tidx(i)+0, 9);
 				h0v(i,1) = obj.psoff_lut(atidx, Vidx(i));
 			end
@@ -241,16 +242,18 @@ classdef black_wolf < mpc_hpc & CP
 			% Choose Voltage
 			domain_paired = 0;
 			if (domain_paired)
-				FD = diag(f_ref)*hc.VDom;
-				V = obj.find_dom_sharedV(hc.FV_table, FD, obj.voltage_rule);
-			else
+				FD = diag(f_ref)*obj.lVDom;
+				V = obj.find_dom_sharedV(obj.lFVT, FD, obj.voltage_rule);
+            else
+                %TODO: 15
 				fd = diag(f_ref)*ones(length(f_ref), 15);
-				V = hc.FV_table(sum(fd' > hc.FV_table(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue
+				V = obj.F2VM(obj.lFVT, fd);
+                %V = obj.lFVT(sum(fd' > obj.lFVT(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue
 			end
 			F = f_ref;
 
 			if (domain_paired)
-				input_mpc = F .* (hc.VDom*(V .* V));
+				input_mpc = F .* (obj.lVDom*(V .* V));
 			else
 				input_mpc = F .* (V .* V);
 			end
@@ -264,22 +267,22 @@ classdef black_wolf < mpc_hpc & CP
 			%	identification atm, I will use this to not use the real
 			%	model which seems to me as too simplicistic
 			power_mpc = obj.output_mpc.*Ceff + ...
-				(hc.VDom*obj.prevV*hc.leak_vdd_k + hc.leak_process_k*process).* ...
-				exp(hc.leak_exp_vdd_k*hc.VDom*obj.prevV + (Tc-273.15)*hc.leak_exp_t_k + hc.leak_exp_k);
+				(obj.lVDom*obj.prevV*obj.pw_stat_lin(1) + obj.pw_stat_lin(3)*process).* ...
+				exp(obj.pw_stat_exp(1)*obj.lVDom*obj.prevV + (Tc-273.15)*obj.pw_stat_exp(2) + obj.pw_stat_exp(3));
 			
-			%state_MPC = (obj.Ad_ctrl + obj.C2*obj.psac(2))*obj.Tobs-(obj.C2*obj.psac(2)*273.15*ones(hc.Ns,1)) + ...
-			%	(obj.Bd_ctrl(:,1:hc.Nc)+(hc.Cc'*obj.psac(3)))*(obj.output_mpc.*Ceff)+obj.Bd_ctrl(:,hc.Nc+1:end)*(1000*hc.temp_amb) + hc.Cc'*(obj.psac(1) + h0v);
+			%state_MPC = (obj.Ad_ctrl + obj.C2*obj.psac(2))*obj.Tobs-(obj.C2*obj.psac(2)*273.15*ones(obj.lNs,1)) + ...
+			%	(obj.Bd_ctrl(:,1:obj.lNc)+(obj.Cc'*obj.psac(3)))*(obj.output_mpc.*Ceff)+obj.Bd_ctrl(:,obj.lNc+1:end)*(1000*obj.T_amb) + obj.Cc'*(obj.psac(1) + h0v);
 
-			%state_MPC = obj.Ad_ctrl*obj.Tobs + obj.Bd_ctrl*[power_mpc; 1000*hc.temp_amb];
-            obj.Tobs = (obj.Ad_ctrl - obj.LK*obj.C)*obj.Tobs + obj.Bd_ctrl*[power_mpc; 1000*hc.temp_amb] + obj.LK*T;
+			%state_MPC = obj.Ad_ctrl*obj.Tobs + obj.Bd_ctrl*[power_mpc; 1000*obj.T_amb];
+            obj.Tobs = (obj.Ad_ctrl - obj.LK*obj.C)*obj.Tobs + obj.Bd_ctrl*[power_mpc; 1000*obj.T_amb] + obj.LK*T;
             state_MPC = obj.Tobs;
 
 			%TBD is it needed?
 			%Update T0v
-			%TODO here hc.Cc
-			%[~, Tidx] = min(abs(obj.T0v - hc.Cc*state_MPC),[],2);
-            Tidx = sum(obj.T0v < hc.Cc*state_MPC,2)+1;
-			for i=1:hc.Nc
+			%TODO here obj.Cc
+			%[~, Tidx] = min(abs(obj.T0v - obj.Cc*state_MPC),[],2);
+            Tidx = sum(obj.T0v < obj.Cc*state_MPC,2)+1;
+			for i=1:obj.lNc
 				%Here it does not change a lot if I add stuff. Fixeing it to 9 does not
 				%solve the overhead problem.
 				atidx = min(Tidx(i)+0, 9);
@@ -288,15 +291,11 @@ classdef black_wolf < mpc_hpc & CP
 			
 			%state_MPC = obj.Tobs;
 
-            if obj.ex_count == 120
-                aa = 1;
-            end
-
 			% MPC
 			obj.xlplot(obj.ex_count+1,:) = 0;
-			mpc_pw_target = repmat(p_budget, obj.Nhzn,1+hc.vd);
-            wSm = obj.wl*(1-hc.wl_mem_weigth)';
-			res = obj.call_mpc(state_MPC, Ceff, hc.temp_amb*1000, h0v, wSm, input_mpc, mpc_pw_target);
+			mpc_pw_target = repmat(pwbdg, obj.Nhzn,1+obj.lvd);
+            wSm = obj.wl*(1-obj.lwl_mem)';
+			res = obj.call_mpc(state_MPC, Ceff, obj.T_amb*1000, h0v, wSm, input_mpc, mpc_pw_target);
 			tt = isnan(res{1});
 			% too complex to make it vectorial
 			%dp = res{1}(~tt);
@@ -315,32 +314,32 @@ classdef black_wolf < mpc_hpc & CP
 
 			% Bisection
 			V =[];
-			for vi=1:hc.vd
-				fp = f_ref.*hc.VDom(:,vi);
-				cidx = [1:1:hc.Nc]' .* (fp>0);
+			for vi=1:obj.lvd
+				fp = f_ref.*obj.lVDom(:,vi);
+				cidx = [1:1:obj.lNc]' .* (fp>0);
 				cidx = cidx(cidx>0);
 				lim_sup = fp(fp>0);		
-				lim_inf = hc.F_min*ones(sum(hc.VDom(:,vi)),1);
-				in_bis = obj.output_mpc.*hc.VDom(:,vi);	
+				lim_inf = obj.lFmin*ones(sum(obj.lVDom(:,vi)),1);
+				in_bis = obj.output_mpc.*obj.lVDom(:,vi);	
 				in_bis = in_bis(in_bis>0);
 
 				Fc = obj.bisection(lim_inf, lim_sup, @obj.intl_bis_fnc, in_bis, ...
-							16, 1e-3*length(in_bis), hc.F_discretization_step*length(in_bis));
+							16, 1e-3*length(in_bis), obj.Fdiscretization_step*length(in_bis));
 
 				%discretize
-				if hc.F_discretization_step > 0
-					Fc = round(Fc/hc.F_discretization_step) * hc.F_discretization_step;
+				if obj.Fdiscretization_step > 0
+					Fc = round(Fc/obj.Fdiscretization_step) * obj.Fdiscretization_step;
 				end
 
 				% output
 				F(cidx) = Fc;
 
 				% TODO: Reverse Voltage choice, here again I use max.
-				V(vi,1) = hc.FV_table(sum(max(Fc) > hc.FV_table(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue
+				V(vi,1) = obj.F2VM(obj.lFVT, max(Fc)); %+1e-6 to fix matlab issue
 			end
 
 			%disp(obj.ex_count)
-			%toto = [hc.Cc*obj.Tobs - 273.15, hc.Cc*state_MPC- 273.15, hc.Cc*res{2} - 273.15, pp, obj.output_mpc, obj.prevF, F, hc.VDom*V,  i_wl*(hc.dyn_ceff_k)'];
+			%toto = [obj.Cc*obj.Tobs - 273.15, obj.Cc*state_MPC- 273.15, obj.Cc*res{2} - 273.15, pp, obj.output_mpc, obj.prevF, F, obj.lVDom*V,  i_wl*(hc.dyn_ceff_k)'];
 			%toto = ["T0", "T1", "T2-mpc", "prevMPC T0-T1", "mpc T1-T2", "prev F T0-T1", "F T1-T2", "V T1-T2", "wl T-1 - T0"; toto]
 
 			obj.prevF = F;
@@ -348,9 +347,9 @@ classdef black_wolf < mpc_hpc & CP
 
 		end
 
-		function [obj] = cleanup_fnc(obj, hpc_class)
+		function [obj] = cleanup_fnc(obj)
 		end
-		function [obj] = plot_fnc(obj, hc, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
+		function [obj] = plot_fnc(obj, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
 			disp(strcat('[CTRL][MPC] number of times the optimization algorithm failed: ',int2str(obj.failed), '/', int2str(obj.lNsim)));
 				
 			figure();

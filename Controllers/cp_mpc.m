@@ -251,7 +251,7 @@ classdef cp_mpc < mpc_hpc & CP
 	methods
 		function [obj] = init_fnc(obj, hc, Nsim)
 
-			 obj.initialize(hc, Nsim);
+			obj.initialize(hc, Nsim);
 
             % sparsify
             if obj.cutoffA ~= 0
