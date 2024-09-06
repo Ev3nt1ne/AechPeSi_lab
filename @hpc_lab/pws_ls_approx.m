@@ -1,16 +1,16 @@
-function [k0, k1, k2] = pws_ls_approx(obj, I, T, C, alp, alp_I0, using_voltage)
+function [k0, k1, k2] = pws_ls_approx(obj, I, T, Toff, C, alp, alp_I0, using_voltage)
 
-	if (nargin < 7) || isempty(using_voltage)
+	if (nargin < 8) || isempty(using_voltage)
 		using_voltage = 0;
-	end
+    end
 
-	a = T(1);
-	b = T(2);
+	a = T(1)+Toff;
+	b = T(2)+Toff;
 	c = I(1);
 	d = I(2);
 
-	Ke = obj.leak_exp_k;
 	KT = obj.leak_exp_t_k;
+    Ke = obj.leak_exp_k - Toff*KT;
 	KV = obj.leak_exp_vdd_k;
 	Ks = obj.leak_process_k;
 	Kw = obj.leak_vdd_k;

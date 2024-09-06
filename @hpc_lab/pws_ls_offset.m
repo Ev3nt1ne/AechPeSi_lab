@@ -6,10 +6,10 @@ function [lut, Vs, Ts, M_var] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 		show = 0;
     end
 
-    add_temp = 0;
+    %add_temp = 0;
 
 	tmin = obj.t_outside;
-	tmax = obj.core_crit_temp + add_temp;
+	tmax = obj.core_crit_temp;
 	
     %Initially I need to craft a value table/surface
     tsloti = round(tmax-tmin);
@@ -39,9 +39,9 @@ function [lut, Vs, Ts, M_var] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 		for j=1:length(V)
 			ps = obj.ps_compute(V(j), T(i),1,0);
 			%TODO: evaluate WHY is the one below, and not above!
-			linps = h1*(T(i)-273.15) + h2*F(j)*V(j)^2 + h0;
-			%linps = h1*(T(i)-273.15) + h2*F(j)^(2*alp+1) + h0;
-			lut(i,j) = ps - linps;
+			linps = h1*(T(i)+ctrl.Tmpc_off) + h2*F(j)*V(j)^2 + h0;
+			%linps = h1*(T(i)+Toff) + h2*F(j)^(2*alp+1) + h0;
+			lut(i,j) = ps - linps; %
 		end
     end
 

@@ -33,6 +33,9 @@ classdef mpc_hpc < handle %< controller
 
         LK;
 
+        Tmpc_off = 0;
+        ctrl_info = [];
+
 	end
 
 	properties(Dependent)

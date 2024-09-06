@@ -19,7 +19,7 @@ classdef power_model < handle
 		leak_exp_t_k (1,1) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
 			= 29.903e-3;
 		leak_exp_k (1,1) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
-			= -6033.035e-3;
+			= -6033.035e-3-8.1680;
 		 
 		dyn_ceff_k {mustBeNumeric, mustBeNonempty, mustBeFinite, mustBeVector} ...
 			= [306.741, 694.866, 1235.452, 1651.217, 1600.92]*1e-3;
@@ -146,7 +146,7 @@ classdef power_model < handle
 			if obj.leak_exp
 				maxT = 125+273.15;
 				ps = ps .* ...
-					exp(V*kps(4) + (min(T,ones(dim,1)*maxT)-273.15)*kps(5) + kps(6));
+					exp(V*kps(4) + (min(T,ones(dim,1)*maxT))*kps(5) + kps(6));
 			end
 		end
 		function pd = pd_compute(obj, F,V,instr,noise)

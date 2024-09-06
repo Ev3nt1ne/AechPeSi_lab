@@ -63,21 +63,24 @@ classdef black_wolf < mpc_hpc & CP
 
 			Bu = obj.Bd_ctrl(:,1:obj.lNc);
 			Bd = obj.Bd_ctrl(:,obj.lNc+1:end);
+
+            Toff = obj.Tmpc_off*ones(obj.lNs,1);
 					
 			constraints = [];
-			%constraints = [x{2} == (Adl_mpc + C2*h1)*x{1}-(C2*h1*273.15*ones(obj.lNs,1))+(Bu+(obj.Cc'*h2))*(u0*w)+Bd*ot + obj.Cc*(h0 + h0v)];
+			%constraints = [x{2} == (Adl_mpc + C2*h1)*x{1}+(Bu+(obj.Cc'*h2))*(u0*w)+Bd*ot + obj.Cc*(h0 + h0v)];
 
 			for k = 1 : obj.Nhzn
 					%constraints = [constraints, x{k+1} == (obj.Ad_ctrl + obj.C2*h1)*x{k}-(obj.C2*h1*273.15*ones(obj.lNs,1))+(Bu+(obj.Cc'*h2))*(u{k}.*w)+Bd*ot + obj.Cc'*(h0 + h0v)];
-					constraints = [constraints, x{k+1} == (obj.Ad_ctrl + Bu*diag(h1)*obj.Cc)*x{k}-(Bu*diag(h1*273.15)*obj.Cc*ones(obj.lNs,1)) ...
-									+ Bu*(u{k}.*(w+h2)) + Bd*ot + Bu*h0 + obj.Cc'*h0v];
+					constraints = [constraints, x{k+1} == (obj.Ad_ctrl + Bu*diag(h1)*obj.Cc)*(x{k}) ... %-(Bu*diag(h1*273.15)*obj.Cc*ones(obj.lNs,1)) ...
+									+ Bu*(u{k}.*(w+h2)) + Bd*ot + Bu*h0 + obj.Cc'*h0v ...
+                                    + obj.Ad_ctrl*(-Toff) + Toff];
 
 					%TODO: Ct I did only for y, and only for max
 					if (~isinf(obj.umin))
-						constraints = [constraints, u{k}.*(w+h2) + h1*(obj.Cc(1:obj.lNc,:)*(x{k}-273.15)) + h0 + h0v >= obj.umin];
+						constraints = [constraints, u{k}.*(w+h2) + h1*(obj.Cc(1:obj.lNc,:)*(x{k})) + h0 + h0v >= obj.umin];
 					end
 					if (~isinf(obj.umax))
-						constraints = [constraints, u{k}.*(w+h2) + h1*(obj.Cc(1:obj.lNc,:)*(x{k}-273.15)) + h0 + h0v<= obj.umax - obj.Ctu(k,:)'];
+						constraints = [constraints, u{k}.*(w+h2) + h1*(obj.Cc(1:obj.lNc,:)*(x{k})) + h0 + h0v <= (obj.umax - obj.Ctu(k,:)')];
 					end
 					if (~isinf(obj.xmin))
 						%constraints = [constraints, x{k+1} >= obj.xmin];
@@ -89,17 +92,17 @@ classdef black_wolf < mpc_hpc & CP
 						%constraints = [constraints, obj.C)*x{k+} >= obj.ymin];
 					end
 					%if (~isinf(obj.yMax))
-						constraints = [constraints, obj.Cc*x{k+1} <= obj.T_target - obj.Cty(k,:)'];
+						constraints = [constraints, obj.Cc*x{k+1} <= (obj.T_target + obj.Tmpc_off - obj.Cty(k,:)')];
 					%end
 					%if (~isinf(obj.usum(1)))
-                        Pw = u{k}.*(w+h2) + h1*(obj.Cc*(x{k}-273.15)) + h0v+h0;
-						constraints = [constraints,sum(Pw) <= ly_usum(k,1) - sum(obj.Ctu(k,:),2)];
+                        Pw = u{k}.*(w+h2) + h1*(obj.Cc*(x{k})) + h0v+h0;
+						constraints = [constraints,sum(Pw) <= (ly_usum(k,1) - sum(obj.Ctu(k,:),2))];
 						%TODO should I also add the "resulting" thing. i.e.
 						%	the above formula with x{k+1}?
 						%	maybe no, because I use horizon for this
 					%end
 					%if (~isinf(obj.usum(2:end)))
-						%constraints = [constraints, obj.VDom'*(u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k}-273.15)) + h0) <= ly_usum(k,2:end)' - (obj.Ctu(k,:)*obj.VDom)'];
+						%constraints = [constraints, obj.VDom'*(u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k})) + h0) <= ly_usum(k,2:end)' - (obj.Ctu(k,:)*obj.VDom)'];
 					%end
 				end
 			
@@ -107,7 +110,7 @@ classdef black_wolf < mpc_hpc & CP
 
 			for k = 1:obj.Nhzn
 				objective = objective + (u{k}-ly_uref)'*obj.Rt*(u{k}-ly_uref) + u{k}'*obj.Rs*(u{k}) + ...
-                        ((x{k+1}-obj.T_amb)/(obj.T_target-obj.T_amb))'*obj.Q*((x{k+1}-obj.T_amb)/(obj.T_target-obj.T_amb)) + ...
+                        ((x{k+1}-obj.T_amb-Toff)/(obj.T_target-obj.T_amb))'*obj.Q*((x{k+1}-obj.T_amb-Toff)/(obj.T_target-obj.T_amb)) + ...
                         ((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm)'*obj.R*((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm);
                 %energy
                 %at = (ly_uref./u{k}).*wSm;
@@ -145,7 +148,9 @@ classdef black_wolf < mpc_hpc & CP
 			end
 			%}
 			
-			[uout, problem,~,~,optimizer_object] = obj.mpc_ctrl({x, w, ot, h0v, wSm, uref, usum});
+			[uout, problem,~,~,~, sol] = obj.mpc_ctrl({x, w, ot, h0v, wSm, uref, usum});
+
+            obj.ctrl_info = [obj.ctrl_info; sol.solvertime];
 
 			% Analyze error flags
 			%if problem
@@ -160,9 +165,11 @@ classdef black_wolf < mpc_hpc & CP
 
 			obj.initialize(hc, Nsim);
 
+            obj.ctrl_info = [];
+
 			% Voltage
 			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([0.5 1.2], [20 90], 0.9, 1/3.497, 1.93, 1);
-			[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([0.5 1.2], [20 90], 0.9, [6.659 -1.979], -1.48, 1);
+			[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([0.5 1.2], [20+273.15 90+273.15], obj.Tmpc_off, 0.9, [6.659 -1.979], -1.48, 1);
 			% Freq
 			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([obj.lFmin obj.lFmax], [20 90], 0.9, 0.2995, 0, 0);
 			%TODO parametrize
@@ -268,9 +275,9 @@ classdef black_wolf < mpc_hpc & CP
 			%	model which seems to me as too simplicistic
 			power_mpc = obj.output_mpc.*Ceff + ...
 				(obj.lVDom*obj.prevV*obj.pw_stat_lin(1) + obj.pw_stat_lin(3)*process).* ...
-				exp(obj.pw_stat_exp(1)*obj.lVDom*obj.prevV + (Tc-273.15)*obj.pw_stat_exp(2) + obj.pw_stat_exp(3));
+				exp(obj.pw_stat_exp(1)*obj.lVDom*obj.prevV + (Tc)*obj.pw_stat_exp(2) + obj.pw_stat_exp(3));
 			
-			%state_MPC = (obj.Ad_ctrl + obj.C2*obj.psac(2))*obj.Tobs-(obj.C2*obj.psac(2)*273.15*ones(obj.lNs,1)) + ...
+			%state_MPC = (obj.Ad_ctrl + obj.C2*obj.psac(2))*obj.Tobs + ...
 			%	(obj.Bd_ctrl(:,1:obj.lNc)+(obj.Cc'*obj.psac(3)))*(obj.output_mpc.*Ceff)+obj.Bd_ctrl(:,obj.lNc+1:end)*(1000*obj.T_amb) + obj.Cc'*(obj.psac(1) + h0v);
 
 			%state_MPC = obj.Ad_ctrl*obj.Tobs + obj.Bd_ctrl*[power_mpc; 1000*obj.T_amb];
@@ -295,7 +302,7 @@ classdef black_wolf < mpc_hpc & CP
 			obj.xlplot(obj.ex_count+1,:) = 0;
 			mpc_pw_target = repmat(pwbdg, obj.Nhzn,1+obj.lvd);
             wSm = obj.wl*(1-obj.lwl_mem)';
-			res = obj.call_mpc(state_MPC, Ceff, obj.T_amb*1000, h0v, wSm, input_mpc, mpc_pw_target);
+			res = obj.call_mpc(state_MPC+obj.Tmpc_off, Ceff, (obj.T_amb)*1000, h0v, wSm, input_mpc, mpc_pw_target);
 			tt = isnan(res{1});
 			% too complex to make it vectorial
 			%dp = res{1}(~tt);
@@ -357,7 +364,7 @@ classdef black_wolf < mpc_hpc & CP
 			%plot(t1, cpxplot(2:end,:) - 273.15, 'b'); hold on; grid on;
 			%plot(t2, [NaN*ones(1,size(obj.tmpc,2)); (obj.tmpc(2:end-1,:) - 273.15)], 'm'); hold on;
 			plot(t1, [(cpxplot(2+2:end,:) - 273.15); NaN*ones(2,size(obj.tmpc,2))], 'b'); hold on;
-			plot(t2, obj.tmpc(2:end,:) - 273.15, 'm');
+			plot(t2, obj.tmpc(2:end,:) - 273.15 -obj.Tmpc_off, 'm');
 			xlabel("Time [s]");
 			ylabel("Temperature [T]");
 		end
