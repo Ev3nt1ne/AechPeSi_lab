@@ -329,7 +329,7 @@ classdef cp_mpc < mpc_hpc & CP
                 pex = 1;
             else
 				maxT = 125+273.15;
-				pex = exp(obj.lVDom*V*obj.pw_stat_exp(1) + (min(obj.Cc*T,ones(obj.lNc,1)*maxT)-273.15)*obj.pw_stat_exp(2) + ones(obj.lNc,1)*obj.pw_stat_exp(3));		
+				pex = exp(obj.lVDom*V*obj.pw_stat_exp(1) + (min(obj.Cc*T,ones(obj.lNc,1)*maxT))*obj.pw_stat_exp(2) + ones(obj.lNc,1)*obj.pw_stat_exp(3));		
 			end
 			pu = Ceff.*F.*(obj.lVDom*(V.*V)) + (obj.pw_stat_lin(1).*(obj.lVDom*V) + process*obj.pw_stat_lin(1)).*pex;
 
@@ -362,7 +362,7 @@ classdef cp_mpc < mpc_hpc & CP
                 pex = 1;
             else
 				maxT = 125+273.15;
-				pex = exp(obj.lVDom*V*obj.pw_stat_exp(1) + (min(obj.Cc*T,ones(obj.lNc,1)*maxT)-273.15)*obj.pw_stat_exp(2) + ones(obj.lNc,1)*obj.pw_stat_exp(3));		
+				pex = exp(obj.lVDom*V*obj.pw_stat_exp(1) + (min(obj.Cc*T,ones(obj.lNc,1)*maxT))*obj.pw_stat_exp(2) + ones(obj.lNc,1)*obj.pw_stat_exp(3));		
             end
 			F_og = (obj.output_mpc - (obj.pw_stat_lin(1).*(obj.lVDom*V) + process*obj.pw_stat_lin(3)).*pex) ./ (obj.lVDom*(V.*V)) ./ Ceff;
 
