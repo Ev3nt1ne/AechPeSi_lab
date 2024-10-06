@@ -81,7 +81,7 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		    asimcl(i).nip_sign = +1;
 	    end
 	    nip_mul(i) = ceil(1/ntd);
-	    asimcl(i).nip_counter(i) = nip_mul(i) + target_ts_offset;
+	    asimcl(i).nip_counter = nip_mul(i) + target_ts_offset;
     
 	    %TODO
 	    x = obj.t_init{i};% + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
@@ -127,7 +127,7 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
         for i=1:N_chip
             if (mod(s,Nsim_mul)==0)
                 % Input step managing
-                asimcl(i).update_counters(target_mul, nip_mul, ctrl_mul);
+                asimcl(i).update_counters(target_mul(i), nip_mul(i), ctrl_mul(i));
 
                 %Compute model:
 		        index = 1+(s-1)*sys_mul(i);
@@ -144,8 +144,8 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 			        asimcl(i).pvt{chip(i).PVT_P} = asimcl(i).process;
 			        asimcl(i).pvt{chip(i).PVT_V} = [];
 			        asimcl(i).pvt{chip(i).PVT_T} = T;
-                    f_ref = obj.frtrc{i}(min(asimcl(i).target_index, size(obj.frtrc,1)),:)';
-			        pwbdg = obj.tot_pw_budget(min(asimcl(i).target_index, length(obj.tot_pw_budget)));
+                    f_ref = obj.frtrc{i}(min(asimcl(i).target_index, size(obj.frtrc{i},1)),:)';
+			        pwbdg = obj.chip_pw_budget{i}(min(asimcl(i).target_index, length(obj.chip_pw_budget{i})));
 			        [asimcl(i).F, asimcl(i).V, ctrl(i)] = ...
                         ctrl(i).ctrl_fnc(f_ref, pwbdg, asimcl(i).pvt, asimcl(i).ctrl_pwm, asimcl(i).ctrl_wl);
 		        %end
@@ -181,7 +181,7 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		    pause(0.5);
 		    obj.xutplot(chip(i),asimcl(i).cpxplot,asimcl(i).cpuplot);
 		    pause(0.5);
-		    obj.powerconstrplot(chip(i),asimcl(i).cpuplot);
+		    obj.powerconstrplot(chip(i),i,asimcl(i).cpuplot);
 		    pause(0.5);
 		    obj.tempconstrplot(chip(i),asimcl(i).cpxplot);
 		    pause(0.5);

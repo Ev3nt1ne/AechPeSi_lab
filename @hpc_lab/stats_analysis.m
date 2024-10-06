@@ -1,4 +1,4 @@
-function res = stats_analysis(obj,ctrl,chip,simres,index)
+function res = stats_analysis(obj,ctrl,chip,simres,cidx)
 %STATS_ANALYSIS Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -16,11 +16,11 @@ function res = stats_analysis(obj,ctrl,chip,simres,index)
 	%%%%%%%%%%%%%%%%%%%%%%%%%
 	% Power
 	
-	pwct = max(round(size(ucp,1)/max(length(obj.tot_pw_budget)-1,1)),1);
-	pwtb = repelem(obj.tot_pw_budget(min(2, length(obj.tot_pw_budget)):end), pwct ,1);
+	pwct = max(round(size(ucp,1)/max(length(obj.chip_pw_budget{cidx})-1,1)),1);
+	pwtb = repelem(obj.chip_pw_budget{cidx}(min(2, length(obj.chip_pw_budget{cidx})):end), pwct ,1);
 
     maxPbudget = chip.core_max_power*chip.Nc;
-    ptime = sum(obj.tot_pw_budget < maxPbudget)*obj.Ts_target;
+    ptime = sum(obj.chip_pw_budget{cidx} < maxPbudget)*obj.Ts_target;
 	
 	% here it is difficult, because if I make it ceil, it will always be ok for
 	% pw budget going down, but never for power budget going up. If I take
@@ -204,10 +204,10 @@ function res = stats_analysis(obj,ctrl,chip,simres,index)
 	
 	%%%%%%%%%%%%%%%%%%%%%%%%%
 	% Perf
-	smref = round((size(fcp,1))/(size(obj.frtrc{index}(2:end,:),1)));
-	smf = round((size(obj.frtrc{index}(2:end,:),1))/(size(fcp,1)));
+	smref = round((size(fcp,1))/(size(obj.frtrc{cidx}(2:end,:),1)));
+	smf = round((size(obj.frtrc{cidx}(2:end,:),1))/(size(fcp,1)));
 	
-	fd = repelem(obj.frtrc{index}(2:end,:),max(smref,1),1) - repelem(fcp,max(smf,1),1);
+	fd = repelem(obj.frtrc{cidx}(2:end,:),max(smref,1),1) - repelem(fcp,max(smf,1),1);
 	
 	n2 = reshape(fd,[],1);
 	perf.fd.l2norm = norm(n2) / sqrt(chip.Nc) / sqrt(ceil(obj.tsim / ctrl.Ts_ctrl));

@@ -30,7 +30,11 @@ classdef hpc_lab < handle
 		wltrc = {0};						% Wokrload Trace
 
 		%% All Controllers
-		tot_pw_budget;
+        %TODO: this is uncommented at the moment to fix other thingy
+        %tot_pw_budget; 
+        %this is its substitute
+        toto_pw_budget;
+		chip_pw_budget;
 		quad_pw_budget;
 		%min_pw_red;
 
@@ -78,7 +82,7 @@ classdef hpc_lab < handle
 				obj.osunix = 0;
 			end
 
-			obj.perf_max_check = 100;
+			obj.perf_max_check{1} = 100;
 			obj.pmc_need_update = 0;
 
 			obj.get_size(obj);
@@ -265,7 +269,7 @@ classdef hpc_lab < handle
 			
 			linkaxes([ax1,ax2,ax3,ax4],'x');
 		end
-		function [fig] = powerconstrplot(obj,chip,u1,u2)
+        function [fig] = powerconstrplot(obj,chip,idx,u1,u2)
 						
 			fig = figure('Name', 'Power Constraints Compliance');
 			movegui(fig, 'southeast');
@@ -277,28 +281,28 @@ classdef hpc_lab < handle
 			gr = sum(u1,2);
 			plot(t1,gr, '.');
 			grid on,title('Total Power'),ylabel('[W]'),xlabel('Time [s]'),hold on;
-			if ((nargin >=4) && (isempty(u2)==0))
+			if ((nargin >=5) && (isempty(u2)==0))
 				gr = sum(u2,2);
 				plot(t1,gr);
 			end
 			%if max(gr) >= obj.usum(1)*0.2
-			plot([0:max(length(obj.tot_pw_budget)-1,1)]*(obj.tsim/max(length(obj.tot_pw_budget)-1,1)),[obj.tot_pw_budget], '--', 'LineWidth',1,  'Color', '#CC0000');
+			plot([0:max(length(obj.chip_pw_budget{idx})-1,1)]*(obj.tsim/max(length(obj.chip_pw_budget{idx})-1,1)),[obj.chip_pw_budget{idx}], '--', 'LineWidth',1,  'Color', '#CC0000');
 			ax2 = subplot(3,4,[5:8]);
 			p = plot(t1,u1*chip.VDom, '.');
 			grid on,title('Domain Power'),ylabel('[W]'),xlabel('Time [s]'),hold on;
-			if ((nargin >=4) && (isempty(u2)==0))
+			if ((nargin >=5) && (isempty(u2)==0))
 				p = plot(t1,u2*chip.VDom);
 			end
 			for pl=1:chip.vd
-				plot([0:max(size(obj.quad_pw_budget,1)-1,1)]*(obj.tsim/max(size(obj.quad_pw_budget,1)-1,1)), [obj.quad_pw_budget], '--', 'LineWidth',1,  'Color', p(pl).Color);
+				plot([0:max(size(obj.quad_pw_budget{idx},1)-1,1)]*(obj.tsim/max(size(obj.quad_pw_budget{idx},1)-1,1)), [obj.quad_pw_budget{idx}], '--', 'LineWidth',1,  'Color', p(pl).Color);
 			end
 			
 			u1 = u1(2:end,:);	
 			dim = size(u1,1);
 			%dim2 = dim
 			
-			pbt = repelem(obj.tot_pw_budget(min(2, length(obj.tot_pw_budget)):end),max(round(size(u1,1)/max(length(obj.tot_pw_budget)-1,1)),1),1);
-			pbq = repelem(obj.quad_pw_budget(min(2, size(obj.quad_pw_budget,1)):end,:),max(round(size(u1,1)/max(size(obj.quad_pw_budget,1)-1,1)),1),1 );
+			pbt = repelem(obj.chip_pw_budget{idx}(min(2, length(obj.chip_pw_budget{idx})):end),max(round(size(u1,1)/max(length(obj.chip_pw_budget{idx})-1,1)),1),1);
+			pbq = repelem(obj.quad_pw_budget{idx}(min(2, size(obj.quad_pw_budget{idx},1)):end,:),max(round(size(u1,1)/max(size(obj.quad_pw_budget{idx},1)-1,1)),1),1 );
 			gr1 = [sum(sum(u1,2) > pbt)*chip.Ts; ...
 					sum( (u1*chip.VDom) > pbq )'*chip.Ts];
 			
@@ -307,13 +311,13 @@ classdef hpc_lab < handle
 			gp1 = [ sum((sum(u1,2) - pbt).*(sum(u1,2) > pbt)) / ttqt(1); ...
 				sum( ((u1*chip.VDom) - pbq).*((u1*chip.VDom) > pbq))' ./  ttqt(2:end)];
 			
-			if (nargin < 4) || isempty(u2)
+			if (nargin < 5) || isempty(u2)
 				BAR1 = [gr1(1) 0];
 				BAR2 = [0 gp1(1)];
 			else
 				%TODO:
 				%u2 = u2(2:end,:);
-				%gr2 = [sum(sum(u2,2) > obj.tot_pw_budget)*chip.Ts; sum( (u2*chip.VDom)' > obj.quad_pw_budget, 2 )*chip.Ts];
+				%gr2 = [sum(sum(u2,2) > obj.chip_pw_budget{idx})*chip.Ts; sum( (u2*chip.VDom)' > obj.quad_pw_budget{idx}, 2 )*chip.Ts];
 				%BAR1 = [gr1(1) gr2(1) 0 0];
 				%BAR2 = [0 0 gp1(1) gp2(1)];
 			end
@@ -344,7 +348,7 @@ classdef hpc_lab < handle
 
 			
 			subplot(3,4,[10:12]);
-			if (nargin < 4) || isempty(u2)
+			if (nargin < 5) || isempty(u2)
 				BAR1 = [gr1(2:end) zeros(length(gr1)-1,1)];
 				BAR2 = [zeros(length(gp1)-1,1) gp1(2:end)];
 			else
@@ -537,7 +541,7 @@ classdef hpc_lab < handle
 
 			linkaxes([ax1,ax2, axi],'x');
 		end
-        function [fig] = perfplot(obj, chip, f, w, cmp,index)
+        function [fig] = perfplot(obj, chip, f, w, cmp,idx)
 
 			font_size = 6;
 			
@@ -545,15 +549,15 @@ classdef hpc_lab < handle
 			movegui(fig, 'northeast');
 			
 			ax1 = subplot(3,4,[1:4]);
-			smref = round(max((size(f,1)-1),1)/max((size(obj.frtrc{index},1)-1),1));
-			smf = round(max((size(obj.frtrc{index},1)-1),1)/max((size(f,1)-1),1));
+			smref = round(max((size(f,1)-1),1)/max((size(obj.frtrc{idx},1)-1),1));
+			smf = round(max((size(obj.frtrc{idx},1)-1),1)/max((size(f,1)-1),1));
 			
-			gr = repelem(f(2:1:end,:),max(smf,1),1) - repelem(obj.frtrc{index}(2:end,:),max(smref,1),1);
+			gr = repelem(f(2:1:end,:),max(smf,1),1) - repelem(obj.frtrc{idx}(2:end,:),max(smref,1),1);
 			plot(obj.tsim*[0:(1/size(gr,1)):1]', [zeros(1,chip.Nc); gr]);
 			grid on,xlabel('Time [s]'), ylabel('Reference Difference [GHz]');
 			
 			subplot(3,4,[5:6]);
-			av = sum(obj.frtrc{index}(2:end,:)) / size(obj.frtrc{index}(2:end,:),1);
+			av = sum(obj.frtrc{idx}(2:end,:)) / size(obj.frtrc{idx}(2:end,:),1);
 			b = bar(sum(gr)/size(gr,1)./av*100);
 			for pb = 1:length(b)
 				xtips = b(pb).XEndPoints;
@@ -1037,7 +1041,11 @@ classdef hpc_lab < handle
             if lenold ~= lennew
                 obj.pmc_need_update(lenold+1:lennew) = 1;
                 for i=lenold+1:lennew
-                    obj.perf_max_check{i} = size(obj.wltrc{i},3)-1;
+                    if (length(obj.wltrc) < lennew)
+                        obj.perf_max_check{i} = 100;
+                    else
+                        obj.perf_max_check{i} = size(obj.wltrc{i},3)-1;
+                    end
                 end
             end
 			
