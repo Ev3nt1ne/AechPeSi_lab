@@ -25,9 +25,9 @@ classdef hpc_lab < handle
 
 		%x_init;					% Initial Conditions 
 		%urplot;						% Input Reference Plot
-		frtrc;						% Freq Reference Trace
+		frtrc = {0};						% Freq Reference Trace
 		%zrplot;					% Power Noise Plot
-		wltrc;						% Wokrload Trace
+		wltrc = {0};						% Wokrload Trace
 
 		%% All Controllers
 		tot_pw_budget;
@@ -40,29 +40,6 @@ classdef hpc_lab < handle
 	properties(SetAccess=protected, GetAccess=public)	
 
 		% Internal Variables for Simulation() fnc
-	 	wl_index;
-	 	qt_storage;
-
-		F_cng_times;
-		V_cng_times;
-		F_cng_us;
-		V_cng_us;
-		F_cng_error;
-		V_cng_error;
-
-		V_T;
-		F_T;
-
-	 	V_s;
-	 	F_s;
-
-		delay_F_index;
-		delay_V_index;
-
-		delay_F_div;
-		delay_V_div;
-
-	 	A_s;
 	 	B_s;
 
 		osunix;
@@ -125,11 +102,16 @@ classdef hpc_lab < handle
 				end				
 			end
         end
-		
+		[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = simulation(obj, ctrl, chip, show)
         %Move This:
 		function obj = taas_fix(obj, wl)
-			obj.pmc_need_update = 0;
-			obj.perf_max_check = wl;
+			obj.pmc_need_update = zeros(size(obj.pmc_need_update));
+            if ~iscell(wl)
+                error("[LAB] wl is not a cell");
+            else
+                obj.perf_max_check = wl;
+            end
+			
 		end
 	end
 	methods(Static)
@@ -217,125 +199,7 @@ classdef hpc_lab < handle
 			%subplot(1,3,2);surf(g2);title('filter size = 50, sigma = 7');
 			%subplot(1,3,3);surf(g3);title('filter size = 50, sigma = 11');
 		end
-	end
-
-	%% Simulations
-	methods
-		[] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma)
-		[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = simulation(obj, ctrl, chip, show)
-		function [obj] = init_compute_model(obj, A, B, Nc, vd, chip)
-			obj.qt_storage = chip.quantum_instr*ones(Nc, 1);
-			obj.wl_index = ones(Nc, 1);
-			obj.F_cng_times = zeros(Nc,1);
-			obj.V_cng_times = zeros(vd,1);
-			obj.F_cng_us = zeros(Nc,1);
-			obj.V_cng_us = zeros(vd,1);
-			obj.F_cng_error = zeros(Nc,1);
-			obj.V_cng_error = zeros(vd,1);
-
-			obj.F_T = chip.F_min*ones(Nc,1);
-			obj.V_T = chip.V_min*ones(vd,1);
-			obj.F_s = chip.F_min*ones(Nc,1);
-			obj.V_s = chip.V_min*ones(vd,1);
-			obj.delay_F_index = zeros(Nc,1);
-			obj.delay_V_index = zeros(vd,1);
-			obj.delay_F_div = ceil(chip.delay_F_mean / chip.Ts);
-			obj.delay_V_div = ceil(chip.delay_V_mean / chip.Ts);
-			obj.A_s = A;
-			obj.B_s = B;
-			% cannot put it here, if I want it to be constant among several
-			% runs
-			%obj.core_pw_noise_char = ones(obj.Nc,1);
-			%if (obj.model_variation)
-			%obj = obj.create_core_pw_noise();
-			%obj = obj.create_thermal_model_noise();
-			%end
-		end
-		function [uplot, xplot, d_is, pw_ms, obj] = compute_model(obj, N, x, V, F, d_p, chip)
-			
-			d_is = zeros(1,chip.ipl);
-			%delay_F_index = zeros(obj.Nc,1);
-			%delay_V_index = zeros(obj.vd,1);		
-			pw_ms = 0;			
-			
-			uplot = zeros(N, length(F));
-			xplot = zeros(N, length(x));
-
-			%F
-			ttd = (obj.delay_F_index > 0)|(obj.F_T ~= obj.F_s);
-			cng = (~ttd).*(obj.F_T ~= F);
-
-			obj.F_cng_times = obj.F_cng_times + cng;
-
-			obj.delay_F_index = obj.delay_F_index.*ttd + cng.*obj.delay_F_div;
-			obj.F_T = (~cng).*obj.F_T + cng.*F;
-			obj.F_cng_error = obj.F_cng_error + ttd.*(obj.F_T ~= F);
-
-			%V
-			ttd = (obj.delay_V_index > 0)|(obj.V_T ~= obj.V_s);
-			cng = (~ttd).*(obj.V_T ~= V);
-
-			obj.V_cng_times = obj.V_cng_times + cng;
-
-			obj.delay_V_index = obj.delay_V_index.*ttd + cng.*obj.delay_V_div;
-			obj.V_T = (~cng).*obj.V_T + cng.*V;
-			obj.V_cng_error = obj.V_cng_error + ttd.*(obj.V_T ~= V);
-			
-			for sim=1:N
-				%index = (ix0-1)*N + sim;
-
-				% Delay Application
-				tv = obj.delay_V_index == 0;
-				obj.V_s = obj.V_s.*(~tv) + obj.V_T.*tv;
-				tf = obj.delay_F_index == 0;
-				obj.F_s = obj.F_s.*(~tf) + obj.F_T.*tf;
-
-				obj.F_cng_us = obj.F_cng_us + ~tf;
-				obj.V_cng_us = obj.V_cng_us + ~tv;
-
-				obj.delay_F_index = obj.delay_F_index - (obj.F_T~=obj.F_s);
-				obj.delay_V_index = obj.delay_V_index - (obj.V_T~=obj.V_s);
-				%
-
-				%noise 
-
-				instr = obj.F_s * 1e9 * (chip.Ts);
-				wl = zeros(chip.Nc, chip.ipl);
-				wld = zeros(chip.Nc, 1);
-				while (sum(instr) > 0)
-					vidx = max(mod(obj.wl_index, size(obj.wltrc,3)),1);
-					[m,n,l] = size(obj.wltrc);
-					idx = sub2ind([m,n,l],repelem(1:m,1,n),repmat(1:n,1,m),repelem(vidx(:).',1,n));
-					wlp = reshape(obj.wltrc(idx),[],m).';
-					
-					[pwl, instr] = chip.quanta2wl(wlp, instr, (chip.F_min./obj.F_s), obj.qt_storage);					
-
-					% add to accumulator
-					wld = wld + pwl;
-					wl = wl + pwl .* wlp;
-
-					% compute new values
-					obj.qt_storage = obj.qt_storage - pwl;
-					ttwl = (obj.qt_storage<=0);
-					obj.qt_storage = obj.qt_storage + chip.quantum_instr .* ttwl;
-					obj.wl_index = obj.wl_index + ttwl;
-				end
-
-				wl = wl ./ wld;
-
-				d_is = d_is + wl;
-
-				pu_s = chip.power_compute(obj.F_s,chip.VDom*obj.V_s,chip.C(1:chip.Nc,:)*x,wl,d_p);
-				pw_ms = pw_ms + sum(pu_s);
-				x = obj.A_s*x + obj.B_s*[pu_s;obj.temp_amb*1000];		
-
-				uplot(sim,:) = pu_s;
-				xplot(sim,:) = x;
-			end	%ssim
-			d_is = d_is / N;
-			pw_ms = pw_ms / N;
-		end
-	end
+    end
 
 	%% Approximation
 	methods(Static)
@@ -597,7 +461,7 @@ classdef hpc_lab < handle
 			
 			b = bar(1:chip.Nc, BAR1);
 			yl = ylim;
-			ylim([min(min(obj.t_init), ymlj)-273.15, yl(2)]);
+			ylim([min(min(obj.temp_amb), ymlj)-273.15, yl(2)]);
 			ylabel('T_{Max} [°C]'),xlabel('Core'),grid on;
 			hold on;
 			plot(xlim, [chip.core_limit_temp chip.core_limit_temp]-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
@@ -673,7 +537,7 @@ classdef hpc_lab < handle
 
 			linkaxes([ax1,ax2, axi],'x');
 		end
-		function [fig] = perfplot(obj, chip, f, w)
+        function [fig] = perfplot(obj, chip, f, w, cmp,index)
 
 			font_size = 6;
 			
@@ -681,15 +545,15 @@ classdef hpc_lab < handle
 			movegui(fig, 'northeast');
 			
 			ax1 = subplot(3,4,[1:4]);
-			smref = round(max((size(f,1)-1),1)/max((size(obj.frtrc,1)-1),1));
-			smf = round(max((size(obj.frtrc,1)-1),1)/max((size(f,1)-1),1));
+			smref = round(max((size(f,1)-1),1)/max((size(obj.frtrc{index},1)-1),1));
+			smf = round(max((size(obj.frtrc{index},1)-1),1)/max((size(f,1)-1),1));
 			
-			gr = repelem(f(2:1:end,:),max(smf,1),1) - repelem(obj.frtrc(2:end,:),max(smref,1),1);
+			gr = repelem(f(2:1:end,:),max(smf,1),1) - repelem(obj.frtrc{index}(2:end,:),max(smref,1),1);
 			plot(obj.tsim*[0:(1/size(gr,1)):1]', [zeros(1,chip.Nc); gr]);
 			grid on,xlabel('Time [s]'), ylabel('Reference Difference [GHz]');
 			
 			subplot(3,4,[5:6]);
-			av = sum(obj.frtrc(2:end,:)) / size(obj.frtrc(2:end,:),1);
+			av = sum(obj.frtrc{index}(2:end,:)) / size(obj.frtrc{index}(2:end,:),1);
 			b = bar(sum(gr)/size(gr,1)./av*100);
 			for pb = 1:length(b)
 				xtips = b(pb).XEndPoints;
@@ -725,15 +589,6 @@ classdef hpc_lab < handle
 			grid on,xlabel('Total'), ylabel('Total Mean Difference [%]');
 			
 			% % %
-			cmp = [];
-			if obj.compare_vs_baseline
-				if obj.pmc_need_update
-					warning("[HPC LAB] Error! You are not comparing with the baseline! You should run base_ideal_unr() or checkante!");
-				end
-				cmp = obj.perf_max_check;
-			else
-				cmp = size(obj.wltrc,3)-1;
-			end
 			%this if() is for saveall() and other plot
 			if w <= 1.001
 				gr = w * 100;
@@ -1156,19 +1011,61 @@ classdef hpc_lab < handle
 	methods
 		function obj = set.compare_vs_baseline(obj, val)
 			if val && (~obj.compare_vs_baseline)
-				obj.pmc_need_update = 1;
-				obj.perf_max_check = size(obj.wltrc,3)-1;
+				obj.pmc_need_update(:) = 1;
+                for i=1:length(obj.wltrc)
+				    obj.perf_max_check{i} = size(obj.wltrc{i},3)-1;
+                end
 			end
 			obj.compare_vs_baseline = val;
 		end
 		function obj = set.frtrc(obj, val)
-			obj.pmc_need_update = 1;
-			obj.perf_max_check = size(obj.wltrc,3)-1;
+            %check which index I'm modifing
+            oldval = obj.frtrc;
+            if ~iscell(val)
+                val{1} = val;
+            end
+            lenold = length(oldval);
+            lennew = length(val);
+            %changed = zeros(lenold,1);
+            for i=1:length(lenold)
+                %ll = size(val{i});
+                %changed(i) = oldval{i}~=val{i};
+                obj.pmc_need_update(i) = 1;
+                obj.perf_max_check{i} = size(obj.wltrc{i},3)-1;
+            end
+			%obj.pmc_need_update = obj.pmc_need_update || changed;
+            if lenold ~= lennew
+                obj.pmc_need_update(lenold+1:lennew) = 1;
+                for i=lenold+1:lennew
+                    obj.perf_max_check{i} = size(obj.wltrc{i},3)-1;
+                end
+            end
+			
 			obj.frtrc = val;
 		end
 		function obj = set.wltrc(obj, val)
-			obj.pmc_need_update = 1;
-			obj.perf_max_check = size(val,3)-1;
+            %check which index I'm modifing
+            oldval = obj.wltrc;
+            if ~iscell(val)
+                val{1} = val;
+            end
+            lenold = length(oldval);
+            lennew = length(val);
+            %changed = zeros(lenold,1);
+            for i=1:length(lenold)
+                %ll = size(val{i});
+                %changed(i) = oldval{i}~=val{i};
+                obj.pmc_need_update(i) = 1;
+                obj.perf_max_check{i} = size(val{i},3)-1;
+            end
+			%obj.pmc_need_update = obj.pmc_need_update || changed;
+            if lenold ~= lennew
+                obj.pmc_need_update(lenold+1:lennew) = 1;
+                for i=lenold+1:lennew
+                    obj.perf_max_check{i} = size(val{i},3)-1;
+                end
+            end
+
 			obj.wltrc = val;
 		end
 	end

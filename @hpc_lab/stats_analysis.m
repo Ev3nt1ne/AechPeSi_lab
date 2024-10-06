@@ -1,6 +1,12 @@
-function res = stats_analysis(obj,ctrl,chip,x,u,f,v,w)
+function res = stats_analysis(obj,ctrl,chip,simres,index)
 %STATS_ANALYSIS Summary of this function goes here
 %   Detailed explanation goes here
+
+    x = simres.cpxplot;
+    u = simres.cpuplot;
+    f = simres.cpfplot;
+    v = simres.cpvplot;
+    w = simres.wlop;
 
 	xcp = x(2:end,:)*chip.Cc' -273.15;
 	ucp = u(2:end,:);
@@ -198,10 +204,10 @@ function res = stats_analysis(obj,ctrl,chip,x,u,f,v,w)
 	
 	%%%%%%%%%%%%%%%%%%%%%%%%%
 	% Perf
-	smref = round((size(fcp,1))/(size(obj.frtrc(2:end,:),1)));
-	smf = round((size(obj.frtrc(2:end,:),1))/(size(fcp,1)));
+	smref = round((size(fcp,1))/(size(obj.frtrc{index}(2:end,:),1)));
+	smf = round((size(obj.frtrc{index}(2:end,:),1))/(size(fcp,1)));
 	
-	fd = repelem(obj.frtrc(2:end,:),max(smref,1),1) - repelem(fcp,max(smf,1),1);
+	fd = repelem(obj.frtrc{index}(2:end,:),max(smref,1),1) - repelem(fcp,max(smf,1),1);
 	
 	n2 = reshape(fd,[],1);
 	perf.fd.l2norm = norm(n2) / sqrt(chip.Nc) / sqrt(ceil(obj.tsim / ctrl.Ts_ctrl));
