@@ -1,4 +1,4 @@
-function [k0, k1, k2] = pws_ls_approx(obj, I, T, Toff, C, alp, alp_I0, using_voltage)
+function [k0, k1, k2] = pws_ls_approx(chip, I, T, Toff, C, alp, alp_I0, using_voltage)
 
 	if (nargin < 8) || isempty(using_voltage)
 		using_voltage = 0;
@@ -9,11 +9,11 @@ function [k0, k1, k2] = pws_ls_approx(obj, I, T, Toff, C, alp, alp_I0, using_vol
 	c = I(1);
 	d = I(2);
 
-	KT = obj.leak_exp_t_k;
-    Ke = obj.leak_exp_k - Toff*KT;
-	KV = obj.leak_exp_vdd_k;
-	Ks = obj.leak_process_k;
-	Kw = obj.leak_vdd_k;
+	KT = chip.leak_exp_t_k;
+    Ke = chip.leak_exp_k - Toff*KT;
+	KV = chip.leak_exp_vdd_k;
+	Ks = chip.leak_process_k;
+	Kw = chip.leak_vdd_k;
 
 	if using_voltage
 
@@ -127,10 +127,10 @@ function [k0, k1, k2] = pws_ls_approx(obj, I, T, Toff, C, alp, alp_I0, using_vol
 		% V0 = C
 		% V0 = C
 
-		%Fint = [obj.F_min obj.F_max];
+		%Fint = [chip.F_min chip.F_max];
 		%Tint = [20 90];
 	
-		%Fint = [2.8 obj.F_Max];
+		%Fint = [2.8 chip.F_Max];
 		%Tint = [60 90];
 	
 		%V0 = 0.9;

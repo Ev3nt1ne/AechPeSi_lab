@@ -249,9 +249,9 @@ classdef cp_mpc < mpc_hpc & CP
 
 	%TODO don't know if these go here!!! or inside MPC!
 	methods
-		function [obj] = init_fnc(obj, hc, Nsim)
+		function [obj] = init_fnc(obj, hc,chip, Nsim)
 
-			obj.initialize(hc, Nsim);
+			obj.initialize(chip, Nsim);
 
             % sparsify
             if obj.cutoffA ~= 0

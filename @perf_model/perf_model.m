@@ -288,11 +288,11 @@ classdef perf_model < handle
 			end %if show
 
 		end
-		function [pwl, res] = quanta2wl(obj, wlp, instr, mem_instr_conv)
+		function [pwl, res] = quanta2wl(obj, wlp, instr, mem_instr_conv, qt_storage)
 			mem_wgt = sum(wlp.*obj.wl_mem_weigth,2).*(instr>0);
 			cinstr = instr.*((1-mem_wgt) + (mem_wgt).*mem_instr_conv); %mem_wgt.*mem_instr_conv.*instr + (1-mem_wgt).*instr;
 						
-			pwl = min(cinstr, obj.qt_storage); %obj.qt_storage./cinstr;
+			pwl = min(cinstr, qt_storage); %qt_storage./cinstr;
 			res = round(instr - pwl.*(instr./cinstr));
 			%((pwl - mem_wgt.*mem_instr_conv) ./ (1-mem_wgt));
 			% saturate to 0

@@ -128,6 +128,18 @@ classdef power_model < handle
 				end				
 			end
         end
+        function [pw_stat_lin, pw_stat_exp, pw_dyn, pw_ceff, ...
+                    core_Pmin, core_Pmax] = power_give_model(obj)
+            pw_stat_lin = [obj.leak_vdd_k, obj.leak_temp_k, obj.leak_process_k];
+            pw_stat_exp = [obj.leak_exp_vdd_k, obj.leak_exp_t_k, obj.leak_exp_k];
+            pw_dyn = [];
+            pw_ceff = obj.dyn_ceff_k;
+            core_Pmin = obj.core_min_power;
+            core_Pmax = obj.core_max_power;
+        end
+        function [FVT] = give_fvtable(obj)
+            FVT = obj.FV_table;
+        end
 	end
 
 	methods

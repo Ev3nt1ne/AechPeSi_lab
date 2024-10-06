@@ -1,4 +1,4 @@
-function [A, B] = create_model(obj, T, pdev, tm_ver)
+function [A, B] = create_model(obj, pdev, tm_ver)
 
 %CREATE_MODEL Summary of this function goes here
 %   Detailed explanation goes here

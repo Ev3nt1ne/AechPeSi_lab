@@ -59,7 +59,7 @@ classdef controller < handle
 	end
 	
 	methods
-		function obj = controller(hpc)
+		function obj = controller(chip)
 			%CONTROLLERS Construct an instance of this class
 			%   Detailed explanation goes here
 			%obj.Property1 = inputArg1 + inputArg2;
@@ -69,26 +69,26 @@ classdef controller < handle
 				obj.osunix = 0;
             end
 
-            obj = obj.initialize(hpc, []);
+            obj = obj.initialize(chip, []);
 
         end
 
-        function obj = initialize(obj, hpc, Nsim)
+        function obj = initialize(obj, chip, Nsim)
 
             obj.ex_count = 0;
 		    obj.lNsim = Nsim;
 
             [obj.Ad_ctrl, obj.Bd_ctrl, obj.Cc, ...
                 obj.lNc, obj.lNh, obj.lNv, ...
-                obj.core_Tcrit] = hpc.thermal_give_model(obj.Ts_ctrl);
+                obj.core_Tcrit] = chip.thermal_give_model(obj.Ts_ctrl);
             obj.lNs = length(obj.Ad_ctrl);
 
             [obj.pw_stat_lin, obj.pw_stat_exp, obj.pw_dyn, obj.pw_ceff, ...
-                obj.lPmin, obj.lPmax, ...
-                obj.lvd, obj.lVDom] = hpc.power_give_model();
+                obj.lPmin, obj.lPmax] = chip.power_give_model();
+            [obj.lvd, obj.lVDom] = chip.domain_give_model();
             obj.lipl = length(obj.pw_ceff);
     
-            obj.lFVT = hpc.give_fvtable();
+            obj.lFVT = chip.give_fvtable();
             obj.lFmin = obj.lFVT(1,3);
             obj.lFmax = obj.lFVT(end,3);
             obj.lVmin = obj.lFVT(1,1);
@@ -97,7 +97,7 @@ classdef controller < handle
 	end
 
 	methods(Abstract=true)
-		[obj] = init_fnc(obj, hpc, Nsim)
+		[obj] = init_fnc(obj, hpc, chip, Nsim)
 		[F,V,obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl)
 		[obj] = cleanup_fnc(obj)
 		[obj] = plot_fnc(obj, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)

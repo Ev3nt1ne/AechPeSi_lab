@@ -1,8 +1,8 @@
-function res = stats_analysis(obj,ctrl,x,u,f,v,w)
+function res = stats_analysis(obj,ctrl,chip,x,u,f,v,w)
 %STATS_ANALYSIS Summary of this function goes here
 %   Detailed explanation goes here
 
-	xcp = x(2:end,:)*obj.Cc' -273.15;
+	xcp = x(2:end,:)*chip.Cc' -273.15;
 	ucp = u(2:end,:);
 	fcp = f(2:end,:);
 	vcp = v(2:end,:);
@@ -13,13 +13,13 @@ function res = stats_analysis(obj,ctrl,x,u,f,v,w)
 	pwct = max(round(size(ucp,1)/max(length(obj.tot_pw_budget)-1,1)),1);
 	pwtb = repelem(obj.tot_pw_budget(min(2, length(obj.tot_pw_budget)):end), pwct ,1);
 
-    maxPbudget = obj.core_max_power*obj.Nc;
+    maxPbudget = chip.core_max_power*chip.Nc;
     ptime = sum(obj.tot_pw_budget < maxPbudget)*obj.Ts_target;
 	
 	% here it is difficult, because if I make it ceil, it will always be ok for
 	% pw budget going down, but never for power budget going up. If I take
 	% floor it will be the opposite. Hope that round will be ok!
-	delay = round((obj.delay_F_max+obj.delay_V_max) / obj.Ts);
+	delay = round((chip.delay_F_max+chip.delay_V_max) / chip.Ts);
 	sidx = delay + pwct;
 	%
 	pwgr = sum(ucp(1+sidx:end,:),2) - pwtb(1:end-sidx);
@@ -45,15 +45,15 @@ function res = stats_analysis(obj,ctrl,x,u,f,v,w)
 	power.exSkew = skewness(pwgr);
 	power.exKurt = kurtosis(pwgr);
 	%
-	power.exTime = sum( sum(ucp(1+sidx:end,:),2) > pwtb(1:end-sidx) ) *obj.Ts;
+	power.exTime = sum( sum(ucp(1+sidx:end,:),2) > pwtb(1:end-sidx) ) *chip.Ts;
     power.exTimeP = power.exTime / ptime;
 	
 	
 	%%%%%%%%%%%%%%%%%%%%%%%%%
 	% Temperature
 	
-	crt = obj.core_crit_temp-273.15;
-	mnt = obj.core_limit_temp-273.15;
+	crt = chip.core_crit_temp-273.15;
+	mnt = chip.core_limit_temp-273.15;
 	
 	temp.Max = max(xcp(:));
 	temp.p95 = prctile(xcp(:),95);
@@ -96,18 +96,18 @@ function res = stats_analysis(obj,ctrl,x,u,f,v,w)
     %   I should do: max(t-mnt(t))
     %temp.exMn.MaxExceed = temp.exMn.Max - mnt;
 	%
-	temp.exCr.TotTime = sum(sum( xcp > crt) *obj.Ts);
-	temp.exCr.StdTime = std(sum( xcp > crt) *obj.Ts);
-	temp.exCr.SkewTime = skewness(sum( xcp > crt) *obj.Ts);
-	temp.exCr.KurtTime = kurtosis(sum( xcp > crt) *obj.Ts);
+	temp.exCr.TotTime = sum(sum( xcp > crt) *chip.Ts);
+	temp.exCr.StdTime = std(sum( xcp > crt) *chip.Ts);
+	temp.exCr.SkewTime = skewness(sum( xcp > crt) *chip.Ts);
+	temp.exCr.KurtTime = kurtosis(sum( xcp > crt) *chip.Ts);
 	%
-	temp.exMn.TotTime = sum(sum( xcp > mnt) *obj.Ts);
-	temp.exMn.StdTime = std(sum( xcp > mnt) *obj.Ts);
-	temp.exMn.SkewTime = skewness(sum( xcp > mnt) *obj.Ts);
-	temp.exMn.KurtTime = kurtosis(sum( xcp > mnt) *obj.Ts);
-	% no need these two: I can divide per obj.Nc
-	temp.exCr.MeanTime = mean(sum( xcp > crt) *obj.Ts);
-	temp.exMn.MeanTime = mean(sum( xcp > mnt) *obj.Ts);
+	temp.exMn.TotTime = sum(sum( xcp > mnt) *chip.Ts);
+	temp.exMn.StdTime = std(sum( xcp > mnt) *chip.Ts);
+	temp.exMn.SkewTime = skewness(sum( xcp > mnt) *chip.Ts);
+	temp.exMn.KurtTime = kurtosis(sum( xcp > mnt) *chip.Ts);
+	% no need these two: I can divide per chip.Nc
+	temp.exCr.MeanTime = mean(sum( xcp > crt) *chip.Ts);
+	temp.exMn.MeanTime = mean(sum( xcp > mnt) *chip.Ts);
     temp.exMn.MeanTimeP = temp.exMn.MeanTime / obj.tsim;
     temp.exCr.MeanTimeP = temp.exCr.MeanTime / obj.tsim;
 	
@@ -204,7 +204,7 @@ function res = stats_analysis(obj,ctrl,x,u,f,v,w)
 	fd = repelem(obj.frtrc(2:end,:),max(smref,1),1) - repelem(fcp,max(smf,1),1);
 	
 	n2 = reshape(fd,[],1);
-	perf.fd.l2norm = norm(n2) / sqrt(obj.Nc) / sqrt(ceil(obj.tsim / ctrl.Ts_ctrl));
+	perf.fd.l2norm = norm(n2) / sqrt(chip.Nc) / sqrt(ceil(obj.tsim / ctrl.Ts_ctrl));
 	%perf.fdAv2norm = mean(norm
 	perf.fd.Max = max(fd(:));
 	perf.fd.min = min(fd(:));

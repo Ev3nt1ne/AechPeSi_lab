@@ -30,7 +30,7 @@ hpc = hpc.create_model_deviation();
 hpc.sensor_noise = 1;
 
 % External Ambient Temperature
-hpc.t_outside = 25.0 + 273.15;
+hpc.temp_amb = 25.0 + 273.15;
 
 
 %% 3: Simulation setup
@@ -205,10 +205,10 @@ max_amb_T = (45+273.15);
 max_init_T = (85 + 273.15) - 25;
 max_elem_T = 55+273.15;
 
-test_T_step = (max_init_T - hpc.t_outside) /  (test_iter-1);
+test_T_step = (max_init_T - hpc.temp_amb) /  (test_iter-1);
 err_ampl = 0.5;
 rand_T_init = rand(hpc.Ns,test_iter)*err_ampl*2 - err_ampl*ones(hpc.Ns,test_iter);
-init_cond = ones(hpc.Ns,1) * (hpc.t_outside:test_T_step:max_init_T);
+init_cond = ones(hpc.Ns,1) * (hpc.temp_amb:test_T_step:max_init_T);
 
 for i=-1:0
     tr = init_cond(end+i,:) > max_amb_T;

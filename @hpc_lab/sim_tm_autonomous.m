@@ -91,7 +91,7 @@ function [] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma, show, save)
 	
 		for s=1:N			
 			%u = obj.power_compute(F,V,obj.C(1:obj.Nc,:)*x,wl,process);
-			x = Adl_true*x + Bdl_true*[u;obj.t_outside*obj.case_fan_nom_speed];
+			x = Adl_true*x + Bdl_true*[u;obj.temp_amb*obj.case_fan_nom_speed];
 			xp(s+1,:) = x;
 			pwp(s+1,:) = u;
 			if sum(s==timestamp)

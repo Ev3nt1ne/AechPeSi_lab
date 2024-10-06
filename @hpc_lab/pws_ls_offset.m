@@ -1,4 +1,4 @@
-function [lut, Vs, Ts, M_var] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
+function [lut, Vs, Ts, M_var] = pws_ls_offset(chip, ctrl, Vslot, Tslot, Tmin, Tmax, show )
 %PWS_LS_OFFSET Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -8,8 +8,8 @@ function [lut, Vs, Ts, M_var] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 
     %add_temp = 0;
 
-	tmin = obj.t_outside;
-	tmax = obj.core_crit_temp;
+	tmin = Tmin;
+	tmax = Tmax;
 	
     %Initially I need to craft a value table/surface
     tsloti = round(tmax-tmin);
@@ -19,11 +19,11 @@ function [lut, Vs, Ts, M_var] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 	slot = (tmax-tmin) / (tsloti-1);
 	T = [tmin:slot:tmax];
     %F
-	%slot = (obj.F_max-obj.F_min) / (vsloti-1);
-	%F = [obj.F_min:slot:obj.F_max];
-	%V = obj.FV_table((sum(F>obj.FV_table(:,3))+1 ),1 );
-    F = obj.FV_table(:,3);
-    V = obj.FV_table(:,1);
+	%slot = (chip.F_max-chip.F_min) / (vsloti-1);
+	%F = [chip.F_min:slot:chip.F_max];
+	%V = chip.FV_table((sum(F>chip.FV_table(:,3))+1 ),1 );
+    F = chip.FV_table(:,3);
+    V = chip.FV_table(:,1);
 
     %T = T(1:end-1);
     %F = F(1:end-1);
@@ -37,7 +37,7 @@ function [lut, Vs, Ts, M_var] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
 	
     for i=1:length(T)
 		for j=1:length(V)
-			ps = obj.ps_compute(V(j), T(i),1,0);
+			ps = chip.ps_compute(V(j), T(i),1,0);
 			%TODO: evaluate WHY is the one below, and not above!
 			linps = h1*(T(i)+ctrl.Tmpc_off) + h2*F(j)*V(j)^2 + h0;
 			%linps = h1*(T(i)+Toff) + h2*F(j)^(2*alp+1) + h0;
@@ -252,24 +252,24 @@ end
     %% OLD considerations
 	% T:
 
-    %P0 = obj.ps_compute(obj.V_min, tmin,1,0);
-	%P1 = obj.ps_compute(obj.V_max, tmax,1,0);
+    %P0 = chip.ps_compute(chip.V_min, tmin,1,0);
+	%P1 = chip.ps_compute(chip.V_max, tmax,1,0);
 	
     %slot = (P1-P0) / (Tslot);
 	%v = [P0:slot:P1];
 	
 	%TODO: this depends on the model I should have something like "inverse..."
-	%vm = (obj.V_min + obj.V_max) / 2;
-	%slot = (obj.V_max - obj.V_min) / Tslot
-	%vp = [obj.V_min:slot:obj.V_max]
-	%T1 = ( log(v/(obj.V_min*obj.leak_vdd_k + obj.leak_process_k)) ...
-	%	- obj.leak_exp_vdd_k*obj.V_min - obj.leak_exp_k ) / obj.leak_exp_t_k
-	%T2 = ( log(v/(obj.V_max*obj.leak_vdd_k + obj.leak_process_k)) ...
-	%	- obj.leak_exp_vdd_k*obj.V_max - obj.leak_exp_k ) / obj.leak_exp_t_k;
-	%T3 = ( log(v/(vm*obj.leak_vdd_k + obj.leak_process_k)) ...
-	%	- obj.leak_exp_vdd_k*vm - obj.leak_exp_k ) / obj.leak_exp_t_k
-	%T4 = ( log(v./(vp*obj.leak_vdd_k + obj.leak_process_k)) ...
-	%	- obj.leak_exp_vdd_k*vp - obj.leak_exp_k ) / obj.leak_exp_t_k
+	%vm = (chip.V_min + chip.V_max) / 2;
+	%slot = (chip.V_max - chip.V_min) / Tslot
+	%vp = [chip.V_min:slot:chip.V_max]
+	%T1 = ( log(v/(chip.V_min*chip.leak_vdd_k + chip.leak_process_k)) ...
+	%	- chip.leak_exp_vdd_k*chip.V_min - chip.leak_exp_k ) / chip.leak_exp_t_k
+	%T2 = ( log(v/(chip.V_max*chip.leak_vdd_k + chip.leak_process_k)) ...
+	%	- chip.leak_exp_vdd_k*chip.V_max - chip.leak_exp_k ) / chip.leak_exp_t_k;
+	%T3 = ( log(v/(vm*chip.leak_vdd_k + chip.leak_process_k)) ...
+	%	- chip.leak_exp_vdd_k*vm - chip.leak_exp_k ) / chip.leak_exp_t_k
+	%T4 = ( log(v./(vp*chip.leak_vdd_k + chip.leak_process_k)) ...
+	%	- chip.leak_exp_vdd_k*vp - chip.leak_exp_k ) / chip.leak_exp_t_k
 	
 	%Tl = (T1+T2+T3+T4)/ 4
 	

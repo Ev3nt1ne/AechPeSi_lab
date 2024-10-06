@@ -1,4 +1,4 @@
-classdef hpc_lab < thermal_model & power_model & perf_model & handle
+classdef hpc_lab < handle
 	%HPC_LAB Summary of this class goes here
 	%   Detailed explanation goes here
 	
@@ -7,23 +7,14 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 		tasim = 2; % Free Simulation Time in [s]
 		tsim = 1;					% Simulation Time in [s]
 		t_init;
-		t_outside = 25+273;
+        temp_amb (1,1) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
+			= 25.0 + 273.15;	% External Ambient Temperature
+
 		
 		Ts_target (1,1) {mustBePositive, mustBeNumeric, mustBeFinite} ...
 			= 1e-3;			% Commands min Ts, old Ts_input
 
-		vd (1,1) {mustBePositive, mustBeInteger} ...
-			= 3;		% Voltage/Power Domains
-		VDom {mustBeNonnegative, mustBeNumericOrLogical, mustBeNonempty, mustBeLessThanOrEqual(VDom,1)} ...
-			= [1 0 0; 1 0 0; 0 1 0; 0 1 0; 1 0 0; 1 0 0; 0 1 0; 0 1 0; 0 0 1; 0 0 1; 0 0 1; 0 0 1];		% Structure of the Voltage Domains Nc x vd
 		
-
-		%measure_noise = 1;
-		sensor_noise (1,1) {mustBeNonnegative, mustBeNumericOrLogical} ...
-			= 1;
-		%T_noise_max = 1.0;
-		sensor_noise_amplitude (3,1) {mustBeNonnegative, mustBeNumeric, mustBeNonempty, mustBeFinite} ...
-			= [1.0; 1.0; 1.0];	% Process, Voltage, Temperature amplitudes.
 
 		graph_show = 1;
 		graph_save = 0;
@@ -82,11 +73,9 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 
 
 	properties(SetAccess=immutable, GetAccess=public)
+
 		customColormap;
 		
-		PVT_P = 1;
-		PVT_V = 2;
-		PVT_T = 3;
 	end
 	
 	%% Gerenal Methods
@@ -116,11 +105,11 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			obj.pmc_need_update = 0;
 
 			obj.get_size(obj);
-		end		
-		function obj = anteSimCheckLab(obj)
+        end        
+        function obj = anteSimCheckLab(obj, chip)
 			% Check if the floorplan has been updated
 			lastwarn('');
-			obj.VDom = obj.VDom;
+			chip.VDom = chip.VDom;
 			[msgstr, ~] = lastwarn;
 			if ~isempty(msgstr)
 				warning("[LAB] Incorrect dimension of VDom (voltage domains configuration)!")
@@ -130,49 +119,40 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 				definput = {'1'};
 				usrin = inputdlg(prompt,dlgtitle,fieldsize,definput);
 				if usrin{1} == '1'
-					obj.default_VDom_config();
+					chip.VDom = obj.default_VDom_config(chip.Nh, chip.Nv, chip.vd);
 				else
 					error("[LAB] VDom has not the correct dimension");
 				end				
 			end
         end
+		
         %Move This:
-        function [pw_stat_lin, pw_stat_exp, pw_dyn, pw_ceff, ...
-                    core_Pmin, core_Pmax, ...
-                    lvd, lVDom] = power_give_model(obj)
-            pw_stat_lin = [obj.leak_vdd_k, obj.leak_temp_k, obj.leak_process_k];
-            pw_stat_exp = [obj.leak_exp_vdd_k, obj.leak_exp_t_k, obj.leak_exp_k];
-            pw_dyn = [];
-            pw_ceff = obj.dyn_ceff_k;
-            core_Pmin = obj.core_min_power;
-            core_Pmax = obj.core_max_power;
-            
-            lvd = obj.vd;
-            lVDom = obj.VDom;
-        end
-        function [FVT] = give_fvtable(obj)
-            FVT = obj.FV_table;
-        end
-		%TODO: not working, need to fix!
-        function obj = default_VDom_config(obj)
+		function obj = taas_fix(obj, wl)
+			obj.pmc_need_update = 0;
+			obj.perf_max_check = wl;
+		end
+	end
+	methods(Static)
+        %TODO: not working, need to fix!
+        function VDom = default_VDom_config(Nh, Nv, vd)
             %above part need to be tested
-			vNh = obj.Nh;
-			vNv = obj.Nv;
+			vNh = Nh;
+			vNv = Nv;
 			cuts = [1 1];
             vddone = (cuts(1)+1)*(cuts(2)+1); %0
-			while (vddone < obj.vd)
+			while (vddone < vd)
 			
 				fr = vNh>vNv;
 				cuts = cuts + [fr, ~fr];
-				vNh = obj.Nh/cuts(1);
-				vNv = obj.Nv/cuts(2);
+				vNh = Nh/cuts(1);
+				vNv = Nv/cuts(2);
 			
-				tt = cuts>[obj.Nh, obj.Nv];
-				cuts = tt.*[obj.Nh, obj.Nv] + ~tt.*cuts;
+				tt = cuts>[Nh, Nv];
+				cuts = tt.*[Nh, Nv] + ~tt.*cuts;
 				vNh = vNh*(vNh>1) + (vNh<=1);
 				vNv = vNv*(vNv>1) + (vNv<=1);
 			
-				if (cuts(2)==obj.Nv) && (cuts(1)==obj.Nh)
+				if (cuts(2)==Nv) && (cuts(1)==Nh)
 					break;
 				end
 			
@@ -181,27 +161,21 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			
             % this needs to be fixed, problably you should define a
             %   sequence of cuts and then have a cut index
-			steps = floor([obj.Nh, obj.Nv] ./ (cuts+1));
-			tbfd = vddone > obj.vd;
+			steps = floor([Nh, Nv] ./ (cuts+1));
+			tbfd = vddone > vd;
 			
-			obj.VDom = zeros(obj.Nc, obj.vd);
-			for i=1:obj.Nh
-				for j=1:obj.Nv
+			VDom = zeros(Nh*Nv, vd);
+			for i=1:Nh
+				for j=1:Nv
 					dom = floor((i-1)/steps(1)) + floor((j-1)/steps(2))*cuts(1) + 1;
 					%fixing odd vd
 					dom = dom + (dom>1)*tbfd*(-1);
-					dom = dom*(dom<=obj.vd) + obj.vd*(dom>obj.vd);
-					idx = (i-1)*obj.Nv + j; %(i + (j-1)*obj.Nh);
-					obj.VDom(idx, dom) = 1;
+					dom = dom*(dom<=vd) + vd*(dom>vd);
+					idx = (i-1)*Nv + j; %(i + (j-1)*Nh);
+					VDom(idx, dom) = 1;
 				end
 			end
 		end
-		function obj = taas_fix(obj, wl)
-			obj.pmc_need_update = 0;
-			obj.perf_max_check = wl;
-		end
-	end
-	methods(Static)
 		function totSize = get_size(class) 
 			props = properties(class); 
 			totSize = 0;
@@ -248,25 +222,25 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 	%% Simulations
 	methods
 		[] = sim_tm_autonomous(obj, ts, Nsample, exp_gamma)
-		[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = simulation(obj, ctrl, ctrl_fcn)
-		function [obj] = init_compute_model(obj, A, B)
-			obj.qt_storage = obj.quantum_instr*ones(obj.Nc, 1);
-			obj.wl_index = ones(obj.Nc, 1);
-			obj.F_cng_times = zeros(obj.Nc,1);
-			obj.V_cng_times = zeros(obj.vd,1);
-			obj.F_cng_us = zeros(obj.Nc,1);
-			obj.V_cng_us = zeros(obj.vd,1);
-			obj.F_cng_error = zeros(obj.Nc,1);
-			obj.V_cng_error = zeros(obj.vd,1);
+		[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = simulation(obj, ctrl, chip, show)
+		function [obj] = init_compute_model(obj, A, B, Nc, vd, chip)
+			obj.qt_storage = chip.quantum_instr*ones(Nc, 1);
+			obj.wl_index = ones(Nc, 1);
+			obj.F_cng_times = zeros(Nc,1);
+			obj.V_cng_times = zeros(vd,1);
+			obj.F_cng_us = zeros(Nc,1);
+			obj.V_cng_us = zeros(vd,1);
+			obj.F_cng_error = zeros(Nc,1);
+			obj.V_cng_error = zeros(vd,1);
 
-			obj.F_T = obj.F_min*ones(obj.Nc,1);
-			obj.V_T = obj.V_min*ones(obj.vd,1);
-			obj.F_s = obj.F_min*ones(obj.Nc,1);
-			obj.V_s = obj.V_min*ones(obj.vd,1);
-			obj.delay_F_index = zeros(obj.Nc,1);
-			obj.delay_V_index = zeros(obj.vd,1);
-			obj.delay_F_div = ceil(obj.delay_F_mean / obj.Ts);
-			obj.delay_V_div = ceil(obj.delay_V_mean / obj.Ts);
+			obj.F_T = chip.F_min*ones(Nc,1);
+			obj.V_T = chip.V_min*ones(vd,1);
+			obj.F_s = chip.F_min*ones(Nc,1);
+			obj.V_s = chip.V_min*ones(vd,1);
+			obj.delay_F_index = zeros(Nc,1);
+			obj.delay_V_index = zeros(vd,1);
+			obj.delay_F_div = ceil(chip.delay_F_mean / chip.Ts);
+			obj.delay_V_div = ceil(chip.delay_V_mean / chip.Ts);
 			obj.A_s = A;
 			obj.B_s = B;
 			% cannot put it here, if I want it to be constant among several
@@ -277,15 +251,15 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			%obj = obj.create_thermal_model_noise();
 			%end
 		end
-		function [uplot, xplot, d_is, pw_ms, obj] = compute_model(obj, N, x, V, F, d_p)
+		function [uplot, xplot, d_is, pw_ms, obj] = compute_model(obj, N, x, V, F, d_p, chip)
 			
-			d_is = zeros(1,obj.ipl);
+			d_is = zeros(1,chip.ipl);
 			%delay_F_index = zeros(obj.Nc,1);
 			%delay_V_index = zeros(obj.vd,1);		
 			pw_ms = 0;			
 			
-			uplot = zeros(N, obj.Nc);
-			xplot = zeros(N, obj.Ns);
+			uplot = zeros(N, length(F));
+			xplot = zeros(N, length(x));
 
 			%F
 			ttd = (obj.delay_F_index > 0)|(obj.F_T ~= obj.F_s);
@@ -325,16 +299,16 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 
 				%noise 
 
-				instr = obj.F_s * 1e9 * (obj.Ts);
-				wl = zeros(obj.Nc, obj.ipl);
-				wld = zeros(obj.Nc, 1);
+				instr = obj.F_s * 1e9 * (chip.Ts);
+				wl = zeros(chip.Nc, chip.ipl);
+				wld = zeros(chip.Nc, 1);
 				while (sum(instr) > 0)
 					vidx = max(mod(obj.wl_index, size(obj.wltrc,3)),1);
 					[m,n,l] = size(obj.wltrc);
 					idx = sub2ind([m,n,l],repelem(1:m,1,n),repmat(1:n,1,m),repelem(vidx(:).',1,n));
 					wlp = reshape(obj.wltrc(idx),[],m).';
 					
-					[pwl, instr] = obj.quanta2wl(wlp, instr, (obj.F_min./obj.F_s));					
+					[pwl, instr] = chip.quanta2wl(wlp, instr, (chip.F_min./obj.F_s), obj.qt_storage);					
 
 					% add to accumulator
 					wld = wld + pwl;
@@ -343,7 +317,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 					% compute new values
 					obj.qt_storage = obj.qt_storage - pwl;
 					ttwl = (obj.qt_storage<=0);
-					obj.qt_storage = obj.qt_storage + obj.quantum_instr .* ttwl;
+					obj.qt_storage = obj.qt_storage + chip.quantum_instr .* ttwl;
 					obj.wl_index = obj.wl_index + ttwl;
 				end
 
@@ -351,7 +325,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 
 				d_is = d_is + wl;
 
-				pu_s = obj.power_compute(obj.F_s,obj.VDom*obj.V_s,obj.C(1:obj.Nc,:)*x,wl,d_p);
+				pu_s = chip.power_compute(obj.F_s,chip.VDom*obj.V_s,chip.C(1:chip.Nc,:)*x,wl,d_p);
 				pw_ms = pw_ms + sum(pu_s);
 				x = obj.A_s*x + obj.B_s*[pu_s;obj.temp_amb*1000];		
 
@@ -364,9 +338,9 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 	end
 
 	%% Approximation
-	methods
-		[k0, k1, k2] = pws_ls_approx(obj, I, T, Toff, C, alp, alp_I0, using_voltage)
-		[lut, F, T, M_var] = pws_ls_offset(obj, ctrl, Vslot, Tslot, show )
+	methods(Static)
+		[k0, k1, k2] = pws_ls_approx(chip, I, T, Toff, C, alp, alp_I0, using_voltage)
+		[lut, F, T, M_var] = pws_ls_offset(chip, ctrl, Vslot, Tslot, Tmin, Tmax, show )
     end
 
     %% Populate Controllers
@@ -392,48 +366,48 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 		end
 	end
 	methods
-		function [fig] = xutplot(obj,x,u)
-			t = [0:1:length(x)-1]*obj.Ts;
+		function [fig] = xutplot(obj,chip,x,u)
+			t = [0:1:length(x)-1]*chip.Ts;
 			fig = figure('Name', 'T-P Evolution');
 			movegui(fig, 'northwest');
-			sbp = 1 + obj.full_model_layers + (obj.add_states>0);
+			sbp = 1 + chip.full_model_layers + (chip.add_states>0);
 			%TODO: make it parametric. Also make the names of add_state
 			%		parametric in thermal_model
 			ax1=subplot(sbp,1,1);
-			plot(t, x(:,1+end-obj.add_states:end)-273.15);
+			plot(t, x(:,1+end-chip.add_states:end)-273.15);
 			grid on,xlabel('Time [s]'),ylabel('Others [°C]'), hold on;
 			legend("Heat-sink", "PCB", "Motherboard", "Air");
 			%
 			ax2=subplot(sbp,1,2);
-			plot(t, x(:,2:2:end-obj.add_states)-273.15);
+			plot(t, x(:,2:2:end-chip.add_states)-273.15);
 			grid on,xlabel('Time [s]'),ylabel('Heat Spreader (Cu) [°C]'),hold on;
 			%
 			ax3=subplot(sbp,1,3);
-			plot(t, x(:,1:2:end-obj.add_states)-273.15);
+			plot(t, x(:,1:2:end-chip.add_states)-273.15);
 			grid on,xlabel('Time [s]'),ylabel('Cores (Si) [°C]'), hold on;
-			if max(max(x(:,1:2:end-1))) >= (obj.core_limit_temp-(0.1*(obj.core_limit_temp-273)))
-				yline(obj.core_limit_temp-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
+			if max(max(x(:,1:2:end-1))) >= (chip.core_limit_temp-(0.1*(chip.core_limit_temp-273)))
+				yline(chip.core_limit_temp-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
 			end
 			%
 			ax4=subplot(sbp,1,sbp);
 			plot(t, u);
 			grid on,xlabel('Time [s]'),ylabel('Cores Power Output [W]'), hold on;
-			if max(max(u)) >= (obj.core_max_power-(0.34*obj.core_max_power))
-				yline(obj.core_max_power, '--', 'Max Power', 'LineWidth',1,  'Color', 'b');
+			if max(max(u)) >= (chip.core_max_power-(0.34*chip.core_max_power))
+				yline(chip.core_max_power, '--', 'Max Power', 'LineWidth',1,  'Color', 'b');
 			end
-			if min(min(u)) <= (obj.core_min_power+(0.34*obj.core_max_power))
-				yline(obj.core_min_power, '--','min Power', 'LineWidth',1,  'Color', 'b');
+			if min(min(u)) <= (chip.core_min_power+(0.34*chip.core_max_power))
+				yline(chip.core_min_power, '--','min Power', 'LineWidth',1,  'Color', 'b');
 			end
 			
 			linkaxes([ax1,ax2,ax3,ax4],'x');
 		end
-		function [fig] = powerconstrplot(obj,u1,u2)
+		function [fig] = powerconstrplot(obj,chip,u1,u2)
 						
 			fig = figure('Name', 'Power Constraints Compliance');
 			movegui(fig, 'southeast');
 			title('Power Constraints analysis')
 			
-			t1 = [0:1:length(u1)-1]*obj.Ts;
+			t1 = [0:1:length(u1)-1]*chip.Ts;
 			
 			ax1 = subplot(3,4,[1:4]);
 			gr = sum(u1,2);
@@ -446,12 +420,12 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			%if max(gr) >= obj.usum(1)*0.2
 			plot([0:max(length(obj.tot_pw_budget)-1,1)]*(obj.tsim/max(length(obj.tot_pw_budget)-1,1)),[obj.tot_pw_budget], '--', 'LineWidth',1,  'Color', '#CC0000');
 			ax2 = subplot(3,4,[5:8]);
-			p = plot(t1,u1*obj.VDom, '.');
+			p = plot(t1,u1*chip.VDom, '.');
 			grid on,title('Domain Power'),ylabel('[W]'),xlabel('Time [s]'),hold on;
 			if ((nargin >=4) && (isempty(u2)==0))
-				p = plot(t1,u2*obj.VDom);
+				p = plot(t1,u2*chip.VDom);
 			end
-			for pl=1:obj.vd
+			for pl=1:chip.vd
 				plot([0:max(size(obj.quad_pw_budget,1)-1,1)]*(obj.tsim/max(size(obj.quad_pw_budget,1)-1,1)), [obj.quad_pw_budget], '--', 'LineWidth',1,  'Color', p(pl).Color);
 			end
 			
@@ -461,13 +435,13 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			
 			pbt = repelem(obj.tot_pw_budget(min(2, length(obj.tot_pw_budget)):end),max(round(size(u1,1)/max(length(obj.tot_pw_budget)-1,1)),1),1);
 			pbq = repelem(obj.quad_pw_budget(min(2, size(obj.quad_pw_budget,1)):end,:),max(round(size(u1,1)/max(size(obj.quad_pw_budget,1)-1,1)),1),1 );
-			gr1 = [sum(sum(u1,2) > pbt)*obj.Ts; ...
-					sum( (u1*obj.VDom) > pbq )'*obj.Ts];
+			gr1 = [sum(sum(u1,2) > pbt)*chip.Ts; ...
+					sum( (u1*chip.VDom) > pbq )'*chip.Ts];
 			
-			ttqt = [sum( (sum(u1,2) > pbt)>0 ); sum( ((u1*obj.VDom) > pbq )>0 )'];
+			ttqt = [sum( (sum(u1,2) > pbt)>0 ); sum( ((u1*chip.VDom) > pbq )>0 )'];
 			ttqt(ttqt<1) = 1;
 			gp1 = [ sum((sum(u1,2) - pbt).*(sum(u1,2) > pbt)) / ttqt(1); ...
-				sum( ((u1*obj.VDom) - pbq).*((u1*obj.VDom) > pbq))' ./  ttqt(2:end)];
+				sum( ((u1*chip.VDom) - pbq).*((u1*chip.VDom) > pbq))' ./  ttqt(2:end)];
 			
 			if (nargin < 4) || isempty(u2)
 				BAR1 = [gr1(1) 0];
@@ -475,7 +449,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			else
 				%TODO:
 				%u2 = u2(2:end,:);
-				%gr2 = [sum(sum(u2,2) > obj.tot_pw_budget)*obj.Ts; sum( (u2*obj.VDom)' > obj.quad_pw_budget, 2 )*obj.Ts];
+				%gr2 = [sum(sum(u2,2) > obj.tot_pw_budget)*chip.Ts; sum( (u2*chip.VDom)' > obj.quad_pw_budget, 2 )*chip.Ts];
 				%BAR1 = [gr1(1) gr2(1) 0 0];
 				%BAR2 = [0 0 gp1(1) gp2(1)];
 			end
@@ -490,7 +464,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			for pb = 1:2:floor(length(b)/2)
 				xtips = b(pb).XEndPoints;
 				ytips = b(pb).YEndPoints;
-				labels = string(round(b(pb).YData/(dim*obj.Ts)*100,2))+'%';
+				labels = string(round(b(pb).YData/(dim*chip.Ts)*100,2))+'%';
 				text(xtips,ytips,labels,'HorizontalAlignment','center',...
 					'VerticalAlignment','bottom');
 			end			
@@ -499,9 +473,9 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			b2 = bar(1, BAR2);
 			grid on,ylabel('\DeltaPw [W]');
 			%axr = gca;
-			%bar(BAR/(dim*obj.Ts)*100, 'FaceColor', "#0072BD");
+			%bar(BAR/(dim*chip.Ts)*100, 'FaceColor', "#0072BD");
 			%axr.Color = 'none';
-			%axr.YTick = axl.YTick/(dim*obj.Ts)*100;
+			%axr.YTick = axl.YTick/(dim*chip.Ts)*100;
 			%ylabel('[%]');
 
 			
@@ -515,49 +489,49 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			end
 			%yyaxis left
 			%axl = gca; % current axes
-			b = bar(1:obj.vd, BAR1);
+			b = bar(1:chip.vd, BAR1);
 			%axl.Color = 'none';
 			grid on,xlabel('Domain'),ylabel('Time [s]');
 			
 			for pb = 1:2:floor(length(b)/2)
 				xtips = b(pb).XEndPoints;
 				ytips = b(pb).YEndPoints;
-				labels = string(round(b(pb).YData/(dim*obj.Ts)*100,2))+'%';
+				labels = string(round(b(pb).YData/(dim*chip.Ts)*100,2))+'%';
 				text(xtips,ytips,labels,'HorizontalAlignment','center',...
 					'VerticalAlignment','bottom');
 			end
 			
 			yyaxis right
-			b2 = bar(1:obj.vd, BAR2);
+			b2 = bar(1:chip.vd, BAR2);
 			grid on,ylabel('\DeltaPw [W]');
 			
 			%axr = gca;
-			%bar(BAR/(dim*obj.Ts)*100, 'FaceColor', "#0072BD");
+			%bar(BAR/(dim*chip.Ts)*100, 'FaceColor', "#0072BD");
 			%axr.Color = 'none';
-			%axr.YTick = axl.YTick/(dim*obj.Ts)*100;
+			%axr.YTick = axl.YTick/(dim*chip.Ts)*100;
 			%ylabel('[%]');
 
 		end
-		function [fig] = tempconstrplot(obj,x1,x2)
+		function [fig] = tempconstrplot(obj,chip,x1,x2)
 			
 			x1 = x1(2:end,:);
 			dim = size(x1,1);
 			%dim2 = dim
-			gr1=obj.C(1:obj.Nc,:)*sum(x1 > obj.core_limit_temp)';
-			tt1 = sum(x1 > obj.core_limit_temp);
+			gr1=chip.C(1:chip.Nc,:)*sum(x1 > chip.core_limit_temp)';
+			tt1 = sum(x1 > chip.core_limit_temp);
 			tt1(tt1==0) = 1;
-			gt1=obj.C(1:obj.Nc,:)*(sum( (x1 - obj.core_limit_temp) .* (x1 > obj.core_limit_temp)) ./ tt1 )';
+			gt1=chip.C(1:chip.Nc,:)*(sum( (x1 - chip.core_limit_temp) .* (x1 > chip.core_limit_temp)) ./ tt1 )';
 
-			if (nargin < 3) || isempty(x2)
-				BAR1 = [sum(obj.Ts*gr1)/obj.Nc 0];
+			if (nargin < 4) || isempty(x2)
+				BAR1 = [sum(chip.Ts*gr1)/chip.Nc 0];
 				BAR2 = [0 sum(gt1)/sum(tt1>1)];
 			else
 				x2 = x2(2:end,:);
-				gr2=obj.C(1:obj.Nc,:)*sum(x2 > obj.core_limit_temp)';
-				tt2 = sum(x2 > obj.core_limit_temp);
+				gr2=chip.C(1:chip.Nc,:)*sum(x2 > chip.core_limit_temp)';
+				tt2 = sum(x2 > chip.core_limit_temp);
 				tt2(tt2==0) = 1;
-				gt2=obj.C(1:obj.Nc,:)*(sum( (x2 - obj.core_limit_temp) .* (x2 > obj.core_limit_temp)) ./ tt2 )';
-				BAR1 = [sum(obj.Ts*gr1)/obj.Nc sum(obj.Ts*gr2)/obj.Nc 0 0 ];
+				gt2=chip.C(1:chip.Nc,:)*(sum( (x2 - chip.core_limit_temp) .* (x2 > chip.core_limit_temp)) ./ tt2 )';
+				BAR1 = [sum(chip.Ts*gr1)/chip.Nc sum(chip.Ts*gr2)/chip.Nc 0 0 ];
 				BAR2 = [0 0 sum(gt1)/sum(tt1>1) sum(gt2)/sum(tt2>1)];
 			end			
 			
@@ -571,7 +545,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			for pb = 1:2:floor(length(b)/2)
 				xtips = b(pb).XEndPoints;
 				ytips = b(pb).YEndPoints;
-				labels = string(round(b(pb).YData/(dim*obj.Ts)*100,2))+'%';
+				labels = string(round(b(pb).YData/(dim*chip.Ts)*100,2))+'%';
 				text(xtips,ytips,labels,'HorizontalAlignment','center',...
 					'VerticalAlignment','bottom');
 			end
@@ -579,64 +553,64 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			b2 = bar(1,BAR2);
 			yl = ylabel('\DeltaT_{crit} [°C]');grid on;
 			%yl.Position(2) = 0;
-			%BAR = [(sum(gr1)/obj.Nc/(dim)*100)' (sum(gr2)/obj.Nc/(dim)*100)'];
+			%BAR = [(sum(gr1)/chip.Nc/(dim)*100)' (sum(gr2)/chip.Nc/(dim)*100)'];
 			%bar(BAR,'FaceColor', "#0072BD");
 			%ylabel('[%]');
 
 			subplot(5,4,[2:4, 6:8, 10:12])
-			if (nargin < 3) || isempty(x2)
-				BAR1 = [obj.Ts*gr1 zeros(obj.Nc,1)];
-				BAR2 = [zeros(obj.Nc,1) gt1];
+			if (nargin < 4) || isempty(x2)
+				BAR1 = [chip.Ts*gr1 zeros(chip.Nc,1)];
+				BAR2 = [zeros(chip.Nc,1) gt1];
 			else
-				BAR1 = [obj.Ts*gr1 obj.Ts*gr2 zeros(obj.Nc,1) zeros(obj.Nc,1)];
-				BAR2 = [zeros(obj.Nc,1) zeros(obj.Nc,1) gt1 gt2];
+				BAR1 = [chip.Ts*gr1 chip.Ts*gr2 zeros(chip.Nc,1) zeros(chip.Nc,1)];
+				BAR2 = [zeros(chip.Nc,1) zeros(chip.Nc,1) gt1 gt2];
 			end
 			%yyaxis left
-			b = bar(1:obj.Nc, BAR1);
+			b = bar(1:chip.Nc, BAR1);
 			ylabel('Time [s]'),xlabel('Core'),grid on;
 			%{
 			for pb = 1:2:floor(length(b)/2)
 				xtips = b(pb).XEndPoints;
 				ytips = b(pb).YEndPoints;
-				labels = string(round(b(pb).YData/(dim*obj.Ts)*100,2))+'%';
+				labels = string(round(b(pb).YData/(dim*chip.Ts)*100,2))+'%';
 				text(xtips,ytips,labels,'HorizontalAlignment','center',...
 					'VerticalAlignment','bottom');
 			end
 			%}
 			yyaxis right
-			b2 = bar(1:obj.Nc, BAR2);
+			b2 = bar(1:chip.Nc, BAR2);
 			ylabel('\DeltaT_{crit} [°C]'),grid on;
 			%BAR = [(gr1/(dim)*100)' (gr2/(dim)*100)'];
 			%bar(BAR,'FaceColor', "#0072BD");
 			%ylabel('[%]');
-			%total_temp_violation = (obj.Ts*sum(gr))
+			%total_temp_violation = (chip.Ts*sum(gr))
 			
 			subplot(5,4,[13:20])
-			if (nargin < 3) || isempty(x2)
-				BAR1 = [obj.C(1:obj.Nc,:)*max(x1,[],1)' - 273.15, zeros(obj.Nc,1)];
-				BAR2 = [zeros(obj.Nc,1), obj.C(1:obj.Nc,:)*mean(x1)' - 273.15];
+			if (nargin < 4) || isempty(x2)
+				BAR1 = [chip.C(1:chip.Nc,:)*max(x1,[],1)' - 273.15, zeros(chip.Nc,1)];
+				BAR2 = [zeros(chip.Nc,1), chip.C(1:chip.Nc,:)*mean(x1)' - 273.15];
 				ymlj = min(x1, [], "all");
 			else
-				BAR = [obj.C(1:obj.Nc,:)*max(x1,[],1)' obj.C(1:obj.Nc,:)*max(x2,[],1)'] - 273.15;
+				BAR = [chip.C(1:chip.Nc,:)*max(x1,[],1)' chip.C(1:chip.Nc,:)*max(x2,[],1)'] - 273.15;
 				ymlj = min(min(x1, [], "all"),  min(x2, [], "all"));
 			end
 			
-			b = bar(1:obj.Nc, BAR1);
+			b = bar(1:chip.Nc, BAR1);
 			yl = ylim;
 			ylim([min(min(obj.t_init), ymlj)-273.15, yl(2)]);
 			ylabel('T_{Max} [°C]'),xlabel('Core'),grid on;
 			hold on;
-			plot(xlim, [obj.core_limit_temp obj.core_limit_temp]-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
+			plot(xlim, [chip.core_limit_temp chip.core_limit_temp]-273.15, '--', 'LineWidth',1,   'Color', '#CC0000');
 			
 			ylp = ylim;
 			
 			yyaxis right
-			b2 = bar(1:obj.Nc, BAR2);
+			b2 = bar(1:chip.Nc, BAR2);
 			ylabel('T_{Average} [°C]'),grid on;
 			ylim(ylp);
 
 		end
-		function [fig] = fvplot(obj, f, v)
+		function [fig] = fvplot(obj, chip, f, v)
 			
 			fig = figure('Name', 'Frequency-Voltage-Domains Graphs');
 
@@ -648,12 +622,12 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			cp = 2;
 			taken = 1;
 			stop = 0;
-			for i=1:obj.vd
+			for i=1:chip.vd
 				rp = 1+i;
 				if (mod(rp,4)==0) || (mod(rp,3)==0) || (rp == 2)
 					taken = min([ceil(rp/3) ceil(rp/2) ceil(rp/4)]);
 					for j=2:2:rp			
-						if (rp-taken)*j >= obj.vd
+						if (rp-taken)*j >= chip.vd
 							stop = 1;
 							cp = j;
 							break;
@@ -684,22 +658,22 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			xlim([0 obj.tsim]);
 			
 			axi = [];
-			dim = sum(obj.VDom);
-			for d=1:obj.vd
+			dim = sum(chip.VDom);
+			for d=1:chip.vd
 				axi = [axi subplot(rp,cp,taken*cp+d)];
 				hold on;
-				idx = obj.VDom(:,d).*[1:1:obj.Nc]';
+				idx = chip.VDom(:,d).*[1:1:chip.Nc]';
 				idx = idx(idx>0);
 				plot(t, f(:,idx));
-				idx = sum((v(:,d) * ones(1,obj.FV_levels)) > obj.FV_table(:,1)',2) + 1;
-				plot(t, obj.FV_table(idx,3), '--', 'LineWidth',1, 'Color', "#0000FF");
+				idx = sum((v(:,d) * ones(1,chip.FV_levels)) > chip.FV_table(:,1)',2) + 1;
+				plot(t, chip.FV_table(idx,3), '--', 'LineWidth',1, 'Color', "#0000FF");
 				grid on,xlabel('Time [s]'), ylabel(strcat("Applied Freq [GHz] - Domain: ", int2str(d)));
 				xlim([0 obj.tsim]);
 			end
 
 			linkaxes([ax1,ax2, axi],'x');
 		end
-		function [fig] = perfplot(obj, f, w)
+		function [fig] = perfplot(obj, chip, f, w)
 
 			font_size = 6;
 			
@@ -711,7 +685,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			smf = round(max((size(obj.frtrc,1)-1),1)/max((size(f,1)-1),1));
 			
 			gr = repelem(f(2:1:end,:),max(smf,1),1) - repelem(obj.frtrc(2:end,:),max(smref,1),1);
-			plot(obj.tsim*[0:(1/size(gr,1)):1]', [zeros(1,obj.Nc); gr]);
+			plot(obj.tsim*[0:(1/size(gr,1)):1]', [zeros(1,chip.Nc); gr]);
 			grid on,xlabel('Time [s]'), ylabel('Reference Difference [GHz]');
 			
 			subplot(3,4,[5:6]);
@@ -728,7 +702,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			
 			subplot(3,4,7);
 			%av = sum(obj.frtrc(2:end,:)) / size(obj.frtrc(2:end,:),1);
-			b = bar(sum(gr)*obj.VDom/size(gr,1)./(av*obj.VDom)*100);
+			b = bar(sum(gr)*chip.VDom/size(gr,1)./(av*chip.VDom)*100);
 			for pb = 1:length(b)
 				xtips = b(pb).XEndPoints;
 				ytips = b(pb).YEndPoints;
@@ -778,13 +752,13 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			grid on,xlabel('Cores'), ylabel('Application Completion [%]');
 			
 			subplot(3,4,11);
-			grv = diag(gr)*obj.VDom;
+			grv = diag(gr)*chip.VDom;
 			tt = grv>0;
 			min_grv = [];
-			for v=1:obj.vd
+			for v=1:chip.vd
 				min_grv = [min_grv min(grv(tt(:,v),v))];
 			end
-			b = bar([obj.VDom'*gr ./ sum(obj.VDom)' min_grv']);
+			b = bar([chip.VDom'*gr ./ sum(chip.VDom)' min_grv']);
 			for pb = 1:length(b)
 				xtips = b(pb).XEndPoints;
 				ytips = b(pb).YEndPoints;
@@ -792,7 +766,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 				text(xtips,ytips,labels,'HorizontalAlignment','center',...
 					'VerticalAlignment','bottom', 'FontSize',font_size);
 			end
-			if obj.vd == 1
+			if chip.vd == 1
 				b.FaceColor = 'flat';
 				b.CData(2,:) = [0.8500 0.3250 0.0980];
 				xticklabels({'Mean', 'Min'});
@@ -800,7 +774,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 			grid on,xlabel('Domains'), ylabel('Application Completion (Mean - Min) [%]');
 			
 			subplot(3,4,12);
-			b = bar([sum(gr)/obj.Nc min(min_grv)]);
+			b = bar([sum(gr)/chip.Nc min(min_grv)]);
 			for pb = 1:length(b)
 				xtips = b(pb).XEndPoints;
 				ytips = b(pb).YEndPoints;
@@ -881,7 +855,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
             T = [];
             V = [obj.V_min:obj.V_discretization_step:obj.V_max];
             d_p = 1;
-            T = [obj.t_outside-T_offset(1):T_step:obj.core_crit_temp+T_offset(2)];
+            T = [obj.temp_amb-T_offset(1):T_step:obj.core_crit_temp+T_offset(2)];
             
             kps = [obj.leak_vdd_k, obj.leak_temp_k, obj.leak_process_k, ...
 					            obj.leak_exp_vdd_k, obj.leak_exp_t_k, obj.leak_exp_k];
@@ -1169,7 +1143,7 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 
 	%% Result Analysis
 	methods
-		res = stats_analysis(obj,ctrl,x,u,f,v,w)
+		res = stats_analysis(obj,ctrl,chip,x,u,f,v,w)
 		[wlres, wlop] = base_ideal_unr(obj)
 	end
 
@@ -1180,15 +1154,6 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 
 	%% Dependent Variables
 	methods
-		function obj = set.VDom(obj, val)
-			cmp = [obj.Nc obj.vd];
-			if all(size(val) == cmp) && ~isempty(val)
-				obj.VDom = val;
-			else
-				warning("[LAB Error]: VDom wrong input size.");
-				disp(strcat("[LAB] VDom required size:", num2str(cmp(2))));
-			end
-		end
 		function obj = set.compare_vs_baseline(obj, val)
 			if val && (~obj.compare_vs_baseline)
 				obj.pmc_need_update = 1;

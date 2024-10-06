@@ -35,9 +35,6 @@ classdef thermal_model < handle
 		D {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
 			= [1];
 
-		temp_amb (1,1) {mustBeNumeric, mustBeNonempty, mustBeFinite} ...
-			= 25.0 + 273.15;	% External Ambient Temperature
-
 		param_dev_per {mustBeNonnegative, mustBeNumeric, mustBeNonempty, mustBeFinite} ...
 			= 1;
 
@@ -135,6 +132,10 @@ end
 	end
 	
 	properties(SetAccess=immutable, GetAccess=public)
+		
+		PVT_P = 1;
+		PVT_V = 2;
+        PVT_T = 3;
 
 		%%% Value that, if changed, I need to change the code
 
@@ -346,8 +347,8 @@ end
 
 			obj.Cc = obj.C(1:obj.Nc,:);
 			
-			[obj.Ac_nom, obj.Bc_nom] = obj.create_model(obj.temp_amb, 0, tm_ver);
-			[obj.Ac_true, obj.Bc_true] = obj.create_model(obj.temp_amb, 1, tm_ver);
+			[obj.Ac_nom, obj.Bc_nom] = obj.create_model(0, tm_ver);
+			[obj.Ac_true, obj.Bc_true] = obj.create_model(1, tm_ver);
 			
 			%rank+obsv is not working: 1) rank considers low numbers 0
                 % one could use rank(sym(obsv() ) ), but this would take a
@@ -390,7 +391,7 @@ end
 		obj = default_floorplan_config(obj);
 	end
 	methods(Access=protected)
-		[A, B] = create_model(obj, T, pdev, tm_ver);
+		[A, B] = create_model(obj, pdev, tm_ver);
 	end %Methods
 
 	%% Dependent Variables

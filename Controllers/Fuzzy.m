@@ -48,10 +48,10 @@ classdef Fuzzy < CP
 			% 
 		end
 
-		function [obj] = init_fnc(obj, hc, Nsim)
+		function [obj] = init_fnc(obj, hc, chip, Nsim)
 			%TODO understand which one I actually really need
 			%TODO understand which needs to go out and which in
-            obj.initialize(hc, Nsim);
+            obj.initialize(chip, Nsim);
 
 			obj.o_inc_st = 0;
 			obj.o_dec_st = 0;

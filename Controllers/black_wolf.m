@@ -161,19 +161,19 @@ classdef black_wolf < mpc_hpc & CP
 
 	%TODO don't know if these go here!!! or inside MPC!
 	methods
-		function [obj] = init_fnc(obj, hc, Nsim)
+		function [obj] = init_fnc(obj, hc,chip, Nsim)
 
-			obj.initialize(hc, Nsim);
+			obj.initialize(chip, Nsim);
 
             obj.ctrl_info = [];
 
 			% Voltage
 			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([0.5 1.2], [20 90], 0.9, 1/3.497, 1.93, 1);
-			[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([0.5 1.2], [20+273.15 90+273.15], obj.Tmpc_off, 0.9, [6.659 -1.979], -1.48, 1);
+			[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx(chip,[0.5 1.2], [20+273.15 90+273.15], obj.Tmpc_off, 0.9, [6.659 -1.979], -1.48, 1);
 			% Freq
 			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([obj.lFmin obj.lFmax], [20 90], 0.9, 0.2995, 0, 0);
 			%TODO parametrize
-			[obj.psoff_lut, Fv, Tv] = hc.pws_ls_offset(obj, 5, 4, 1);
+			[obj.psoff_lut, Fv, Tv] = hc.pws_ls_offset(chip, obj, 5, 4, hc.temp_amb, chip.core_crit_temp, 1);
 			obj.V0v = ones(obj.lNc, length(Fv))*diag(Fv);
 			obj.T0v = ones(obj.lNc, length(Tv))*diag(Tv);
 
