@@ -1,5 +1,5 @@
 function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
-	simulation(obj, ctrl, chip, show)
+	simulation(obj, ctrl, chip, CM, show)
 %SIMULATION Summary of this function goes here
 %   Detailed explanation goes here	
 
@@ -29,6 +29,10 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
         error("[LAB] Simulation inputs have wrong dimensions")
     end
     N_chip = lt1;
+
+    if (size(CM)~=[N_chip,N_chip])
+        error("[LAB] Wrong Communication MAtrix (CM) dimensions");
+    end
     
     Nsim = zeros(N_chip,1);
     sys_mul = zeros(N_chip,1);
@@ -37,26 +41,28 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
     nip_mul = zeros(N_chip,1);
 
     asimcl = hpc_simulation.empty(N_chip,0);
+    comm = cell(N_chip,1);
+    ctrl_comm = cell(N_chip,N_chip);
 
-    for i=1:N_chip
-	    chip(i).anteSimCheckTM();
-	    obj.anteSimCheckLab(chip(i));
-	    chip(i).anteSimCheckPM();
+    for cid=1:N_chip
+	    chip(cid).anteSimCheckTM();
+	    obj.anteSimCheckLab(chip(cid));
+	    chip(cid).anteSimCheckPM();
 
         % INIT
-        asimcl(i) = hpc_simulation(chip(i),chip(i).Ad_true, chip(i).Bd_true);
+        asimcl(cid) = hpc_simulation(chip(cid),chip(cid).Ad_true, chip(cid).Bd_true);
 	    %obj.init_compute_model(, chip.Nc, chip.vd, chip); %called automatically
 
 	    % To Optimize execution, istead of having several functions called and
 	    %	several ifs statement, we use ctrl.Ts_ctrl as the main time step of
 	    %	the simulation.
-	    Nsim(i) = ceil(obj.tsim / ctrl(i).Ts_ctrl);
+	    Nsim(cid) = ceil(obj.tsim / ctrl(cid).Ts_ctrl);
     
 	    % System:
 	    % initial offset:
 	    %sys_ts_offset = 0;
 	    % frequency
-	    sys_mul(i) = round(ctrl(i).Ts_ctrl / chip(i).Ts);
+	    sys_mul(cid) = round(ctrl(cid).Ts_ctrl / chip(cid).Ts);
 	    % output completed
 	    %ctrl_output_mul = round(obj.ctrl_Texec / obj.Ts);
     
@@ -64,47 +70,47 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 	    % initial offset:
 	    target_ts_offset = 0;
 	    % frequency
-	    ts_div = obj.Ts_target / ctrl(i).Ts_ctrl;
-	    target_mul(i) = floor(ts_div);
-	    ctrl_mul(i) = floor(1/ts_div) -1;
-	    ctrl_mul(i) = (ctrl_mul(i)<0)*0 + (ctrl_mul(i)>=0)*ctrl_mul(i);
-	    asimcl(i).target_counter = target_mul(i) + target_ts_offset;
+	    ts_div = obj.Ts_target / ctrl(cid).Ts_ctrl;
+	    target_mul(cid) = floor(ts_div);
+	    ctrl_mul(cid) = floor(1/ts_div) -1;
+	    ctrl_mul(cid) = (ctrl_mul(cid)<0)*0 + (ctrl_mul(cid)>=0)*ctrl_mul(cid);
+	    asimcl(cid).target_counter = target_mul(cid) + target_ts_offset;
 	    % Manage non-integer part:
 	    % TODO: This does not work well with y.xx when xx> 60 and y = [2,3,4,5] 
 	    %	because it removes too much. instead with 1, and 6, 7... works well 
 	    %	I should investigate the math further.
-	    if target_mul(i)>ctrl_mul(i)
-		    ntd = (ts_div-target_mul(i))/target_mul(i)/target_mul(i);
-		    asimcl(i).nip_sign = -1;
+	    if target_mul(cid)>ctrl_mul(cid)
+		    ntd = (ts_div-target_mul(cid))/target_mul(cid)/target_mul(cid);
+		    asimcl(cid).nip_sign = -1;
 	    else
-		    ntd = (1/ts_div)-(ctrl_mul(i)+1);
-		    asimcl(i).nip_sign = +1;
+		    ntd = (1/ts_div)-(ctrl_mul(cid)+1);
+		    asimcl(cid).nip_sign = +1;
 	    end
-	    nip_mul(i) = ceil(1/ntd);
-	    asimcl(i).nip_counter = nip_mul(i) + target_ts_offset;
+	    nip_mul(cid) = ceil(1/ntd);
+	    asimcl(cid).nip_counter = nip_mul(cid) + target_ts_offset;
     
 	    %TODO
-	    x = obj.t_init{i};% + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
-        asimcl(i).cpuplot = zeros(Nsim(i)+1,chip(i).Nc);
-	    asimcl(i).cpxplot = zeros(Nsim(i)+1,chip(i).Ns);
-        asimcl(i).cpfplot = zeros(Nsim(i)+1,chip(i).Nc);
-	    asimcl(i).cpvplot = zeros(Nsim(i)+1,chip(i).vd);
-        asimcl(i).cpxplot(1,:) = x;
-	    asimcl(i).cpuplot(1,:) = NaN;
-	    asimcl(i).cpfplot(1,:) = asimcl(i).F;
-	    asimcl(i).cpvplot(1,:) = asimcl(i).V;
-	    asimcl(i).pvt{chip.PVT_P} = asimcl(i).process;
-	    asimcl(i).pvt{chip.PVT_V} = [];
-	    asimcl(i).pvt{chip.PVT_T} = ctrl(i).C*x;
+	    x = obj.t_init{cid};% + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
+        asimcl(cid).cpuplot = zeros(Nsim(cid)+1,chip(cid).Nc);
+	    asimcl(cid).cpxplot = zeros(Nsim(cid)+1,chip(cid).Ns);
+        asimcl(cid).cpfplot = zeros(Nsim(cid)+1,chip(cid).Nc);
+	    asimcl(cid).cpvplot = zeros(Nsim(cid)+1,chip(cid).vd);
+        asimcl(cid).cpxplot(1,:) = x;
+	    asimcl(cid).cpuplot(1,:) = NaN;
+	    asimcl(cid).cpfplot(1,:) = asimcl(cid).F;
+	    asimcl(cid).cpvplot(1,:) = asimcl(cid).V;
+	    asimcl(cid).pvt{chip.PVT_P} = asimcl(cid).process;
+	    asimcl(cid).pvt{chip.PVT_V} = [];
+	    asimcl(cid).pvt{chip.PVT_T} = ctrl(cid).C*x;
     
-	    ctrl(i) = ctrl(i).init_fnc(obj, chip(i), Nsim(i));
+	    [ctrl(cid), comm{cid}] = ctrl(cid).init_fnc(obj, chip(cid), cid, Nsim(cid));
     end
 
     % Nsim multiplicity check
     Nsim_max = max(Nsim);
     rp = 1;
-    for i=1:N_chip
-        rp = rp && (mod(Nsim_max,Nsim(i))==0);
+    for cid=1:N_chip
+        rp = rp && (mod(Nsim_max,Nsim(cid))==0);
     end
     if (~rp)
         %TODO: Improve this instead of throw error
@@ -113,8 +119,8 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 
     % Create Nsim multiciplity
     Nsim_mul = ones(N_chip,1);
-    for i=1:N_chip
-        Nsim_mul(i) = fix(Nsim_max / Nsim(i));
+    for cid=1:N_chip
+        Nsim_mul(cid) = fix(Nsim_max / Nsim(cid));
     end
 
     % Start pool of parallel workers
@@ -122,36 +128,56 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 
 	% LOOOP
 	for s=1:Nsim_max
-
-        %parfor i=1:N_chip
+        
+        % Manage Communications
+        %TODO: I did not consider queue. I'm just updating with the new
+        %   infoù
+        %TODO: I'm not "consuming"/resetting the communication if delivered
         for i=1:N_chip
+            for j=1:N_chip
+                if (CM(i,j)~=0)
+                    ctrl_comm{j, i} = comm{i};
+                else
+                    ctrl_comm{j, i} = {};
+                end
+            end
+        end
+
+        %TODO I did not implement offset timers. Also Very important for
+        %   communications desync and delays
+        %parfor i=1:N_chip
+        for cid=1:N_chip
             if (mod(s,Nsim_mul)==0)
                 % Input step managing
-                asimcl(i).update_counters(target_mul(i), nip_mul(i), ctrl_mul(i));
+                asimcl(cid).update_counters(target_mul(cid), nip_mul(cid), ctrl_mul(cid));
 
                 %Compute model:
-		        index = 1+(s-1)*sys_mul(i);
-		        [asimcl(i).cpuplot(index+1:index+sys_mul(i),:), asimcl(i).cpxplot(index+1:index+sys_mul(i),:), asimcl(i).wl, asimcl(i).pwm, asimcl(i)] = ...
-                    asimcl(i).compute_model(sys_mul(i), asimcl(i).cpxplot(index,:)', asimcl(i).V, asimcl(i).F, asimcl(i).process, obj.temp_amb, obj.wltrc{i}, chip(i));	
+		        index = 1+(s-1)*sys_mul(cid);
+		        [asimcl(cid).cpuplot(index+1:index+sys_mul(cid),:), asimcl(cid).cpxplot(index+1:index+sys_mul(cid),:), asimcl(cid).wl, asimcl(cid).pwm, asimcl(cid)] = ...
+                    asimcl(cid).compute_model(sys_mul(cid), asimcl(cid).cpxplot(index,:)', asimcl(cid).V, asimcl(cid).F, asimcl(cid).process, obj.temp_amb, obj.wltrc{cid}, chip(cid));	
         
 		        % Sim output managing
-		        T = ctrl(i).C*asimcl(i).cpxplot(index,:)';
+		        T = ctrl(cid).C*asimcl(cid).cpxplot(index,:)';
 		        % Noise:
-		        dim = min(length(T), chip(i).Nc);
-		        T = T + [(chip(i).sensor_noise)*( (rand(dim,1) - 0.5)*2 * chip(i).sensor_noise_amplitude(chip(i).PVT_T) ); zeros(length(T)-dim,1)];	
+		        dim = min(length(T), chip(cid).Nc);
+		        T = T + [(chip(cid).sensor_noise)*( (rand(dim,1) - 0.5)*2 * chip(cid).sensor_noise_amplitude(chip(cid).PVT_T) ); zeros(length(T)-dim,1)];	
         
 		        %if (mod(s-1 + ctrl_ts_offset, ctrl_mul) == 0)
-			        asimcl(i).pvt{chip(i).PVT_P} = asimcl(i).process;
-			        asimcl(i).pvt{chip(i).PVT_V} = [];
-			        asimcl(i).pvt{chip(i).PVT_T} = T;
-                    f_ref = obj.frtrc{i}(min(asimcl(i).target_index, size(obj.frtrc{i},1)),:)';
-			        pwbdg = obj.chip_pw_budget{i}(min(asimcl(i).target_index, length(obj.chip_pw_budget{i})));
-			        [asimcl(i).F, asimcl(i).V, ctrl(i)] = ...
-                        ctrl(i).ctrl_fnc(f_ref, pwbdg, asimcl(i).pvt, asimcl(i).ctrl_pwm, asimcl(i).ctrl_wl);
-		        %end
-        
-		        asimcl(i).cpfplot(s+1,:) = asimcl(i).F;
-		        asimcl(i).cpvplot(s+1,:) = asimcl(i).V;
+			        asimcl(cid).pvt{chip(cid).PVT_P} = asimcl(cid).process;
+			        asimcl(cid).pvt{chip(cid).PVT_V} = [];
+			        asimcl(cid).pvt{chip(cid).PVT_T} = T;
+                    f_ref = obj.frtrc{cid}(min(asimcl(cid).target_index, size(obj.frtrc{cid},1)),:)';
+			        chippwb = obj.chip_pw_budget{cid}(min(asimcl(cid).target_index, length(obj.chip_pw_budget{cid})));
+                    totpwb = obj.toto_pw_budget(min(asimcl(cid).target_index, length(obj.toto_pw_budget)));
+                    pwbdg = [totpwb, chippwb];
+			        [asimcl(cid).F, asimcl(cid).V, comm{cid}, ctrl(cid)] = ...
+                        ctrl(cid).ctrl_fnc(f_ref, pwbdg, asimcl(cid).pvt, asimcl(cid).ctrl_pwm, asimcl(cid).ctrl_wl, cid, ctrl_comm(cid,:));
+		            % Consumed the information
+                    %ctrl_comm(i,:) = {};
+                %end
+
+		        asimcl(cid).cpfplot(s+1,:) = asimcl(cid).F;
+		        asimcl(cid).cpvplot(s+1,:) = asimcl(cid).V;
             end
         end
     end
@@ -164,35 +190,35 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 		if obj.pmc_need_update
 			warning("[HPC LAB] Warning! You are not comparing with the baseline! You should run base_ideal_unr() or checkante!");
         end
-        for i=1:N_chip
-		    cmp{i} = obj.perf_max_check;
+        for cid=1:N_chip
+		    cmp{cid} = obj.perf_max_check;
         end
     else
-        for i=1:N_chip
-		    cmp{i} = size(obj.wltrc{i},3)-1;
+        for cid=1:N_chip
+		    cmp{cid} = size(obj.wltrc{cid},3)-1;
         end
     end
-    for i=1:N_chip
-	    asimcl(i).wlop = asimcl(i).wl_index ./ cmp{i} * 100;
-	    ctrl(i) = ctrl(i).cleanup_fnc();
+    for cid=1:N_chip
+	    asimcl(cid).wlop = asimcl(cid).wl_index ./ cmp{cid} * 100;
+	    ctrl(cid) = ctrl(cid).cleanup_fnc();
 
 	    if show
 		    % Pause because it is bugged on Linux
 		    pause(0.5);
-		    obj.xutplot(chip(i),asimcl(i).cpxplot,asimcl(i).cpuplot);
+		    obj.xutplot(chip(cid),asimcl(cid).cpxplot,asimcl(cid).cpuplot);
 		    pause(0.5);
-		    obj.powerconstrplot(chip(i),i,asimcl(i).cpuplot);
+		    obj.powerconstrplot(chip(cid),cid,asimcl(cid).cpuplot);
 		    pause(0.5);
-		    obj.tempconstrplot(chip(i),asimcl(i).cpxplot);
+		    obj.tempconstrplot(chip(cid),asimcl(cid).cpxplot);
 		    pause(0.5);
-		    obj.perfplot(chip(i),asimcl(i).cpfplot,asimcl(i).wl_index, cmp{i}, i);	
+		    obj.perfplot(chip(cid),asimcl(cid).cpfplot,asimcl(cid).wl_index, cmp{cid}, cid);	
 		    pause(0.5);
-		    obj.fvplot(chip(i),asimcl(i).cpfplot,asimcl(i).cpvplot);
+		    obj.fvplot(chip(cid),asimcl(cid).cpfplot,asimcl(cid).cpvplot);
     
-		    t1 = chip(i).Ts*[1:Nsim(i)*sys_mul(i)]';
-		    t2 = chip(i).Ts*sys_mul(i)*[1:Nsim(i)]';
+		    t1 = chip(cid).Ts*[1:Nsim(cid)*sys_mul(cid)]';
+		    t2 = chip(cid).Ts*sys_mul(cid)*[1:Nsim(cid)]';
     
-		    ctrl(i) = ctrl(i).plot_fnc(t1, t2, asimcl(i).cpxplot, asimcl(i).cpuplot, asimcl(i).cpfplot, asimcl(i).cpvplot, asimcl(i).wlop);
+		    ctrl(cid) = ctrl(cid).plot_fnc(t1, t2, asimcl(cid).cpxplot, asimcl(cid).cpuplot, asimcl(cid).cpfplot, asimcl(cid).cpvplot, asimcl(cid).wlop);
         end
     end
 

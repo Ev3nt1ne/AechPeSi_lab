@@ -106,7 +106,7 @@ classdef hpc_lab < handle
 				end				
 			end
         end
-		[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = simulation(obj, ctrl, chip, show)
+		[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = simulation(obj, ctrl, chip, CM,show)
         %Move This:
 		function obj = taas_fix(obj, wl)
 			obj.pmc_need_update = zeros(size(obj.pmc_need_update));

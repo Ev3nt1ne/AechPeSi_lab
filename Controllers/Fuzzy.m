@@ -48,7 +48,7 @@ classdef Fuzzy < CP
 			% 
 		end
 
-		function [obj] = init_fnc(obj, hc, chip, Nsim)
+		function [obj, comms] = init_fnc(obj, hc, chip, ctrl_id, Nsim)
 			%TODO understand which one I actually really need
 			%TODO understand which needs to go out and which in
             obj.initialize(chip, Nsim);
@@ -75,16 +75,22 @@ classdef Fuzzy < CP
 			obj.wl = [ones(obj.lNc,1) zeros(obj.lNc, obj.lipl -1)];
 			obj.VCred = zeros(obj.lNc,1);
 			obj.nOut = obj.lVmin*ones(obj.lvd,1);
+
+            comms{1} = 0;
+            comms{2} = 0;
 		end		
-		function [F,V, obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl)
+		function [F,V, comm, obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl, ctrl_id, ctrl_comm)
 
 			if obj.ex_count >= 10*obj.Tper
 				obj.ex_count = 2*obj.Tper;
 			end
 			obj.ex_count = obj.ex_count + 1;
+            
+            chippwbdg = pwbdg(2);
+            totpwbdg = pwbdg(1);
 
-			if pwbdg~=obj.pbold
-				obj.pbold = pwbdg;
+			if chippwbdg~=obj.pbold
+				obj.pbold = chippwbdg;
 				obj.pbc = 1;
 				obj.hys_p_count = 0;
 				obj.o_hys_act = 0;
@@ -170,7 +176,7 @@ classdef Fuzzy < CP
 			
 			% DispatchPower
 			%TODO, quad power budget dispatching
-			delta_p = sum(pu) - pwbdg + obj.pw_adapt;
+			delta_p = sum(pu) - chippwbdg + obj.pw_adapt;
 			if (delta_p > 0)
 				dompw = obj.lVDom'*pu;
 				domT = ((obj.lVDom'*T ./ sum(obj.lVDom)') + max(T.*obj.lVDom)' ) / 2; %here mean*2 / 3??
@@ -272,9 +278,9 @@ classdef Fuzzy < CP
 			obj.o_hys_step_count = ((obj.o_hys_step_count>0).*obj.o_hys_step_count) + (obj.o_hys_step_count<=0).*(obj.o_hys_act.*obj.o_hys_steps);
 			%Reduce
 			%pull = (Ceff.*F.*(obj.VDom*V) + obj.leak_vdd/1000).*(obj.VDom*V) + d_p*obj.leak_process/1000;
-			v_hys_red = (i_pwm - pwbdg) < -(pwbdg*(0.125+obj.hys_p_count/10));
-			%(sum(pull) - pwbdg + pw_adapt) < -6 ;
-			%(delta_p < (pwbdg - 6)); %TODO: 6 depends on the #of cores, #of domains, and the ratio between the two.
+			v_hys_red = (i_pwm - chippwbdg) < -(chippwbdg*(0.125+obj.hys_p_count/10));
+			%(sum(pull) - chippwbdg + pw_adapt) < -6 ;
+			%(delta_p < (chippwbdg - 6)); %TODO: 6 depends on the #of cores, #of domains, and the ratio between the two.
 			%TODO: also depends on the power budget itself, and the PMAX, PMIN
 			obj.o_hys_step_count = (obj.o_hys_act & obj.o_hys_step_count) .* ...
 				(obj.o_hys_step_count - v_hys_red);
@@ -313,6 +319,25 @@ classdef Fuzzy < CP
 			pu = (Ceff.*F.*(obj.lVDom*V) + obj.pw_stat_lin(1)).*(obj.lVDom*V) + process*obj.pw_stat_lin(3);
 			obj.pw_old{2} = sum(pu);
 
+
+            % Distributed Algorithm:
+            comm{1} = 0;
+            comm{2} = 0;
+            aa = 0;
+            bb= 0;
+            if ctrl_id==1
+                adab = 1;
+            else
+                adab = 2;
+            end
+            for i=1:length(ctrl_comm)
+                if ~isempty(ctrl_comm{i})
+                    aa = aa + ctrl_comm{i}{1} + adab;
+                    bb = bb + ctrl_comm{i}{2} + 1;
+                end
+            end
+            comm{1} = aa;
+            comm{2} = bb;
 
 		end
 		function [obj] = cleanup_fnc(obj)

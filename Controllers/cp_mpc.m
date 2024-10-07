@@ -249,7 +249,7 @@ classdef cp_mpc < mpc_hpc & CP
 
 	%TODO don't know if these go here!!! or inside MPC!
 	methods
-		function [obj] = init_fnc(obj, hc,chip, Nsim)
+		function [obj, comms] = init_fnc(obj, hc, chip, ctrl_id, Nsim)
 
 			obj.initialize(chip, Nsim);
 
@@ -300,13 +300,18 @@ classdef cp_mpc < mpc_hpc & CP
 
 			obj.solver_stats = [];
 
+            comms{1} = 0;
+            comms{2} = 0;
 		end
-		function [F,V,obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl)
+		function [F,V, comm, obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl, ctrl_id, ctrl_comm)
 
 			obj.ex_count = obj.ex_count + 1;
 
 			T = pvt{obj.PVT_T};
 			process = pvt{obj.PVT_P};
+
+            chippwbdg = pwbdg(2);
+            totpwbdg = pwbdg(1);
 
 			% Process Workload
 			obj.wl = obj.wl*(1-obj.alpha_wl) + i_wl*obj.alpha_wl;
@@ -338,9 +343,9 @@ classdef cp_mpc < mpc_hpc & CP
 
 			% MPC
 			obj.xlplot(obj.ex_count+1,:) = 0;
-			%mpc_pw_target = repmat(pwbdg, obj.Nhzn,1+obj.lvd);
+			%mpc_pw_target = repmat(chippwbdg, obj.Nhzn,1+obj.lvd);
 			%res = obj.call_mpc(obj.Tobs, obj.T_amb*1000, pu, mpc_pw_target);
-			res = obj.call_mpc(obj.Tobs, obj.T_amb*1000, pu, pwbdg);
+			res = obj.call_mpc(obj.Tobs, obj.T_amb*1000, pu, chippwbdg);
 			tt = isnan(res{1});
 			% too complex to make it vectorial
 			%dp = res{1}(~tt);
@@ -393,6 +398,25 @@ classdef cp_mpc < mpc_hpc & CP
 			%TEST: TODO REMOVE
 			pu = Ceff.*F.*(obj.lVDom*(V.*V)) + (obj.pw_stat_lin(1).*(obj.lVDom*V) + process*obj.pw_stat_lin(3)).*pex;
 			obj.pw_old{2} = sum(pu);
+
+            % Distributed Algorithm:
+            comm{1} = 0;
+            comm{2} = 0;
+            aa = 0;
+            bb= 0;
+            if ctrl_id==1
+                adab = 1;
+            else
+                adab = 2;
+            end
+            for i=1:length(ctrl_comm)
+                if ~isempty(ctrl_comm{i})
+                    aa = aa + ctrl_comm{i}{1} + adab;
+                    bb = bb + ctrl_comm{i}{2} + 1;
+                end
+            end
+            comm{1} = aa;
+            comm{2} = bb;
 
 		end
 

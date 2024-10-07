@@ -161,7 +161,7 @@ classdef black_wolf < mpc_hpc & CP
 
 	%TODO don't know if these go here!!! or inside MPC!
 	methods
-		function [obj] = init_fnc(obj, hc,chip, Nsim)
+		function [obj, comms] = init_fnc(obj, hc, chip, ctrl_id, Nsim)
 
 			obj.initialize(chip, Nsim);
 
@@ -219,8 +219,10 @@ classdef black_wolf < mpc_hpc & CP
             %[kalmf,L,P] = kalman(sys,Q,R,N);
             [obj.LK, P, Z] = dlqe(obj.Ad_ctrl, obj.Gw, obj.C, obj.Qcov, obj.Rcov);
 
+            comms{1} = 0;
+            comms{2} = 0;
 		end
-		function [F,V,obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl)
+		function [F,V, comm, obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl, ctrl_id, ctrl_comm)
 
 			obj.ex_count = obj.ex_count + 1;
 
@@ -228,6 +230,9 @@ classdef black_wolf < mpc_hpc & CP
 			T = pvt{obj.PVT_T};
             Tc = T(1:obj.lNc);
 			process = pvt{obj.PVT_P};
+
+            chippwbdg = pwbdg(2);
+            totpwbdg = pwbdg(1);
 
 			% Process Workload
 			obj.wl = obj.wl*(1-obj.alpha_wl) + i_wl*obj.alpha_wl;
@@ -300,7 +305,7 @@ classdef black_wolf < mpc_hpc & CP
 
 			% MPC
 			obj.xlplot(obj.ex_count+1,:) = 0;
-			mpc_pw_target = repmat(pwbdg, obj.Nhzn,1+obj.lvd);
+			mpc_pw_target = repmat(chippwbdg, obj.Nhzn,1+obj.lvd);
             wSm = obj.wl*(1-obj.lwl_mem)';
 			res = obj.call_mpc(state_MPC+obj.Tmpc_off, Ceff, (obj.T_amb)*1000, h0v, wSm, input_mpc, mpc_pw_target);
 			tt = isnan(res{1});
@@ -351,6 +356,25 @@ classdef black_wolf < mpc_hpc & CP
 
 			obj.prevF = F;
 			obj.prevV = V;
+
+            % Distributed Algorithm:
+            comm{1} = 0;
+            comm{2} = 0;
+            aa = 0;
+            bb= 0;
+            if ctrl_id==1
+                adab = 1;
+            else
+                adab = 2;
+            end
+            for i=1:length(ctrl_comm)
+                if ~isempty(ctrl_comm{i})
+                    aa = aa + ctrl_comm{i}{1} + adab;
+                    bb = bb + ctrl_comm{i}{2} + 1;
+                end
+            end
+            comm{1} = aa;
+            comm{2} = bb;
 
 		end
 
