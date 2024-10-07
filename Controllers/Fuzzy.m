@@ -76,8 +76,7 @@ classdef Fuzzy < CP
 			obj.VCred = zeros(obj.lNc,1);
 			obj.nOut = obj.lVmin*ones(obj.lvd,1);
 
-            comms{1} = 0;
-            comms{2} = 0;
+            [obj, comms] = obj.init_grad_track_comm(hc, ctrl_id);
 		end		
 		function [F,V, comm, obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl, ctrl_id, ctrl_comm)
 
@@ -88,6 +87,34 @@ classdef Fuzzy < CP
             
             chippwbdg = pwbdg(2);
             totpwbdg = pwbdg(1);
+
+            %%%%%%%
+            % Distributed Algorithm:
+            [dist_pw, dist_grad, obj] = obj.grad_track_alg(ctrl_comm, ctrl_id);
+            %{     
+            comm{1} = 0;
+            comm{2} = 0;
+            aa = 0;
+            bb= 0;
+            if ctrl_id==1
+                adab = 1;
+            else
+                adab = 2;
+            end
+            for i=1:length(ctrl_comm)
+                if ~isempty(ctrl_comm{i})
+                    aa = aa + ctrl_comm{i}{1} + adab;
+                    bb = bb + ctrl_comm{i}{2} + 1;
+                end
+            end
+            comm{1} = aa;
+            comm{2} = bb;
+            %}
+            comm{1} = dist_pw;
+            comm{2} = dist_grad;
+
+            chippwbdg = min(chippwbdg, dist_pw(ctrl_id));
+            %%%%%%%
 
 			if chippwbdg~=obj.pbold
 				obj.pbold = chippwbdg;
@@ -318,26 +345,6 @@ classdef Fuzzy < CP
 			%TEST: TODO REMOVE
 			pu = (Ceff.*F.*(obj.lVDom*V) + obj.pw_stat_lin(1)).*(obj.lVDom*V) + process*obj.pw_stat_lin(3);
 			obj.pw_old{2} = sum(pu);
-
-
-            % Distributed Algorithm:
-            comm{1} = 0;
-            comm{2} = 0;
-            aa = 0;
-            bb= 0;
-            if ctrl_id==1
-                adab = 1;
-            else
-                adab = 2;
-            end
-            for i=1:length(ctrl_comm)
-                if ~isempty(ctrl_comm{i})
-                    aa = aa + ctrl_comm{i}{1} + adab;
-                    bb = bb + ctrl_comm{i}{2} + 1;
-                end
-            end
-            comm{1} = aa;
-            comm{2} = bb;
 
 		end
 		function [obj] = cleanup_fnc(obj)

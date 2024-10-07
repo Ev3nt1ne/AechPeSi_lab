@@ -44,9 +44,57 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
     comm = cell(N_chip,1);
     ctrl_comm = cell(N_chip,N_chip);
 
+    %TODO: I should add this to the antesimchecklab and move the content of
+    %       that one into antesimchipletlab
+    %it is already a cell, as I format it in the set function
+    % FRTRC
+    if length(obj.frtrc) > N_chip
+        %cut it
+        warning("[LAB] The Frequency Trace (frtrc) was cut")
+        obj.frtrc{length(obj.frtrc)+1:N_chip} = [];
+    end
+    if length(obj.frtrc) < N_chip
+        error("[LAB] Frequency Trace (frtrc) dimension not enough for the number of chiplets")
+    end
+    %WLTRC
+    if length(obj.wltrc) > N_chip
+        %cut it
+        warning("[LAB] The Workload Trace (wltrc) was cut")
+        obj.wltrc{length(obj.wltrc)+1:N_chip} = [];
+    end
+    if length(obj.wltrc) < N_chip
+        error("[LAB] Workload Trace (wltrc) dimension not enough for the number of chiplets")
+    end
+    %CHIP_PW_BUDGET
+    if ~iscell(obj.chip_pw_budget)
+        obj.chip_pw_budget{1} = obj.chip_pw_budget;
+    end
+    if length(obj.chip_pw_budget) > N_chip
+        %cut it
+        warning("[LAB] The Chip Power Budget Trace (chip_pw_budget) was cut")
+        obj.chip_pw_budget{length(obj.chip_pw_budget)+1:N_chip} = [];
+    end
+    if length(obj.chip_pw_budget) < N_chip
+        error("[LAB] The Chip Power Budget Trace (chip_pw_budget) dimension not enough for the number of chiplets")
+    end
+    %QUAD_PW_BUDGET
+    if ~iscell(obj.quad_pw_budget)
+        obj.quad_pw_budget{1} = obj.quad_pw_budget;
+    end
+    if length(obj.quad_pw_budget) > N_chip
+        %cut it
+        warning("[LAB] The Quad Power Budget Trace (quad_pw_budget) was cut")
+        obj.quad_pw_budget{length(obj.quad_pw_budget)+1:N_chip} = [];
+    end
+    if length(obj.quad_pw_budget) < N_chip
+        error("[LAB] The Quad Power Budget Trace (quad_pw_budget) dimension not enough for the number of chiplets")
+    end
+
     for cid=1:N_chip
 	    chip(cid).anteSimCheckTM();
 	    obj.anteSimCheckLab(chip(cid));
+        %TODO: add checks to the quad_pw_budget: if its dim is == number of
+        %       quads
 	    chip(cid).anteSimCheckPM();
 
         % INIT
@@ -122,6 +170,14 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
     for cid=1:N_chip
         Nsim_mul(cid) = fix(Nsim_max / Nsim(cid));
     end
+
+    %TODO:
+    % check if ctrl.comm is equal for all and equal to the CM.
+    % Alternatively, here in the simulation I compile the comm matrix
+    % Actually I don't need the comm matrix in the ctrl, I should remove it
+    %   I should pass it to the initialization of the ctrl class so that
+    %   they can create the ADJ matrix (IF NOT PRESENT!! -FIX THIS)
+    %   but I should check if all the adj matrix have the same dimensions
 
     % Start pool of parallel workers
     %pool = parpool;

@@ -12,6 +12,15 @@ classdef controller < handle
 
         T_amb = 25 + 273.15;
 
+        adj_mat;
+        comm_mat;
+
+        %Maybe do a class alone for this???
+        multi_der_fcn;
+        multi_prev_grad;
+        multi_prev_x;
+        multi_prev_y;
+        multi_learn_rate;
 	end
 
 	properties(Dependent)
@@ -93,7 +102,47 @@ classdef controller < handle
             obj.lFmax = obj.lFVT(end,3);
             obj.lVmin = obj.lFVT(1,1);
             obj.lVmax = obj.lFVT(end,1);
-        end		
+        end
+        function [obj, comm] = init_grad_track_comm(obj, hc, ctrl_id)
+            if isempty(obj.comm_mat)
+                error("[CTRL] Communication matrix empty");
+            end
+            obj.adj_mat = obj.create_adj_mat(obj.comm_mat, [2,3]);
+            ll = length(hc.chip_pw_budget);
+            c1 = ones(ll,1);
+            for i=1:ll
+                c1(i) = hc.chip_pw_budget{i}(1);
+            end
+            comm{1} = c1;
+            grad = obj.multi_der_fcn(c1,ctrl_id);
+            comm{2} = grad;
+            obj.multi_prev_x = c1;
+            obj.multi_prev_y = grad;
+            obj.multi_prev_grad = grad;
+        end
+        function [x, y, obj] = grad_track_alg(obj, ctrl_comm, ctrl_id)
+            GAMMA = obj.multi_learn_rate;
+            % Gather informations from neighboors
+            u = 0;
+            v = 0;
+            for idx=1:length(ctrl_comm)
+                if (~isempty(ctrl_comm{idx}) && (idx ~= ctrl_id))
+                    val = ctrl_comm{idx}{1};
+                    u = u + obj.adj_mat(ctrl_id,idx)*val;
+                    val = ctrl_comm{idx}{2};
+                    v = v + obj.adj_mat(ctrl_id,idx)*val;
+                end
+            end
+            x = obj.adj_mat(ctrl_id,ctrl_id)*obj.multi_prev_x + u;            
+            x = x - GAMMA*obj.multi_prev_y;
+            obj.multi_prev_x = x;
+            
+            y = obj.adj_mat(ctrl_id,ctrl_id)*obj.multi_prev_y + v;
+            grad = obj.multi_der_fcn(x,ctrl_id);
+            y = y + (grad - obj.multi_prev_grad);
+            obj.multi_prev_y = y;
+            obj.multi_prev_grad = grad;
+        end
 	end
 
 	methods(Abstract=true)
@@ -169,7 +218,53 @@ classdef controller < handle
 			%	vote_cast(2,:) = vote_cast;
 			%end
 			%voltage_choice = obj.FV_table(round(prctile(vote_cast,obj.voltage_rule)),1);
-        end   
+        end
+        function [Adj] = create_adj_mat(mat, mul, max_iter, tol)
+            if (nargin < 4) || isempty(tol)
+                tol = 1e-4;
+            end
+            if (nargin < 3) || isempty(max_iter)
+                max_iter = 1000;
+            end
+            if (nargin < 2) || isempty(mul)
+                mul = [1,1];
+            end
+            if length(mul) ~= 2
+                warning("[CTRL] Wrong mul input, setting default [1,1]");
+                mul = [1,1];
+            end
+
+            diagmat = diag(mat);
+            am = mat - eye(size(mat)).*diagmat;
+            am = am*mul(2);
+            % convert zeros in 1
+            if (sum(diagmat==0)>0)
+                md = min(diagmat(diagmat>0));
+                if isempty(md) || (md > 1)
+                    md = 1;
+                end
+                %diagmat(diagmat==0) = md;
+                diagmat = diagmat + md;
+            end
+            diagmat = diagmat*mul(1);
+            Adj = am + eye(size(mat)).*diagmat;
+
+            iter = 0;
+            convcheck = 0;
+            while ( (iter<max_iter) && (~convcheck))
+                iter = iter + 1;
+                % Normalize rows
+                rows_sum = sum(Adj,2);
+                Adj = Adj ./ rows_sum;
+        
+                % Normalize columns
+                cols_sum = sum(Adj,1);
+                Adj = (Adj' ./ cols_sum')';
+        
+                % Check convergence
+                convcheck = (sum(sum(Adj,1)) <= tol) && (sum(sum(Adj,2)) <= tol);
+            end
+        end
     end
 
 	%% Dependent Variables
