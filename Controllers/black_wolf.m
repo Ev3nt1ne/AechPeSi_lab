@@ -7,6 +7,8 @@ classdef black_wolf < mpc_hpc & CP
         %RE;
         Fdiscretization_step;
         lwl_mem;
+        Q2 = 0;
+        not_update_lin = 0;
 
 	end
 	properties(SetAccess=protected, GetAccess=public)	
@@ -104,15 +106,15 @@ classdef black_wolf < mpc_hpc & CP
 					%if (~isinf(obj.usum(2:end)))
 						%constraints = [constraints, obj.VDom'*(u{k}.*w*(h2+1) + h1*(obj.C(1:obj.Nc,:)*(x{k})) + h0) <= ly_usum(k,2:end)' - (obj.Ctu(k,:)*obj.VDom)'];
 					%end
-				end
+            end
 			
 			objective = 0;
 
-			for k = 1:obj.Nhzn
+			for k = 1:obj.Nhzn %TODO T_target(1) not good!!!!!
 				objective = objective + (u{k}-ly_uref)'*obj.Rt*(u{k}-ly_uref) + u{k}'*obj.Rs*(u{k}) + ...
-                        ((x{k+1}-obj.T_amb-Toff)/(obj.T_target-obj.T_amb))'*obj.Q*((x{k+1}-obj.T_amb-Toff)/(obj.T_target-obj.T_amb)) + ...
+                        ((x{k+1}-obj.T_amb-Toff)/(obj.T_target(1)-obj.T_amb))'*obj.Q*((x{k+1}-obj.T_amb-Toff)/(obj.T_target(1)-obj.T_amb)) + ...
                         ((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm)'*obj.R*((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm) + ...
-                        %(x{k+1}-obj.T_amb)'*(-obj.Q*1)*(x{k+1}-obj.T_amb) + (-obj.Cc'*(h0+h0v)/h1)'*(obj.Q*1)*(-obj.Cc'*(h0+h0v)/h1);
+                        (x{k+1}-obj.T_amb)'*(-obj.Q2*1)*(x{k+1}-obj.T_amb) + (-obj.Cc'*(h0+h0v)/h1)'*(obj.Q2*1)*(-obj.Cc'*(h0+h0v)/h1);
                 %energy
                 %at = (ly_uref./u{k}).*wSm;
                 %Ev = [Pw; at; h1*(obj.Cc*(x{k+1}-x{k})); (at-1)];
@@ -170,13 +172,20 @@ classdef black_wolf < mpc_hpc & CP
 
 			% Voltage
 			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([0.5 1.2], [20 90], 0.9, 1/3.497, 1.93, 1);
-			[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx(chip,[0.5 1.2], [20+273.15 90+273.15], obj.Tmpc_off, 0.9, [6.659 -1.979], -1.48, 1);
-			% Freq
-			%[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([obj.lFmin obj.lFmax], [20 90], 0.9, 0.2995, 0, 0);
-			%TODO parametrize
-			[obj.psoff_lut, Fv, Tv] = hc.pws_ls_offset(chip, obj, 5, 4, hc.temp_amb, chip.core_crit_temp, 1);
-			obj.V0v = ones(obj.lNc, length(Fv))*diag(Fv);
-			obj.T0v = ones(obj.lNc, length(Tv))*diag(Tv);
+            if obj.not_update_lin 
+               obj.not_update_lin = 0;
+            else
+			    [obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx(chip,[0.5 1.2], [20+273.15 90+273.15], obj.Tmpc_off, 0.9, [6.659 -1.979], -1.48, 1);
+			    % Freq
+			    %[obj.psac(1),obj.psac(2),obj.psac(3)] = hc.pws_ls_approx([obj.lFmin obj.lFmax], [20 90], 0.9, 0.2995, 0, 0);
+			    %TODO parametrize
+                show = 0;
+			    [obj.psoff_lut, Fv, Tv] = hc.pws_ls_offset(chip, obj, 5, 4, hc.temp_amb, chip.core_crit_temp, show);
+
+                obj.V0v = ones(obj.lNc, length(Fv))*diag(Fv);
+			    obj.T0v = ones(obj.lNc, length(Tv))*diag(Tv);
+            end
+
 
             %todo?
             obj.Pm_max = obj.lFmax*obj.lVmax^2;		
@@ -379,16 +388,16 @@ classdef black_wolf < mpc_hpc & CP
 
 		end
 
-		function [obj] = cleanup_fnc(obj)
+		function [obj] = cleanup_fnc(obj,hc)
 		end
-		function [obj] = plot_fnc(obj, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
+		function [obj] = plot_fnc(obj, t1, t2, xop, uop, fop, vop, wlop)
 			disp(strcat('[CTRL][MPC] number of times the optimization algorithm failed: ',int2str(obj.failed), '/', int2str(obj.lNsim)));
 				
 			figure();
 			%plot(obj.Ts*sim_mul*[1:Nsim]', pceff(2:end,:)*20+293, 'g'); hold on;
 			%plot(t1, cpxplot(2:end,:) - 273.15, 'b'); hold on; grid on;
 			%plot(t2, [NaN*ones(1,size(obj.tmpc,2)); (obj.tmpc(2:end-1,:) - 273.15)], 'm'); hold on;
-			plot(t1, [(cpxplot(2+2:end,:) - 273.15); NaN*ones(2,size(obj.tmpc,2))], 'b'); hold on;
+			plot(t1, [(xop(2+2:end,:) - 273.15); NaN*ones(2,size(obj.tmpc,2))], 'b'); hold on;
 			plot(t2, obj.tmpc(2:end,:) - 273.15 -obj.Tmpc_off, 'm');
 			xlabel("Time [s]");
 			ylabel("Temperature [T]");

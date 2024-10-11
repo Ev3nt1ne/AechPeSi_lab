@@ -141,15 +141,17 @@ wl_times = 3;
 th_models = 3; %2;
 ndom = 4;
 robust = 0;
-show = 0;
+show = 1;
 savetofile = 0;
 hpc.compare_vs_baseline = 1;
 chip1.sensor_noise = 0;
 
-test_iter = 2; %10;%20;
+test_iter = 4; %10;%20;
+
+AlgN = 4;
 
 tres = [];
-tres{test_iter, ndom, th_models, 3, wl_times} = [];
+tres{test_iter, ndom, th_models, AlgN, wl_times} = [];
 
 xres = [];
 %xres{ndom, th_models, 3, wl_times} = [];
@@ -160,7 +162,7 @@ fres = [];
 vres = [];
 %vres{ndom, th_models, 3, wl_times} = [];
 wlres = [];
-wlres{test_iter, ndom, th_models, 3, wl_times} = [];
+wlres{test_iter, ndom, th_models, AlgN, wl_times} = [];
 
 
 
@@ -224,7 +226,7 @@ for i = 1:length(vars)
 end
 
 % Import the file
-fileToRead1 = strcat(cpth, separator_os, 'TAAS_Init_cond.mat');
+fileToRead1 = strcat(cpth, separator_os, 'MPC16_Init_cond.mat');
 newData1 = load('-mat', fileToRead1);
 
 % Create new variables in the base workspace from those fields.
@@ -238,12 +240,38 @@ figid = 1;
 
 addpath('Controllers/');
 
+% Linearized Black wolf
+ctrl_bf = black_wolf(chip1);
+ctrl_bf.C = chip1.C; %eye(hpc.Ns);
+ctrl_bf.Ts_ctrl = 1e-3;
+ctrl_bf.comm_mat = 1;
+ctrl_bf.multi_der_fcn = @mff;
+ctrl_bf.multi_learn_rate = 0.1;
+ctrl_bf.T_target = ones(ctrl_bf.lNc, 1)*chip1.core_limit_temp;
+ctrl_bf.Fdiscretization_step = chip1.F_discretization_step;
+ctrl_bf.lwl_mem = chip1.wl_mem_weigth;
+ctrl_bf.Tmpc_off = -370;
+
+ctrl_bf.Nhzn = 2;
+
+ctrl_bf.Gw = eye(chip1.Ns);
+Qc = 3.4e-4; %0.1;
+ctrl_bf.Qcov = Qc*eye(chip1.Ns);
+Rc = 0.33; %1;
+ctrl_bf.Rcov = Rc*eye(size(ctrl_bf.C,1)); 
+
+%Robust Margins for T and P
+ctrl_bf.Cty = zeros(ctrl_bf.Nhzn, chip1.Nc);
+ctrl_bf.Ctu = zeros(ctrl_bf.Nhzn, chip1.Nc);
+ctrl_bf.not_update_lin = 0;
+
+
 %%
 for tit=1:test_iter
 
 	hpc.t_init{1} = init_cond(:,tit);
 
-for wli=2:wl_times
+for wli=1:wl_times
 	
 	tic
 		
@@ -259,6 +287,7 @@ for wli=2:wl_times
 			hpc.frtrc{1} = 3.45 * ones(tt,chip1.Nc);
 		case 2
 			%full idle but 9 cores
+            
 
 		case 3
 			hpc.wltrc{1} = wlwl3;
@@ -360,6 +389,7 @@ for wli=2:wl_times
 			%vres{di, mdli, 1, wli} = vop;
             wlop = simres(1).wlop;
 			wlres{tit, di, mdli, 1, wli} = wlop;
+            tres{tit, di, mdli, 1, wli} = hpc.stats_analysis(ctrl, chip1,simres(1),1);
 			
 			if show
 				figarray = flip(findobj('Type','figure'));
@@ -389,27 +419,144 @@ for wli=2:wl_times
             ctrl.T_target = ones(ctrl.lNc, 1)*chip1.core_limit_temp;
             ctrl.Fdiscretization_step = chip1.F_discretization_step;
             ctrl.save_solver_stats = 0;
+
+            ctrl.Nhzn = 4;
+
+            %Robust Margins for T and P
+            ctrl.Cty = zeros(ctrl.Nhzn, chip1.Nc);
+            ctrl.Ctu = zeros(ctrl.Nhzn, chip1.Nc);
+            
+            %Reference Tracking Objective Matrix
+            R_coeff = 10;
+            ctrl.Rt = R_coeff*eye(chip1.Nc);
+            
+            %Others
+            ctrl.Rs = zeros(chip1.Nc);
+            ctrl.R = zeros(chip1.Nc);
+            ctrl.Q = 10*eye(chip1.Ns);
+
+
 			simres = hpc.simulation(ctrl, chip1,CM,show);
 			%xres{di, mdli, 2, wli} = xop;
 			%ures{di, mdli, 2, wli} = uop; 
 			%fres{di, mdli, 2, wli} = fop;
 			%vres{di, mdli, 2, wli} = vop;
             wlop = simres(1).wlop;
-			wlres{tit, di, mdli, 2, wli} = wlop;			
+			wlres{tit, di, mdli, 2, wli} = wlop;
+    		tres{tit, di, mdli, 2, wli} = hpc.stats_analysis(ctrl, chip1,simres(1),1);
 			
 			if show
 				figarray = flip(findobj('Type','figure'));
 				%TODO Improve: https://it.mathworks.com/help/matlab/ref/arrayfun.html
 
 				for fn=figid:length(figarray)
-					figarray(fn).Name = strcat(figarray(fn).Name, ' Alg: CP - ', itname);
+					figarray(fn).Name = strcat(figarray(fn).Name, ' Alg: clMPC - ', itname);
 				end
 				figid = length(figarray)+1;
 			end
 			
 			if savetofile
 				hpc.saveall(simres(1).xop, simres(1).uop, simres(1).fop, simres(1).vop, simres(1).wlop, ...
-                    path, regexprep(strcat('Alg: CP - ', itname), ':', '_'));
+                    path, regexprep(strcat('Alg: clMPC - ', itname), ':', '_'));
+            end
+
+            %%
+            
+            %Linearized Black Wolf
+            R_coeff = 0; %absolute value
+            R_shared = 0;%15; % R_coeff/0.2;
+            R_track = 10;
+            Q_coeff = 0; %6 %1e-2%2.5; 
+            
+            % Create matrixes
+            ctrl_bf.R = R_coeff*eye(chip1.Nc);
+            ctrl_bf.Rt = R_track*eye(chip1.Nc);
+            ctrl_bf.Rs = zeros(chip1.Nc);
+            for v=1:chip1.vd
+	            %Here I could create an accumulation thing that need to be
+	            %optimized (e.g. reduced) that contains the deltaF among quadrant 
+	            ctrl_bf.Rs = ctrl_bf.Rs + chip1.VDom(:,v)*chip1.VDom(:,v)' / sum(chip1.VDom(:,v))^2 * R_shared;
+            end
+            %TODO: Assuming that the diagonal is full
+            ctrl_bf.Rs(~eye(size(ctrl_bf.Rs))) = ctrl_bf.Rs(~eye(size(ctrl_bf.Rs))) * (-1);
+            cores_per_dom = sum(chip1.VDom);
+            ctrl_bf.Rs(logical(eye(size(ctrl_bf.Rs)))) = ctrl_bf.Rs(~~eye(size(ctrl_bf.Rs))) .* chip1.VDom*cores_per_dom'; %here I need ~~ to converto to logical values
+            
+            ctrl_bf.Q = (Q_coeff)*eye(chip1.Ns);
+
+			simres = hpc.simulation(ctrl_bf, chip1,CM,show);
+            ctrl_bf.not_update_lin = 1;
+			%xres{di, mdli, 2, wli} = xop;
+			%ures{di, mdli, 2, wli} = uop; 
+			%fres{di, mdli, 2, wli} = fop;
+			%vres{di, mdli, 2, wli} = vop;
+            wlop = simres(1).wlop;
+			wlres{tit, di, mdli, 3, wli} = wlop;
+            tres{tit, di, mdli, 3, wli} = hpc.stats_analysis(ctrl_bf, chip1,simres(1),1);
+			
+			if show
+				figarray = flip(findobj('Type','figure'));
+				%TODO Improve: https://it.mathworks.com/help/matlab/ref/arrayfun.html
+
+				for fn=figid:length(figarray)
+					figarray(fn).Name = strcat(figarray(fn).Name, ' Alg: BW - ', itname);
+				end
+				figid = length(figarray)+1;
+            end
+			
+			if savetofile
+				hpc.saveall(simres(1).xop, simres(1).uop, simres(1).fop, simres(1).vop, simres(1).wlop, ...
+                    path, regexprep(strcat('Alg: BW - ', itname), ':', '_'));
+            end
+
+            %%
+            % Improved Black wolf
+            
+            %Reference Tracking Objective Matrix
+            R_coeff = 20; %absolute value
+            R_shared = 7;%15; % R_coeff/0.2;
+            R_track = 20;
+            Q_coeff = 0.5; %6 %1e-2%2.5;  
+            
+            % Create matrixes
+            ctrl_bf.R = R_coeff*eye(chip1.Nc);
+            ctrl_bf.Rt = R_track*eye(chip1.Nc);
+            ctrl_bf.Rs = zeros(chip1.Nc);
+            for v=1:chip1.vd
+	            %Here I could create an accumulation thing that need to be
+	            %optimized (e.g. reduced) that contains the deltaF among quadrant 
+	            ctrl_bf.Rs = ctrl_bf.Rs + chip1.VDom(:,v)*chip1.VDom(:,v)' / sum(chip1.VDom(:,v))^2 * R_shared;
+            end
+            %TODO: Assuming that the diagonal is full
+            ctrl_bf.Rs(~eye(size(ctrl_bf.Rs))) = ctrl_bf.Rs(~eye(size(ctrl_bf.Rs))) * (-1);
+            cores_per_dom = sum(chip1.VDom);
+            ctrl_bf.Rs(logical(eye(size(ctrl_bf.Rs)))) = ctrl_bf.Rs(~~eye(size(ctrl_bf.Rs))) .* chip1.VDom*cores_per_dom'; %here I need ~~ to converto to logical values
+            
+            ctrl_bf.Q = (Q_coeff)*eye(chip1.Ns);
+
+			simres = hpc.simulation(ctrl_bf, chip1,CM,show);
+            ctrl_bf.not_update_lin = 1;
+			%xres{di, mdli, 2, wli} = xop;
+			%ures{di, mdli, 2, wli} = uop; 
+			%fres{di, mdli, 2, wli} = fop;
+			%vres{di, mdli, 2, wli} = vop;
+            wlop = simres(1).wlop;
+			wlres{tit, di, mdli, 4, wli} = wlop;
+            tres{tit, di, mdli, 4, wli} = hpc.stats_analysis(ctrl_bf, chip1,simres(1),1);
+			
+			if show
+				figarray = flip(findobj('Type','figure'));
+				%TODO Improve: https://it.mathworks.com/help/matlab/ref/arrayfun.html
+
+				for fn=figid:length(figarray)
+					figarray(fn).Name = strcat(figarray(fn).Name, ' Alg: ImBW - ', itname);
+				end
+				figid = length(figarray)+1;
+			end
+			
+			if savetofile
+				hpc.saveall(simres(1).xop, simres(1).uop, simres(1).fop, simres(1).vop, simres(1).wlop, ...
+                    path, regexprep(strcat('Alg: ImBW - ', itname), ':', '_'));
             end
 
 		end % for di domains

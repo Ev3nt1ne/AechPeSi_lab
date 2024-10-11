@@ -96,7 +96,8 @@ classdef cp_mpc < mpc_hpc & CP
 						constraints = [constraints, u{k} <= obj.umax - obj.Ctu(k,:)'];
 					end
 
-				    objective = objective + (u{k}-ly_uref)'*obj.Rt*(u{k}-ly_uref) + u{k}'*obj.Rs*(u{k}) + x{k+1}'*obj.Q*x{k+1};
+				    objective = objective + (u{k}-ly_uref)'*obj.Rt*(u{k}-ly_uref) + u{k}'*obj.Rs*(u{k}) + ...
+                        ((x{k+1}-obj.T_amb)/(obj.T_target(1)-obj.T_amb))'*obj.Q*((x{k+1}-obj.T_amb)/(obj.T_target(1)-obj.T_amb)); %x{k+1}'*obj.Q*x{k+1};
                 end
             end
 			
