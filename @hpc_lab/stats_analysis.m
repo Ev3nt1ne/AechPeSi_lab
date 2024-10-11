@@ -2,10 +2,10 @@ function res = stats_analysis(obj,ctrl,chip,simres,cidx)
 %STATS_ANALYSIS Summary of this function goes here
 %   Detailed explanation goes here
 
-    x = simres.cpxplot;
-    u = simres.cpuplot;
-    f = simres.cpfplot;
-    v = simres.cpvplot;
+    x = simres.xop;
+    u = simres.uop;
+    f = simres.fop;
+    v = simres.vop;
     w = simres.wlop;
 
 	xcp = x(2:end,:)*chip.Cc' -273.15;

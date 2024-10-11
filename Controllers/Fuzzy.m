@@ -347,7 +347,7 @@ classdef Fuzzy < CP
 			obj.pw_old{2} = sum(pu);
 
 		end
-		function [obj] = cleanup_fnc(obj)
+		function [obj] = cleanup_fnc(obj, hc)
 		end
 		function [obj] = plot_fnc(obj, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
 		end

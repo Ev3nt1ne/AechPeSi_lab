@@ -11,27 +11,31 @@ classdef ideal_unr < controller
 	end
 	
 	methods
-		function obj = ideal_unr()
+		function obj = ideal_unr(chip)
 			%IDEAL_UNR Construct an instance of this class
 			%   Detailed explanation goes here
+            obj = obj@controller(chip);
 			
 		end
 		
-		function [obj] = init_fnc(obj, hc, Nsim)
+		function [obj, comms] = init_fnc(obj, hc, chip, ctrl_id, Nsim)
 			obj.widx = 0;
+            comms = 0;
 		end
-		function [F,V, obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
+		function [F,V,comm,obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl,ctrl_id, ctrl_comm)
 
 			obj.ex_count = obj.ex_count + 1;
 
-			F = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
-			FD = diag(F)*hc.VDom;			
-			V = obj.compute_sharedV(hc, FD, 100);
+			F = f_ref;
+			FD = diag(F)*obj.lVDom;			
+			V = obj.find_dom_sharedV(obj.lFVT, FD, 100);
+
+            comm = 0;
 		end
 		function [obj] = cleanup_fnc(obj, hc)
 			obj.widx = hc.wl_index;
 		end
-		function [obj] = plot_fnc(obj, hc, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
+		function [obj] = plot_fnc(obj, hc, t1, t2, xop, uop, fop, vop, wlop)
 		end
 
 	end

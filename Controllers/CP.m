@@ -66,22 +66,22 @@ classdef CP < controller
             obj = obj@controller(hpc);
 			
 		end
-		function [obj] = init_fnc(obj, hc, Nsim)
+		function [obj, comms] = init_fnc(obj, hc, chip, ctrl_id, Nsim)
 			%TODO understand which one I actually really need
 			%TODO understand which needs to go out and which in
 			obj.pw_storage = 0;
 			obj.pw_adapt = 0;
 			obj.pw_old = [];
-			obj.pw_old{1} = 1*hc.Nc;
-			obj.pw_old{2} = 1*hc.Nc;
+			obj.pw_old{1} = 1*chip.Nc;
+			obj.pw_old{2} = 1*chip.Nc;
 			obj.pbold = 0;
 			obj.pbc = 0;
 			obj.ex_count = 0;
-			obj.wl = [ones(hc.Nc,1) zeros(hc.Nc, hc.ipl -1)];
-			obj.T_target = ones(hc.Nc, 1)*hc.core_limit_temp;
+			obj.wl = [ones(chip.Nc,1) zeros(chip.Nc, chip.ipl -1)];
+			obj.T_target = ones(chip.Nc, 1)*chip.core_limit_temp;
 
-			obj.f_ma = hc.F_min*ones(hc.Nc,1);
-			obj.pid_integ = zeros(hc.Nc,1);
+			obj.f_ma = chip.F_min*ones(chip.Nc,1);
+			obj.pid_integ = zeros(chip.Nc,1);
 
 			obj.o_inc_st = 0;
 			obj.o_dec_st = 0;
@@ -91,14 +91,16 @@ classdef CP < controller
 			obj.o_hys_act = 0;
 			obj.o_hys_step_count = 0; %v_hys_steps;
 			obj.hys_p_count = 0;
-			obj.nOut = hc.F_min*ones(hc.Nc,1);
+			obj.nOut = chip.F_min*ones(chip.Nc,1);
+
+            comms = 0;
 		end
-		function [F,V, obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
+		function [F,V,comm,obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl,ctrl_id, ctrl_comm)
 
 			obj.ex_count = obj.ex_count + 1;
+            comm = 0;
 
-			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
-			p_budget = hc.tot_pw_budget(min(target_index, length(hc.tot_pw_budget)));
+            p_budget = pwbdg(2);
 
 			if p_budget~=obj.pbold
 				obj.pbold = p_budget;
@@ -114,14 +116,14 @@ classdef CP < controller
 				obj.pbc = 0;
 			end
 
-			T = pvt{hc.PVT_T};
-			process = pvt{hc.PVT_P};
+			T = pvt{obj.PVT_T};
+			process = pvt{obj.PVT_P};
 
 			obj.pw_storage = 0;
 
 			% Process Workload
 			obj.wl = obj.wl*(1-obj.alpha_wl) + i_wl*obj.alpha_wl;
-			Ceff = obj.wl * (hc.dyn_ceff_k)';
+			Ceff = obj.wl * (obj.pw_ceff)';
 
 			% Process Power Budget
 			% (?)
@@ -132,36 +134,38 @@ classdef CP < controller
 
 			% Choose Voltage
 			obj.f_ma(obj.f_ma<0) = 0; %saturate F_MA
-			FD = diag(f_ref - obj.f_ma)*hc.VDom;			
-			V = obj.find_dom_sharedV(hc.FV_table, FD, obj.voltage_rule);
+            fctrl = f_ref - obj.f_ma;
+            fctrl(fctrl<=0) = obj.lFmin;
+			FD = diag(fctrl)*obj.lVDom;			
+			V = obj.find_dom_sharedV(obj.lFVT, FD, obj.voltage_rule);
 			F = f_ref;
 
 			% Compute Power
-			pu = (Ceff.*F.*(hc.VDom*V) + hc.leak_vdd_k).*(hc.VDom*V) + process*hc.leak_process_k;
+			pu = (Ceff.*F.*(obj.lVDom*V) + obj.pw_stat_lin(1)).*(obj.lVDom*V) + process*obj.pw_stat_lin(3);
 
 			% DispatchPower
 			%TODO, quad power budget dispatching
 			delta_p = sum(pu) - p_budget + obj.pw_adapt;
 			if (delta_p > 0)
-				[pu, ~] = obj.cp_pw_dispatcher(T, hc.core_limit_temp, obj.T_target, delta_p, pu, hc.min_pw_red); %todo: core_limit_temp(1:obj.vd)
+				[pu, ~] = obj.cp_pw_dispatcher(T, obj.core_Tcrit, obj.T_target, delta_p, pu, obj.lPmin); %todo: core_limit_temp(1:obj.vd)
 			end
 
 			if sum(isempty(pu)) || sum(pu<=0)
 				disp("error, something wrong");
-				F = hc.F_min * ones(hc.Nc,1);
-				V = hc.V_min * ones(hc.vd,1);
+				F = obj.lFmin * ones(obj.lNc,1);
+				V = obj.lVmin * ones(obj.lvd,1);
 				%TODO should I trigger some other cleanup?
 				return;
 			end
 
 			% PID
-			[upid, obj.pid_integ] = obj.cp_pid(hc, T, obj.T_target, obj.pid_integ, pu);
+			[upid, obj.pid_integ] = obj.cp_pid(T, obj.T_target, obj.pid_integ, pu, obj.lPmin);
 			% Controller Output
 			pu = pu + upid;
 			%cpdebug(s+1,:) = upid;
 
 			% Compute Freq
-			F = (((pu - process*hc.leak_process_k) ./ (hc.VDom*V)) - hc.leak_vdd_k) ./ (hc.VDom*V) ./ Ceff;
+			F = (((pu - process*obj.pw_stat_lin(3)) ./ (obj.lVDom*V)) - obj.pw_stat_lin(1)) ./ (obj.lVDom*V) ./ Ceff;
 		
 			% Save OG freq
 			F_og = F;
@@ -218,12 +222,12 @@ classdef CP < controller
 	
 			% Process Freq
 			%	Check vs maxF, Temp hysteresis, etc.
-			fmaxi = hc.FV_table(sum(hc.VDom * V > ones(hc.Nc,1)*hc.FV_table(:,1)'+1e-6, 2) + 1, 3);
+			fmaxi = obj.lFVT(sum(obj.lVDom * V > ones(obj.lNc,1)*obj.lFVT(:,1)'+1e-6, 2) + 1, 3);
 			F = F + (F>fmaxi).*(fmaxi - F);
-			F = F + (F<hc.F_min).*(hc.F_min*ones(hc.Nc,1) - F);
+			F = F + (F<obj.lFmin).*(obj.lFmin*ones(obj.lNc,1) - F);
 			
 			%TEST: TODO REMOVE
-			pu = (Ceff.*F.*(hc.VDom*V) + hc.leak_vdd_k).*(hc.VDom*V) + process*hc.leak_process_k;
+			pu = (Ceff.*F.*(obj.lVDom*V) + obj.pw_stat_lin(1)).*(obj.lVDom*V) + process*obj.pw_stat_lin(3);
 			obj.pw_old{2} = sum(pu);
 
 			%TODO
@@ -234,22 +238,23 @@ classdef CP < controller
 			% f_MA = f_ref - f_app --> sat 0
 			%	Sat 0 is a choice, without we have TurboBoost!
 			%TODO Turbo boosting is not working!
-			turbo_boost = zeros(hc.Nc,1);
+			turbo_boost = zeros(obj.lNc,1);
 			tt = (f_ref - F_og)>-turbo_boost;
 			obj.f_ma = obj.f_ma*(1-alpha_MA) + alpha_MA*(tt.*(f_ref - F_og) + (~tt).*0); %This is 0 and not turbo_boost!
 
 		end
 		function [obj] = cleanup_fnc(obj, hc)
 		end
-		function [obj] = plot_fnc(obj, hc, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
+		function [obj] = plot_fnc(obj, hc, t1, t2, xop, uop, fop, vop, wlop)
 		end
 		
 	end
 		
 
 	methods
-		function [upid, ointeg] = cp_pid(obj, hc, T, pid_target, pid_integ, pu)
+        function [upid, ointeg] = cp_pid(obj, T, pid_target, pid_integ, pu, pmin)
 			
+            Nc = length(T);
 			kp_l = obj.kp;
 			ki_l = obj.ki*obj.Ts_ctrl;
 
@@ -282,8 +287,8 @@ classdef CP < controller
 			eU = upid>obj.sat_up;
 			upid = eU*obj.sat_up + (~eU).*upid;
 			%TODO
-			eU = upid < (-(pu-ones(hc.Nc,1).*hc.min_pw_red*0.7));
-			upid = eU.*(-(pu-ones(hc.Nc,1).*hc.min_pw_red*0.7)) + (~eU).*upid;
+			eU = upid < (-(pu-ones(Nc,1).*pmin*0.7));
+			upid = eU.*(-(pu-ones(Nc,1).*pmin*0.7)) + (~eU).*upid;
 		end
 		function [pu, pw_storage] = cp_pw_dispatcher(obj, T, core_crit_temp, core_limit_temp, delta_p, ipu, min_pw_red)
 			

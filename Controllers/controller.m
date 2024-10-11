@@ -148,8 +148,8 @@ classdef controller < handle
 	methods(Abstract=true)
 		[obj, comms] = init_fnc(obj, hc, chip, ctrl_id, Nsim)
 		[F,V,comm,obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl,ctrl_id, ctrl_comm)
-		[obj] = cleanup_fnc(obj)
-		[obj] = plot_fnc(obj, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
+		[obj] = cleanup_fnc(obj, hc)
+		[obj] = plot_fnc(obj, t1, t2, xop, uop, fop, vop, wlop)
 	end
 
 	methods(Static)

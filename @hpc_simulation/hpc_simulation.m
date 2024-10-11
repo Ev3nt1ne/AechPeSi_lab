@@ -6,10 +6,10 @@ classdef hpc_simulation < handle
         F;
         V;
         process;
-        cpuplot;
-        cpxplot;
-        cpfplot;
-        cpvplot;
+        uop;
+        xop;
+        fop;
+        vop;
         wlop;
 
         pwm;

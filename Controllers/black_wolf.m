@@ -111,7 +111,8 @@ classdef black_wolf < mpc_hpc & CP
 			for k = 1:obj.Nhzn
 				objective = objective + (u{k}-ly_uref)'*obj.Rt*(u{k}-ly_uref) + u{k}'*obj.Rs*(u{k}) + ...
                         ((x{k+1}-obj.T_amb-Toff)/(obj.T_target-obj.T_amb))'*obj.Q*((x{k+1}-obj.T_amb-Toff)/(obj.T_target-obj.T_amb)) + ...
-                        ((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm)'*obj.R*((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm);
+                        ((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm)'*obj.R*((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm) + ...
+                        %(x{k+1}-obj.T_amb)'*(-obj.Q*1)*(x{k+1}-obj.T_amb) + (-obj.Cc'*(h0+h0v)/h1)'*(obj.Q*1)*(-obj.Cc'*(h0+h0v)/h1);
                 %energy
                 %at = (ly_uref./u{k}).*wSm;
                 %Ev = [Pw; at; h1*(obj.Cc*(x{k+1}-x{k})); (at-1)];

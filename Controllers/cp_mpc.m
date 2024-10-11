@@ -323,9 +323,15 @@ classdef cp_mpc < mpc_hpc & CP
 			% Adapt Measured&Computed Power
 			obj.pw_adapt = obj.cp_pw_adapt(obj.pw_adapt, i_pwm, obj.pw_old{1}, obj.pbc);
 			obj.pw_old{1} = obj.pw_old{2};
+
+            if obj.pbc==1
+                obj.f_ma = zeros(size(obj.f_ma));
+            end
 			
 			% Choose Voltage
-			FD = diag(f_ref-obj.f_ma)*obj.lVDom;
+			fctrl = f_ref - obj.f_ma;
+            fctrl(fctrl<=0) = obj.lFmin;
+			FD = diag(fctrl)*obj.lVDom;	
 			V = obj.find_dom_sharedV(obj.lFVT, FD, obj.voltage_rule);
 			F = f_ref;
 
@@ -420,7 +426,7 @@ classdef cp_mpc < mpc_hpc & CP
 
 		end
 
-		function [obj] = cleanup_fnc(obj)
+		function [obj] = cleanup_fnc(obj,hc)
 		end
 		function [obj] = plot_fnc(obj, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
 			disp(strcat('[CTRL][MPC] number of times the optimization algorithm failed: ',int2str(obj.failed), '/', int2str(obj.lNsim)));

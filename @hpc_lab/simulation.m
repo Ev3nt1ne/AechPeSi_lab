@@ -1,4 +1,4 @@
-function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
+function asimcl = ... %[xop, uop, fop, vop, wlop] = ...
 	simulation(obj, ctrl, chip, CM, show)
 %SIMULATION Summary of this function goes here
 %   Detailed explanation goes here	
@@ -139,14 +139,14 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
     
 	    %TODO
 	    x = obj.t_init{cid};% + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
-        asimcl(cid).cpuplot = zeros(Nsim(cid)+1,chip(cid).Nc);
-	    asimcl(cid).cpxplot = zeros(Nsim(cid)+1,chip(cid).Ns);
-        asimcl(cid).cpfplot = zeros(Nsim(cid)+1,chip(cid).Nc);
-	    asimcl(cid).cpvplot = zeros(Nsim(cid)+1,chip(cid).vd);
-        asimcl(cid).cpxplot(1,:) = x;
-	    asimcl(cid).cpuplot(1,:) = NaN;
-	    asimcl(cid).cpfplot(1,:) = asimcl(cid).F;
-	    asimcl(cid).cpvplot(1,:) = asimcl(cid).V;
+        asimcl(cid).uop = zeros(Nsim(cid)+1,chip(cid).Nc);
+	    asimcl(cid).xop = zeros(Nsim(cid)+1,chip(cid).Ns);
+        asimcl(cid).fop = zeros(Nsim(cid)+1,chip(cid).Nc);
+	    asimcl(cid).vop = zeros(Nsim(cid)+1,chip(cid).vd);
+        asimcl(cid).xop(1,:) = x;
+	    asimcl(cid).uop(1,:) = NaN;
+	    asimcl(cid).fop(1,:) = asimcl(cid).F;
+	    asimcl(cid).vop(1,:) = asimcl(cid).V;
 	    asimcl(cid).pvt{chip.PVT_P} = asimcl(cid).process;
 	    asimcl(cid).pvt{chip.PVT_V} = [];
 	    asimcl(cid).pvt{chip.PVT_T} = ctrl(cid).C*x;
@@ -209,11 +209,11 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 
                 %Compute model:
 		        index = 1+(s-1)*sys_mul(cid);
-		        [asimcl(cid).cpuplot(index+1:index+sys_mul(cid),:), asimcl(cid).cpxplot(index+1:index+sys_mul(cid),:), asimcl(cid).wl, asimcl(cid).pwm, asimcl(cid)] = ...
-                    asimcl(cid).compute_model(sys_mul(cid), asimcl(cid).cpxplot(index,:)', asimcl(cid).V, asimcl(cid).F, asimcl(cid).process, obj.temp_amb, obj.wltrc{cid}, chip(cid));	
+		        [asimcl(cid).uop(index+1:index+sys_mul(cid),:), asimcl(cid).xop(index+1:index+sys_mul(cid),:), asimcl(cid).wl, asimcl(cid).pwm, asimcl(cid)] = ...
+                    asimcl(cid).compute_model(sys_mul(cid), asimcl(cid).xop(index,:)', asimcl(cid).V, asimcl(cid).F, asimcl(cid).process, obj.temp_amb, obj.wltrc{cid}, chip(cid));	
         
 		        % Sim output managing
-		        T = ctrl(cid).C*asimcl(cid).cpxplot(index,:)';
+		        T = ctrl(cid).C*asimcl(cid).xop(index,:)';
 		        % Noise:
 		        dim = min(length(T), chip(cid).Nc);
 		        T = T + [(chip(cid).sensor_noise)*( (rand(dim,1) - 0.5)*2 * chip(cid).sensor_noise_amplitude(chip(cid).PVT_T) ); zeros(length(T)-dim,1)];	
@@ -232,8 +232,8 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
                     %ctrl_comm(i,:) = {};
                 %end
 
-		        asimcl(cid).cpfplot(s+1,:) = asimcl(cid).F;
-		        asimcl(cid).cpvplot(s+1,:) = asimcl(cid).V;
+		        asimcl(cid).fop(s+1,:) = asimcl(cid).F;
+		        asimcl(cid).vop(s+1,:) = asimcl(cid).V;
             end
         end
     end
@@ -247,7 +247,7 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
 			warning("[HPC LAB] Warning! You are not comparing with the baseline! You should run base_ideal_unr() or checkante!");
         end
         for cid=1:N_chip
-		    cmp{cid} = obj.perf_max_check;
+		    cmp{cid} = obj.perf_max_check{cid};
         end
     else
         for cid=1:N_chip
@@ -256,25 +256,26 @@ function asimcl = ... %[cpxplot, cpuplot, cpfplot, cpvplot, wlop] = ...
     end
     for cid=1:N_chip
 	    asimcl(cid).wlop = asimcl(cid).wl_index ./ cmp{cid} * 100;
-	    ctrl(cid) = ctrl(cid).cleanup_fnc();
+	    ctrl(cid) = ctrl(cid).cleanup_fnc(asimcl(cid));
 
 	    if show
 		    % Pause because it is bugged on Linux
 		    pause(0.5);
-		    obj.xutplot(chip(cid),asimcl(cid).cpxplot,asimcl(cid).cpuplot);
+		    obj.xutplot(chip(cid),asimcl(cid).xop,asimcl(cid).uop);
 		    pause(0.5);
-		    obj.powerconstrplot(chip(cid),cid,asimcl(cid).cpuplot);
+		    obj.powerconstrplot(chip(cid),cid,asimcl(cid).uop);
 		    pause(0.5);
-		    obj.tempconstrplot(chip(cid),asimcl(cid).cpxplot);
+		    obj.tempconstrplot(chip(cid),asimcl(cid).xop);
 		    pause(0.5);
-		    obj.perfplot(chip(cid),asimcl(cid).cpfplot,asimcl(cid).wl_index, cmp{cid}, cid);	
+		    obj.perfplot(chip(cid),asimcl(cid).fop,asimcl(cid).wl_index, cmp{cid}, cid);	
 		    pause(0.5);
-		    obj.fvplot(chip(cid),asimcl(cid).cpfplot,asimcl(cid).cpvplot);
+		    obj.fvplot(chip(cid),asimcl(cid).fop,asimcl(cid).vop);
+            pause(0.5);
     
 		    t1 = chip(cid).Ts*[1:Nsim(cid)*sys_mul(cid)]';
 		    t2 = chip(cid).Ts*sys_mul(cid)*[1:Nsim(cid)]';
     
-		    ctrl(cid) = ctrl(cid).plot_fnc(t1, t2, asimcl(cid).cpxplot, asimcl(cid).cpuplot, asimcl(cid).cpfplot, asimcl(cid).cpvplot, asimcl(cid).wlop);
+		    ctrl(cid) = ctrl(cid).plot_fnc(t1, t2, asimcl(cid).xop, asimcl(cid).uop, asimcl(cid).fop, asimcl(cid).vop, asimcl(cid).wlop);
         end
     end
 

@@ -51,32 +51,34 @@ classdef IBM_OCC < controller
 	end
 	
 	methods
-		function obj = IBM_OCC()
+		function obj = IBM_OCC(hpc)
 			%CP Construct an instance of this class
 			%   Detailed explanation goes here
+            obj = obj@controller(hpc);
 			
 		end
-		function [obj] = init_fnc(obj, hc, Nsim)
+		function [obj, comms] = init_fnc(obj, hc, chip, ctrl_id, Nsim)
 			%TODO understand which one I actually really need
 			%TODO understand which needs to go out and which in
+            comms = 0;
 
 			obj.ex_count = 0;
-			obj.T_target = ones(hc.Nc, 1)*hc.core_limit_temp;
+			obj.T_target = ones(chip.Nc, 1)*chip.core_limit_temp;
 
 			obj.lf_max = obj.gf_max;
 			obj.cf_max = obj.gf_max;
-			obj.gf_min = hc.F_min;
+			obj.gf_min = chip.F_min;
 
-			obj.core_dps = 1000*ones(hc.Nc,1); %here they initialize at 2000, but they saturate at 1000 right away. dunno why....
-			obj.core_util = ones(hc.Nc,1);
+			obj.core_dps = 1000*ones(chip.Nc,1); %here they initialize at 2000, but they saturate at 1000 right away. dunno why....
+			obj.core_util = ones(chip.Nc,1);
 
 			obj.occ_thermal_tick_idx = obj.occ_thermal_tick;
-			obj.cpu_speed = 1000*ones(hc.Nc,1);
-			obj.th_freq = obj.gf_max*ones(hc.Nc,1);
+			obj.cpu_speed = 1000*ones(chip.Nc,1);
+			obj.th_freq = obj.gf_max*ones(chip.Nc,1);
 			obj.st_proc_pcap_vote = obj.gf_max;
-			obj.proc_ghz_per_watt = 1.118 / hc.Nc; % but with leakage this is really not good
-			obj.pdrop_thresh = 10/15*hc.Nc; % normalized with the number of core!
-			obj.frequency_step_pstate = hc.F_discretization_step; %Comes from refclk/dpll_divider attributes.
+			obj.proc_ghz_per_watt = 1.118 / chip.Nc; % but with leakage this is really not good
+			obj.pdrop_thresh = 10/15*chip.Nc; % normalized with the number of core!
+			obj.frequency_step_pstate = chip.F_discretization_step; %Comes from refclk/dpll_divider attributes.
 
 			%%%%%%%%%%%%%%%%%%5
 			%function [ptl, pmin] = create_pstate_table(obj, fmax, fmin, frequency_step_pstate)	
@@ -87,26 +89,29 @@ classdef IBM_OCC < controller
 				obj.ptl(:,1) = 0:1:obj.pmin;
 				obj.ptl(:,2) = [obj.gf_max:-obj.frequency_step_pstate:obj.gf_min obj.gf_min];
 				
-				tt = sum(obj.ptl(:,2).*ones(obj.pmin+1,hc.FV_levels) > hc.FV_table(:,3)',2) + 1;
-				obj.ptl(:,3) = hc.FV_table(tt,1);
+				tt = sum(obj.ptl(:,2).*ones(obj.pmin+1,chip.FV_levels) > chip.FV_table(:,3)',2) + 1;
+				obj.ptl(:,3) = chip.FV_table(tt,1);
 			%end
 			%%%%%%%%%%%%%%%%%%5
 				obj.psm = obj.pmin; %psm = 0 + (gf_max - gf_min) / frequency_step_pstate; %minimum pstate; 
 				obj.node_ghz_per_watt = obj.proc_ghz_per_watt; %only one proc
 				
-				obj.ghz_per_pstate = hc.F_discretization_step; %frequency_step_khz/1000, in the main %todo
+				obj.ghz_per_pstate = chip.F_discretization_step; %frequency_step_khz/1000, in the main %todo
 
 
 		end
-		function [F,V, obj] = ctrl_fnc(obj, hc, target_index, pvt, i_pwm, i_wl)
+		function [F,V,comm,obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl,ctrl_id, ctrl_comm)
+
+            comm = 0;
 
 			obj.ex_count = obj.ex_count + 1;
 
-			f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
-			p_budget = hc.tot_pw_budget(min(target_index, length(hc.tot_pw_budget)));
+			%f_ref = hc.frtrc(min(target_index, size(hc.frtrc,1)),:)';
+			%p_budget = hc.tot_pw_budget(min(target_index, length(hc.tot_pw_budget)));
 
-			T = pvt{hc.PVT_T};
-			process = pvt{hc.PVT_P};
+			T = pvt{obj.PVT_T};
+			process = pvt{obj.PVT_P};
+            p_budget = pwbdg(2);
 
 			% ignore gpu power control
 			% ignore memory power control
@@ -173,9 +178,9 @@ classdef IBM_OCC < controller
 	
 				% Get hottest core temperature in OCC processor
 				if obj.occ_dom_active
-					occ_temp = obj.VDom*max(T.*hc.VDom)';
+					occ_temp = obj.VDom*max(T.*obj.lVDom)';
 				else
-					occ_temp = max(T)*ones(hc.Nc,1);
+					occ_temp = max(T)*ones(obj.lNc,1);
 				end
 				if obj.occ_thermal_all
 					occ_temp = T;
@@ -251,7 +256,7 @@ classdef IBM_OCC < controller
 				(obj.core_dps < 1000).*obj.gf_max .* obj.core_dps ./ 1000;
 			%we are not using dps, cuz we are measuring performance and not
 			%energy without any wait time for idling
-			dps_freq = obj.gf_max*ones(hc.Nc,1);
+			dps_freq = obj.gf_max*ones(obj.lNc,1);
 			
 		
 			%%%%%%%%%%%%%%%
@@ -317,10 +322,10 @@ classdef IBM_OCC < controller
 			%if obj.ctrl_fixedv
 			%	V = obj.ctrl_fixedv_value*ones(obj.vd, 1);
 			%else
-				for vidx=1:hc.vd
-					fc = F.*hc.VDom(:,vidx);
+				for vidx=1:obj.lvd
+					fc = F.*obj.lVDom(:,vidx);
 					fcm = max(fc);
-					V(vidx,:) = hc.FV_table(sum(fcm > hc.FV_table(:,3))+1,1);
+					V(vidx,:) = obj.lFVT(sum(fcm > obj.lFVT(:,3))+1,1);
 					%V = V + vc*obj.VDom(:,vidx);			
 				end
 			%end
@@ -334,7 +339,7 @@ classdef IBM_OCC < controller
 		end
 		function [obj] = cleanup_fnc(obj, hc)
 		end
-		function [obj] = plot_fnc(obj, hc, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
+		function [obj] = plot_fnc(obj, hc, t1, t2, xop, uop, fop, vop, wlop)
 		end
 		
 	end
