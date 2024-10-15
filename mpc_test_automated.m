@@ -529,12 +529,15 @@ for wli=1:wl_times
             % Improved Black wolf
             
             %Reference Tracking Objective Matrix
-            R_coeff = 10; % 20%absolute value
-            R_shared = 7;%15; % R_coeff/0.2;
+            R_coeff = 1; % 20 %absolute value
+            R_shared = 5;%15; % R_coeff/0.2;
             R_track = 20;
             Q_coeff = 0.5; %6 %1e-2%2.5;  
             
             % Create matrixes
+            ctrl.R = R_coeff*eye(chip1.Nc);
+            ctrl.Rt = R_track*eye(chip1.Nc);
+            ctrl.Rs = zeros(chip1.Nc);
             for v=1:chip1.vd
 	            %Here I could create an accumulation thing that need to be
 	            %optimized (e.g. reduced) that contains the deltaF among quadrant 
