@@ -268,8 +268,8 @@ classdef cp_mpc < mpc_hpc & CP
                 disp(sprintf('sparsifying B by x%f.  nnz(B) goes from %d to %d.',nnzS/nnzE, nnzS, nnzE));
             end
 
-            obj.umin = obj.lPmin;
-            obj.umax = obj.lPmax;
+            obj.umin = chip.core_min_power; %obj.Pm_min;
+            obj.umax = chip.core_max_power; %obj.Pm_max;
 
 			obj = obj.setup_mpc();
 
@@ -331,7 +331,7 @@ classdef cp_mpc < mpc_hpc & CP
 			
 			% Choose Voltage
 			fctrl = f_ref - obj.f_ma;
-            fctrl(fctrl<=0) = obj.lFmin;
+            fctrl(fctrl<=obj.lFmin) = obj.lFmin;
 			FD = diag(fctrl)*obj.lVDom;	
 			V = obj.find_dom_sharedV(obj.lFVT, FD, obj.voltage_rule);
 			F = f_ref;

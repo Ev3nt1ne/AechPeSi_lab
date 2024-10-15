@@ -267,7 +267,7 @@ function asimcl = ... %[xop, uop, fop, vop, wlop] = ...
 		    pause(0.5);
 		    obj.tempconstrplot(chip(cid),asimcl(cid).xop);
 		    pause(0.5);
-		    obj.perfplot(chip(cid),asimcl(cid).fop,asimcl(cid).wl_index, cmp{cid}, cid);	
+		    obj.perfplot(chip(cid),asimcl(cid).fop,asimcl(cid).wlop, cid);	
 		    pause(0.5);
 		    obj.fvplot(chip(cid),asimcl(cid).fop,asimcl(cid).vop);
             pause(0.5);

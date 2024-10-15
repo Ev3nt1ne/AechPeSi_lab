@@ -191,8 +191,8 @@ classdef black_wolf < mpc_hpc & CP
             obj.Pm_max = obj.lFmax*obj.lVmax^2;		
             obj.Pm_min = obj.lFmin*obj.lVmin^2;
 
-            obj.umin = obj.Pm_min;
-            obj.umax = obj.Pm_max;
+            obj.umin = chip.core_min_power; %obj.Pm_min;
+            obj.umax = chip.core_max_power; %obj.Pm_max;
 
             %TODO: check if all the matrix are ok and defined, otherwise
             %       fix them
@@ -211,7 +211,9 @@ classdef black_wolf < mpc_hpc & CP
 			obj.lNsim = Nsim;
 			obj.prevF = obj.lFmin*ones(obj.lNc,1);
 			obj.prevV = obj.lVmin*ones(obj.lvd,1);
-            obj.Tobs = obj.T_amb*ones(obj.lNs,1);
+            %rounding initial guess
+            rig = 5;
+            obj.Tobs = fix(hc.t_init{ctrl_id}/rig)*rig; %hc.T_amb*ones(obj.lNs,1);
 			%TODO
 			obj.output_mpc = 1*ones(obj.lNc,1);	
 
@@ -235,6 +237,10 @@ classdef black_wolf < mpc_hpc & CP
 		function [F,V, comm, obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl, ctrl_id, ctrl_comm)
 
 			obj.ex_count = obj.ex_count + 1;
+
+            %if (obj.ex_count == 300)
+            %    aa = 1;
+            %end
 
 			%pp = obj.output_mpc;
 			T = pvt{obj.PVT_T};
@@ -370,21 +376,6 @@ classdef black_wolf < mpc_hpc & CP
             % Distributed Algorithm:
             comm{1} = 0;
             comm{2} = 0;
-            aa = 0;
-            bb= 0;
-            if ctrl_id==1
-                adab = 1;
-            else
-                adab = 2;
-            end
-            for i=1:length(ctrl_comm)
-                if ~isempty(ctrl_comm{i})
-                    aa = aa + ctrl_comm{i}{1} + adab;
-                    bb = bb + ctrl_comm{i}{2} + 1;
-                end
-            end
-            comm{1} = aa;
-            comm{2} = bb;
 
 		end
 

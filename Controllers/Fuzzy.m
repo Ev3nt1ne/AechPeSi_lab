@@ -91,29 +91,11 @@ classdef Fuzzy < CP
             %%%%%%%
             % Distributed Algorithm:
             [dist_pw, dist_grad, obj] = obj.grad_track_alg(ctrl_comm, ctrl_id);
-            %{     
-            comm{1} = 0;
-            comm{2} = 0;
-            aa = 0;
-            bb= 0;
-            if ctrl_id==1
-                adab = 1;
-            else
-                adab = 2;
-            end
-            for i=1:length(ctrl_comm)
-                if ~isempty(ctrl_comm{i})
-                    aa = aa + ctrl_comm{i}{1} + adab;
-                    bb = bb + ctrl_comm{i}{2} + 1;
-                end
-            end
-            comm{1} = aa;
-            comm{2} = bb;
-            %}
+
             comm{1} = dist_pw;
             comm{2} = dist_grad;
 
-            chippwbdg = min(chippwbdg, dist_pw(ctrl_id));
+            %chippwbdg = min(chippwbdg, dist_pw(ctrl_id));
             %%%%%%%
 
 			if chippwbdg~=obj.pbold

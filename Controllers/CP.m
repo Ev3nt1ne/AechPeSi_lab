@@ -135,7 +135,7 @@ classdef CP < controller
 			% Choose Voltage
 			obj.f_ma(obj.f_ma<0) = 0; %saturate F_MA
             fctrl = f_ref - obj.f_ma;
-            fctrl(fctrl<=0) = obj.lFmin;
+            fctrl(fctrl<=obj.lFmin) = obj.lFmin;
 			FD = diag(fctrl)*obj.lVDom;			
 			V = obj.find_dom_sharedV(obj.lFVT, FD, obj.voltage_rule);
 			F = f_ref;
@@ -429,7 +429,7 @@ classdef CP < controller
 			
 			%here? above?
 			if pbc
-				pw_adapt = delta;
+				pw_adapt = 0;%delta;
 			end
 		end
 	end

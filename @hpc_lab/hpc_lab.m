@@ -512,7 +512,7 @@ classdef hpc_lab < handle
 
 			linkaxes([ax1,ax2, axi],'x');
 		end
-        function [fig] = perfplot(obj, chip, f, w, cmp,idx)
+        function [fig] = perfplot(obj, chip, f, w,idx)
 
 			font_size = 6;
 			
@@ -568,7 +568,7 @@ classdef hpc_lab < handle
 			if w <= 1.001
 				gr = w * 100;
 			else
-				gr = w ./ cmp * 100;
+				gr = w;
 			end
 			subplot(3,4,[9:10]);
 			b = bar(gr);
@@ -619,15 +619,15 @@ classdef hpc_lab < handle
 			%linkaxes([ax1,ax2,ax3],'x');
 			
 		end
-		function [] = saveall(obj, xop, uop, fop, vop, wop, path, name)
-			if nargin < 7 || (strlength(path)<1)
+		function [] = saveall(obj, asimcl, chip, cid, path, name)
+			if nargin < 5 || (strlength(path)<1)
 				if isunix
 					path = "/tmp/MATLAB-Figures";
 				else
 					path = "C:\temp\MATLAB-Figures";
 				end
 			end
-			if nargin < 8 || (strlength(name)<1)
+			if nargin < 6 || (strlength(name)<1)
 				name = string(datetime('now','Format','dd-MMM-yyyy HH_mm_ss_SSS'));
 			end
 
@@ -647,23 +647,23 @@ classdef hpc_lab < handle
 			for i=1:5
 				switch i
 					case 1
-						fig = obj.xutplot(xop, uop);
+						fig = obj.xutplot(chip, asimcl.xop, asimcl.uop);
 						namefig = "TP";
 						res = 1.5;
 					case 2
-						fig = obj.powerconstrplot(uop);
+						fig = obj.powerconstrplot(chip, cid, asimcl.uop);
 						namefig = "Pw";
 						res = 1;
 					case 3
-						fig = obj.tempconstrplot(xop);
+						fig = obj.tempconstrplot(chip, asimcl.xop);
 						namefig = "T";
 						res = 1;
 					case 4
-						fig = obj.perfplot(fop, wop / 100 );
+						fig = obj.perfplot(chip, asimcl.fop, asimcl.wlop, cid);
 						namefig = "Perf";
 						res = 1;
 					case 5 
-						fig = obj.fvplot(fop,vop);
+						fig = obj.fvplot(chip, asimcl.fop,asimcl.vop);
 						namefig = "FV";
 						res = 1.5;
 				end

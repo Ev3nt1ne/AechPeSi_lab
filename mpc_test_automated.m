@@ -3,7 +3,7 @@
 hpc = hpc_lab;
 chip1 = hpc_chiplet;
 
-path = "/home/eventine/Documents/MATLAB/Results";
+path = "/home/eventine/Documents/MATLAB/Results-mpc";
 %path = "C:\Users\giovanni.bambini2\OneDrive - Alma Mater Studiorum Università di Bologna\___PhD\Papers\TAAS-2023\Results\Automated";
 
 if isunix
@@ -141,8 +141,8 @@ wl_times = 3;
 th_models = 3; %2;
 ndom = 4;
 robust = 0;
-show = 1;
-savetofile = 0;
+show = 0;
+savetofile = 1;
 hpc.compare_vs_baseline = 1;
 chip1.sensor_noise = 0;
 
@@ -206,17 +206,7 @@ init_cond = init_cond + rand_T_init;
 %% 
 % Import the file
 cpth = pwd;
-fileToRead1 = strcat(cpth, separator_os, 'wl_journal_good.mat');
-newData1 = load('-mat', fileToRead1);
-
-% Create new variables in the base workspace from those fields.
-vars = fieldnames(newData1);
-for i = 1:length(vars)
-	assignin('base', vars{i}, newData1.(vars{i}));
-end
-
-% Import the file
-fileToRead1 = strcat(cpth, separator_os, 'wl4.mat');
+fileToRead1 = strcat(cpth, separator_os, 'wl_mpc_cloud.mat');
 newData1 = load('-mat', fileToRead1);
 
 % Create new variables in the base workspace from those fields.
@@ -253,6 +243,7 @@ ctrl_bf.lwl_mem = chip1.wl_mem_weigth;
 ctrl_bf.Tmpc_off = -370;
 
 ctrl_bf.Nhzn = 2;
+ctrl_bf.Q2 = 0;
 
 ctrl_bf.Gw = eye(chip1.Ns);
 Qc = 3.4e-4; %0.1;
@@ -286,11 +277,30 @@ for wli=1:wl_times
 			% Max Freq all time:
 			hpc.frtrc{1} = 3.45 * ones(tt,chip1.Nc);
 		case 2
-			%full idle but 9 cores
-            
-
+            coreid1 = [4 8 10 16];
+	        coreid2 = [1 5 7 11 15];
+	        coreid12 = [ 1 4 5 7 8 10 11 15 16];
+			%full idle but 4 cores
+            %full idle but 9 cores
+			ll = ceil(hpc.tsim*1e6/chip1.quantum_us);
+            hpc.wltrc=[];
+			hpc.wltrc{1} = zeros(chip1.Nc, chip1.ipl, ll);
+			hpc.wltrc{1}(:,bwl,:) = 1;
+			
+			% Med Freq all time:
+			hpc.frtrc{1} = chip1.F_min * ones(tt,chip1.Nc);
+			
+			hpc.wltrc{1}(coreid1,bwl,:) = 0;
+			hpc.wltrc{1}(coreid1,5,:) = 1;
+			% Max Freq all time:
+			hpc.frtrc{1}(:, coreid1) = 3.45;
+							
+			hpc.wltrc{1}(coreid2,bwl,:) = 0;
+			hpc.wltrc{1}(coreid2,3,:) = 0.70;
+			hpc.wltrc{1}(coreid2,2,:) = 0.30;
+			hpc.frtrc{1}(:, coreid2) = 2.7;
 		case 3
-			hpc.wltrc{1} = wlwl3;
+			hpc.wltrc{1} = wl_mpc_cloud;
 			% Max Freq all time:
 			hpc.frtrc{1} = 3.45 * ones(tt,chip1.Nc);
 		case 4
@@ -400,7 +410,7 @@ for wli=1:wl_times
 				figid = length(figarray)+1;
 			end
 			if savetofile
-				hpc.saveall(simres(1).xop, simres(1).uop, simres(1).fop, simres(1).vop, simres(1).wlop, ...
+				hpc.saveall(simres(1), chip1, 1, ...
                     path, regexprep(strcat('Alg: Fuzzy - ', itname), ':', '_'));
 			else
 				hpc.savetofile(hpc.xutplot(chip1, simres(1).xop, simres(1).uop),...
@@ -433,7 +443,7 @@ for wli=1:wl_times
             %Others
             ctrl.Rs = zeros(chip1.Nc);
             ctrl.R = zeros(chip1.Nc);
-            ctrl.Q = 10*eye(chip1.Ns);
+            ctrl.Q = 0.5*eye(chip1.Ns);
 
 
 			simres = hpc.simulation(ctrl, chip1,CM,show);
@@ -456,7 +466,7 @@ for wli=1:wl_times
 			end
 			
 			if savetofile
-				hpc.saveall(simres(1).xop, simres(1).uop, simres(1).fop, simres(1).vop, simres(1).wlop, ...
+				hpc.saveall(simres(1), chip1, 1, ...
                     path, regexprep(strcat('Alg: clMPC - ', itname), ':', '_'));
             end
 
@@ -466,7 +476,7 @@ for wli=1:wl_times
             R_coeff = 0; %absolute value
             R_shared = 0;%15; % R_coeff/0.2;
             R_track = 10;
-            Q_coeff = 0; %6 %1e-2%2.5; 
+            Q_coeff = 0.5; %6 %1e-2%2.5; 
             
             % Create matrixes
             ctrl_bf.R = R_coeff*eye(chip1.Nc);
@@ -475,13 +485,19 @@ for wli=1:wl_times
             for v=1:chip1.vd
 	            %Here I could create an accumulation thing that need to be
 	            %optimized (e.g. reduced) that contains the deltaF among quadrant 
-	            ctrl_bf.Rs = ctrl_bf.Rs + chip1.VDom(:,v)*chip1.VDom(:,v)' / sum(chip1.VDom(:,v))^2 * R_shared;
+                nc = (sum(chip1.VDom(:,v))-1);
+                if nc == 0
+                    nc = 1;
+                end
+	            ctrl.Rs = ctrl.Rs + chip1.VDom(:,v)*chip1.VDom(:,v)' / nc * R_shared;
             end
             %TODO: Assuming that the diagonal is full
-            ctrl_bf.Rs(~eye(size(ctrl_bf.Rs))) = ctrl_bf.Rs(~eye(size(ctrl_bf.Rs))) * (-1);
-            cores_per_dom = sum(chip1.VDom);
-            ctrl_bf.Rs(logical(eye(size(ctrl_bf.Rs)))) = ctrl_bf.Rs(~~eye(size(ctrl_bf.Rs))) .* chip1.VDom*cores_per_dom'; %here I need ~~ to converto to logical values
-            
+            ctrl.Rs(~eye(size(ctrl.Rs))) = ctrl.Rs(~eye(size(ctrl.Rs))) * (-1);
+            %cores_per_dom = sum(chip1.VDom);
+            %ctrl.Rs(logical(eye(size(ctrl.Rs)))) = ctrl.Rs(~~eye(size(ctrl.Rs))) .* chip1.VDom*cores_per_dom'; %here I need ~~ to converto to logical values
+            ctrl.Rs(logical(eye(size(ctrl.Rs)))) = 0;
+            ctrl.Rs(logical(eye(size(ctrl.Rs)))) = -sum(ctrl.Rs,1);
+
             ctrl_bf.Q = (Q_coeff)*eye(chip1.Ns);
 
 			simres = hpc.simulation(ctrl_bf, chip1,CM,show);
@@ -505,7 +521,7 @@ for wli=1:wl_times
             end
 			
 			if savetofile
-				hpc.saveall(simres(1).xop, simres(1).uop, simres(1).fop, simres(1).vop, simres(1).wlop, ...
+				hpc.saveall(simres(1), chip1, 1, ...
                     path, regexprep(strcat('Alg: BW - ', itname), ':', '_'));
             end
 
@@ -513,24 +529,27 @@ for wli=1:wl_times
             % Improved Black wolf
             
             %Reference Tracking Objective Matrix
-            R_coeff = 20; %absolute value
+            R_coeff = 10; % 20%absolute value
             R_shared = 7;%15; % R_coeff/0.2;
             R_track = 20;
             Q_coeff = 0.5; %6 %1e-2%2.5;  
             
             % Create matrixes
-            ctrl_bf.R = R_coeff*eye(chip1.Nc);
-            ctrl_bf.Rt = R_track*eye(chip1.Nc);
-            ctrl_bf.Rs = zeros(chip1.Nc);
             for v=1:chip1.vd
 	            %Here I could create an accumulation thing that need to be
 	            %optimized (e.g. reduced) that contains the deltaF among quadrant 
-	            ctrl_bf.Rs = ctrl_bf.Rs + chip1.VDom(:,v)*chip1.VDom(:,v)' / sum(chip1.VDom(:,v))^2 * R_shared;
+                nc = (sum(chip1.VDom(:,v))-1);
+                if nc == 0
+                    nc = 1;
+                end
+	            ctrl.Rs = ctrl.Rs + chip1.VDom(:,v)*chip1.VDom(:,v)' / nc * R_shared;
             end
             %TODO: Assuming that the diagonal is full
-            ctrl_bf.Rs(~eye(size(ctrl_bf.Rs))) = ctrl_bf.Rs(~eye(size(ctrl_bf.Rs))) * (-1);
-            cores_per_dom = sum(chip1.VDom);
-            ctrl_bf.Rs(logical(eye(size(ctrl_bf.Rs)))) = ctrl_bf.Rs(~~eye(size(ctrl_bf.Rs))) .* chip1.VDom*cores_per_dom'; %here I need ~~ to converto to logical values
+            ctrl.Rs(~eye(size(ctrl.Rs))) = ctrl.Rs(~eye(size(ctrl.Rs))) * (-1);
+            %cores_per_dom = sum(chip1.VDom);
+            %ctrl.Rs(logical(eye(size(ctrl.Rs)))) = ctrl.Rs(~~eye(size(ctrl.Rs))) .* chip1.VDom*cores_per_dom'; %here I need ~~ to converto to logical values
+            ctrl.Rs(logical(eye(size(ctrl.Rs)))) = 0;
+            ctrl.Rs(logical(eye(size(ctrl.Rs)))) = -sum(ctrl.Rs,1);
             
             ctrl_bf.Q = (Q_coeff)*eye(chip1.Ns);
 
@@ -555,7 +574,7 @@ for wli=1:wl_times
 			end
 			
 			if savetofile
-				hpc.saveall(simres(1).xop, simres(1).uop, simres(1).fop, simres(1).vop, simres(1).wlop, ...
+				hpc.saveall(simres(1), chip1, 1, ...
                     path, regexprep(strcat('Alg: ImBW - ', itname), ':', '_'));
             end
 

@@ -146,7 +146,7 @@ savetofile = 0;
 hpc.compare_vs_baseline = 1;
 chip1.sensor_noise = 0;
 
-test_iter = 2; %10;%20;
+test_iter = 10; %10;%20;
 
 tres = [];
 tres{test_iter, ndom, th_models, 3, wl_times} = [];
@@ -267,7 +267,7 @@ for tit=1:test_iter
 
 	hpc.t_init{1} = init_cond(:,tit);
 
-for wli=2:wl_times
+for wli=1:wl_times
 	
 	tic
 		
@@ -488,7 +488,7 @@ for wli=2:wl_times
 				hpc.frtrc{1} = hpc.frtrc{1}(:,coreid12);
 				hpc.taas_fix(awl,1);
 			end
-			tres{tit, di, mdli, 1, wli} = hpc.stats_analysis(ctrl, chip1,simres(1),1);
+			tres{tit, di, mdli, 2, wli} = hpc.stats_analysis(ctrl, chip1,simres(1),1);
 			if wli == 2
 				hpc.frtrc{1} = frtrc_hold;
 				simres(1).fop = fop_hold;
@@ -537,7 +537,7 @@ for wli=2:wl_times
 				hpc.frtrc{1} = hpc.frtrc{1}(:,coreid12);
 				hpc.taas_fix(awl,1);
 			end
-			tres{tit, di, mdli, 1, wli} = hpc.stats_analysis(ctrl, chip1,simres(1),1);
+			tres{tit, di, mdli, 3, wli} = hpc.stats_analysis(ctrl, chip1,simres(1),1);
 			if wli == 2
 				hpc.frtrc{1} = frtrc_hold;
 				simres(1).fop = fop_hold;
