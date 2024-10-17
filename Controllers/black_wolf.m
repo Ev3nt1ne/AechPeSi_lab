@@ -111,9 +111,10 @@ classdef black_wolf < mpc_hpc & CP
 			objective = 0;
 
 			for k = 1:obj.Nhzn %TODO T_target(1) not good!!!!!
-				objective = objective + (u{k}-ly_uref)'*obj.Rt*(u{k}-ly_uref) + u{k}'*obj.Rs*(u{k}) + ...
+				objective = objective + (((u{k}-ly_uref)-obj.Pm_min)/(obj.Pm_max-obj.Pm_min))'*obj.Rt*(((u{k}-ly_uref)-obj.Pm_min)/(obj.Pm_max-obj.Pm_min)) + ...
+                        ((u{k}-obj.Pm_min)/(obj.Pm_max-obj.Pm_min))'*obj.Rs*((u{k}-obj.Pm_min)/(obj.Pm_max-obj.Pm_min)) + ...
                         ((x{k+1}-obj.T_amb-Toff)/(obj.T_target(1)-obj.T_amb))'*obj.Q*((x{k+1}-obj.T_amb-Toff)/(obj.T_target(1)-obj.T_amb)) + ...
-                        ((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm)'*obj.R*((u{k}-obj.Pm_max)/(obj.Pm_max-obj.Pm_min).*wSm) + ...
+                        ((u{k}-obj.Pm_min)/(obj.Pm_max-obj.Pm_min).*wSm)'*obj.R*((u{k}-obj.Pm_min)/(obj.Pm_max-obj.Pm_min).*wSm) + ...
                         (x{k+1}-obj.T_amb)'*(-obj.Q2*1)*(x{k+1}-obj.T_amb) + (-obj.Cc'*(h0+h0v)/h1)'*(obj.Q2*1)*(-obj.Cc'*(h0+h0v)/h1);
                 %energy
                 %at = (ly_uref./u{k}).*wSm;
@@ -206,6 +207,7 @@ classdef black_wolf < mpc_hpc & CP
             obj.Pw_diff = zeros(Nsim+1, 1);
 
 			obj.ex_count = 0;
+            obj.hyst_idx = -1;
 			obj.failed = 0;
 			obj.wl = [ones(obj.lNc,1) zeros(obj.lNc, obj.lipl -1)];
 			obj.lNsim = Nsim;
@@ -215,7 +217,9 @@ classdef black_wolf < mpc_hpc & CP
             rig = 5;
             obj.Tobs = fix(hc.t_init{ctrl_id}/rig)*rig; %hc.T_amb*ones(obj.lNs,1);
 			%TODO
-			obj.output_mpc = 1*ones(obj.lNc,1);	
+			obj.output_mpc = 1*ones(obj.lNc,1);
+
+            obj.hyst_duration = 4;
 
             % Observer
             % create the dicrete system
@@ -328,10 +332,14 @@ classdef black_wolf < mpc_hpc & CP
 			% too complex to make it vectorial
 			%dp = res{1}(~tt);
 			%obj.output_mpc = repmat(tt, length(tt), length(dp))*dp + ...tt.*obj.output_mpc;
-			if ~tt
-				obj.output_mpc = res{1};
-				%TODO
-				%else
+			if (~tt)
+                if (obj.hyst_idx < obj.ex_count)
+				    obj.output_mpc = res{1};
+                end
+			%TODO
+            else
+                obj.output_mpc = obj.Pm_min; %obj.output_mpc/3*2;
+                obj.hyst_idx = obj.ex_count + obj.hyst_duration;
 			end
 			obj.tmpc(obj.ex_count+1, :) = res{2}';
 

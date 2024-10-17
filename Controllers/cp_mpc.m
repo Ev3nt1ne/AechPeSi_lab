@@ -96,7 +96,8 @@ classdef cp_mpc < mpc_hpc & CP
 						constraints = [constraints, u{k} <= obj.umax - obj.Ctu(k,:)'];
 					end
 
-				    objective = objective + (u{k}-ly_uref)'*obj.Rt*(u{k}-ly_uref) + u{k}'*obj.Rs*(u{k}) + ...
+				    objective = objective + (((u{k}-ly_uref)-obj.umin)/(obj.umax-obj.umin))'*obj.Rt*(((u{k}-ly_uref)-obj.umin)/(obj.umax-obj.umin)) + ...
+                        ((u{k}-obj.umin)/(obj.umax-obj.umin))'*obj.Rs*((u{k}-obj.umin)/(obj.umax-obj.umin)) + ...
                         ((x{k+1}-obj.T_amb)/(obj.T_target(1)-obj.T_amb))'*obj.Q*((x{k+1}-obj.T_amb)/(obj.T_target(1)-obj.T_amb)); %x{k+1}'*obj.Q*x{k+1};
                 end
             end
@@ -290,6 +291,9 @@ classdef cp_mpc < mpc_hpc & CP
 			obj.pbold = 0;
 			obj.pbc = 0;
 
+            obj.ex_count = 0;
+            obj.hyst_idx = -1;
+
 			obj.wl = [ones(obj.lNc,1) zeros(obj.lNc, obj.lipl -1)];
 
 			obj.T_target = ones(obj.lNc, 1)*obj.core_Tcrit;
@@ -300,6 +304,8 @@ classdef cp_mpc < mpc_hpc & CP
 			obj.output_mpc = 1*ones(obj.lNc,1);
 
 			obj.solver_stats = [];
+
+            obj.hyst_duration = 4;
 
             comms{1} = 0;
             comms{2} = 0;
@@ -357,10 +363,14 @@ classdef cp_mpc < mpc_hpc & CP
 			% too complex to make it vectorial
 			%dp = res{1}(~tt);
 			%obj.output_mpc = repmat(tt, length(tt), length(dp))*dp + ...tt.*obj.output_mpc;
-			if ~tt
-				obj.output_mpc = res{1};
-				%TODO
-				%else
+			if (~tt)
+                if (obj.hyst_idx < obj.ex_count)
+				    obj.output_mpc = res{1};
+                end
+			%TODO
+            else
+                obj.output_mpc = obj.umin; %obj.output_mpc/3*2;
+                obj.hyst_idx = obj.ex_count + obj.hyst_duration;
 			end
 			obj.tmpc(obj.ex_count+1, :) = res{2}';
 
@@ -409,21 +419,6 @@ classdef cp_mpc < mpc_hpc & CP
             % Distributed Algorithm:
             comm{1} = 0;
             comm{2} = 0;
-            aa = 0;
-            bb= 0;
-            if ctrl_id==1
-                adab = 1;
-            else
-                adab = 2;
-            end
-            for i=1:length(ctrl_comm)
-                if ~isempty(ctrl_comm{i})
-                    aa = aa + ctrl_comm{i}{1} + adab;
-                    bb = bb + ctrl_comm{i}{2} + 1;
-                end
-            end
-            comm{1} = aa;
-            comm{2} = bb;
 
 		end
 

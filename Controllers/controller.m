@@ -98,7 +98,7 @@ classdef controller < handle
             obj.lipl = length(obj.pw_ceff);
     
             obj.lFVT = chip.give_fvtable();
-            obj.lFmin = obj.lFVT(1,3);
+            obj.lFmin = obj.lFVT(1,2);
             obj.lFmax = obj.lFVT(end,3);
             obj.lVmin = obj.lFVT(1,1);
             obj.lVmax = obj.lFVT(end,1);

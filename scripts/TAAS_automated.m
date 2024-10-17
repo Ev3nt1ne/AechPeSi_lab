@@ -433,7 +433,7 @@ for wli=1:wl_times
 				frtrc_hold = hpc.frtrc{1};
 				fop_hold = simres(1).fop;
 				simres(1).fop = simres(1).fop(:,coreid12);
-				wlop = wlop(coreid12);
+				simres(1).wlop = wlop(coreid12);
 				hpc.frtrc{1} = hpc.frtrc{1}(:,coreid12);
 				hpc.taas_fix(awl, 1);
 			end
@@ -441,7 +441,7 @@ for wli=1:wl_times
 			if wli == 2
 				hpc.frtrc{1} = frtrc_hold;
 				simres(1).fop = fop_hold;
-				wlop = wlres{tit,di, mdli, 1, wli};
+				simres(1).wlop = wlres{tit,di, mdli, 1, wli};
 				hpc.taas_fix(awl, 1);
 			end
 			
@@ -484,7 +484,7 @@ for wli=1:wl_times
 				frtrc_hold = hpc.frtrc{1};
 				fop_hold = simres(1).fop;
 				simres(1).fop = simres(1).fop(:,coreid12);
-				wlop = wlop(coreid12);
+				simres(1).wlop = wlop(coreid12);
 				hpc.frtrc{1} = hpc.frtrc{1}(:,coreid12);
 				hpc.taas_fix(awl,1);
 			end
@@ -492,7 +492,7 @@ for wli=1:wl_times
 			if wli == 2
 				hpc.frtrc{1} = frtrc_hold;
 				simres(1).fop = fop_hold;
-				wlop = wlres{tit,di, mdli, 1, wli};
+				simres(1).wlop = wlres{tit,di, mdli, 2, wli};
 				hpc.taas_fix(awl,1);
 			end
 			
@@ -533,7 +533,7 @@ for wli=1:wl_times
 				frtrc_hold = hpc.frtrc{1};
 				fop_hold = simres(1).fop;
 				simres(1).fop = simres(1).fop(:,coreid12);
-				wlop = wlop(coreid12);
+				simres(1).wlop = wlop(coreid12);
 				hpc.frtrc{1} = hpc.frtrc{1}(:,coreid12);
 				hpc.taas_fix(awl,1);
 			end
@@ -541,7 +541,7 @@ for wli=1:wl_times
 			if wli == 2
 				hpc.frtrc{1} = frtrc_hold;
 				simres(1).fop = fop_hold;
-				wlop = wlres{tit,di, mdli, 1, wli};
+				simres(1).wlop = wlres{tit,di, mdli, 3, wli};
 				hpc.taas_fix(awl,1);
 			end
 

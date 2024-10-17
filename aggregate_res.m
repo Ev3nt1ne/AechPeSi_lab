@@ -42,7 +42,7 @@ scm = alg_pos;
 
 % show values:
 show_tip_values = 1;
-show_violin = 1;
+show_violin = 0;
 font_size_tips = 10;
 font_size_tit = 18;
 font_size_axes = 12;

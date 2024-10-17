@@ -138,7 +138,7 @@ hpc.t_init{1} = (25+273.15)*ones(chip1.Ns,1); %temp_amb*ones(chip1.Ns,1);
 
 %% ITERATE ON WORKLOAD
 wl_times = 3;
-th_models = 3; %2;
+th_models = 3;
 ndom = 4;
 robust = 0;
 show = 0;
@@ -146,8 +146,7 @@ savetofile = 1;
 hpc.compare_vs_baseline = 1;
 chip1.sensor_noise = 0;
 
-test_iter = 4; %10;%20;
-
+test_iter = 4; %10;
 AlgN = 4;
 
 tres = [];
@@ -216,6 +215,17 @@ for i = 1:length(vars)
 end
 
 % Import the file
+cpth = pwd;
+fileToRead1 = strcat(cpth, separator_os, 'wl_journal_good.mat');
+newData1 = load('-mat', fileToRead1);
+
+% Create new variables in the base workspace from those fields.
+vars = fieldnames(newData1);
+for i = 1:length(vars)
+	assignin('base', vars{i}, newData1.(vars{i}));
+end
+
+% Import the file
 fileToRead1 = strcat(cpth, separator_os, 'MPC16_Init_cond.mat');
 newData1 = load('-mat', fileToRead1);
 
@@ -256,6 +266,8 @@ ctrl_bf.Cty = zeros(ctrl_bf.Nhzn, chip1.Nc);
 ctrl_bf.Ctu = zeros(ctrl_bf.Nhzn, chip1.Nc);
 ctrl_bf.not_update_lin = 0;
 
+%TODO cambiare riga 276!!!!
+%aa = 1;
 
 %%
 for tit=1:test_iter
@@ -300,7 +312,8 @@ for wli=1:wl_times
 			hpc.wltrc{1}(coreid2,2,:) = 0.30;
 			hpc.frtrc{1}(:, coreid2) = 2.7;
 		case 3
-			hpc.wltrc{1} = wl_mpc_cloud;
+			%hpc.wltrc{1} = wl_mpc_cloud;
+            hpc.wltrc{1} = wlwl3(1:chip1.Nc,:,:);
 			% Max Freq all time:
 			hpc.frtrc{1} = 3.45 * ones(tt,chip1.Nc);
 		case 4
@@ -399,7 +412,21 @@ for wli=1:wl_times
 			%vres{di, mdli, 1, wli} = vop;
             wlop = simres(1).wlop;
 			wlres{tit, di, mdli, 1, wli} = wlop;
-            tres{tit, di, mdli, 1, wli} = hpc.stats_analysis(ctrl, chip1,simres(1),1);
+            if wli == 2
+				frtrc_hold = hpc.frtrc{1};
+				fop_hold = simres(1).fop;
+				simres(1).fop = simres(1).fop(:,coreid12);
+				simres(1).wlop = wlop(coreid12);
+				hpc.frtrc{1} = hpc.frtrc{1}(:,coreid12);
+				hpc.taas_fix(awl, 1);
+			end
+			tres{tit, di, mdli, 1, wli} = hpc.stats_analysis(ctrl, chip1,simres(1),1);
+			if wli == 2
+				hpc.frtrc{1} = frtrc_hold;
+				simres(1).fop = fop_hold;
+				simres(1).wlop = wlres{tit,di, mdli, 1, wli};
+				hpc.taas_fix(awl, 1);
+            end
 			
 			if show
 				figarray = flip(findobj('Type','figure'));
@@ -437,13 +464,14 @@ for wli=1:wl_times
             ctrl.Ctu = zeros(ctrl.Nhzn, chip1.Nc);
             
             %Reference Tracking Objective Matrix
-            R_coeff = 10;
+            R_coeff = 20;
+            Q_coeff = 12.5;
             ctrl.Rt = R_coeff*eye(chip1.Nc);
             
             %Others
             ctrl.Rs = zeros(chip1.Nc);
             ctrl.R = zeros(chip1.Nc);
-            ctrl.Q = 0.5*eye(chip1.Ns);
+            ctrl.Q = Q_coeff*eye(chip1.Ns);
 
 
 			simres = hpc.simulation(ctrl, chip1,CM,show);
@@ -453,7 +481,21 @@ for wli=1:wl_times
 			%vres{di, mdli, 2, wli} = vop;
             wlop = simres(1).wlop;
 			wlres{tit, di, mdli, 2, wli} = wlop;
-    		tres{tit, di, mdli, 2, wli} = hpc.stats_analysis(ctrl, chip1,simres(1),1);
+    		if wli == 2
+				frtrc_hold = hpc.frtrc{1};
+				fop_hold = simres(1).fop;
+				simres(1).fop = simres(1).fop(:,coreid12);
+				simres(1).wlop = wlop(coreid12);
+				hpc.frtrc{1} = hpc.frtrc{1}(:,coreid12);
+				hpc.taas_fix(awl, 1);
+			end
+			tres{tit, di, mdli, 2, wli} = hpc.stats_analysis(ctrl, chip1,simres(1),1);
+			if wli == 2
+				hpc.frtrc{1} = frtrc_hold;
+				simres(1).fop = fop_hold;
+				simres(1).wlop = wlres{tit,di, mdli, 2, wli};
+				hpc.taas_fix(awl,1);
+			end
 			
 			if show
 				figarray = flip(findobj('Type','figure'));
@@ -475,8 +517,8 @@ for wli=1:wl_times
             %Linearized Black Wolf
             R_coeff = 0; %absolute value
             R_shared = 0;%15; % R_coeff/0.2;
-            R_track = 10;
-            Q_coeff = 0.5; %6 %1e-2%2.5; 
+            R_track = 20;
+            Q_coeff = 22.5; %6 %1e-2%2.5; 
             
             % Create matrixes
             ctrl_bf.R = R_coeff*eye(chip1.Nc);
@@ -489,14 +531,14 @@ for wli=1:wl_times
                 if nc == 0
                     nc = 1;
                 end
-	            ctrl.Rs = ctrl.Rs + chip1.VDom(:,v)*chip1.VDom(:,v)' / nc * R_shared;
+	            ctrl_bf.Rs = ctrl_bf.Rs + chip1.VDom(:,v)*chip1.VDom(:,v)' / nc * R_shared;
             end
             %TODO: Assuming that the diagonal is full
-            ctrl.Rs(~eye(size(ctrl.Rs))) = ctrl.Rs(~eye(size(ctrl.Rs))) * (-1);
+            ctrl_bf.Rs(~eye(size(ctrl_bf.Rs))) = ctrl_bf.Rs(~eye(size(ctrl_bf.Rs))) * (-1);
             %cores_per_dom = sum(chip1.VDom);
-            %ctrl.Rs(logical(eye(size(ctrl.Rs)))) = ctrl.Rs(~~eye(size(ctrl.Rs))) .* chip1.VDom*cores_per_dom'; %here I need ~~ to converto to logical values
-            ctrl.Rs(logical(eye(size(ctrl.Rs)))) = 0;
-            ctrl.Rs(logical(eye(size(ctrl.Rs)))) = -sum(ctrl.Rs,1);
+            %ctrl_bf.Rs(logical(eye(size(ctrl_bf.Rs)))) = ctrl_bf.Rs(~~eye(size(ctrl_bf.Rs))) .* chip1.VDom*cores_per_dom'; %here I need ~~ to converto to logical values
+            ctrl_bf.Rs(logical(eye(size(ctrl_bf.Rs)))) = 0;
+            ctrl_bf.Rs(logical(eye(size(ctrl_bf.Rs)))) = -sum(ctrl_bf.Rs,1);
 
             ctrl_bf.Q = (Q_coeff)*eye(chip1.Ns);
 
@@ -508,7 +550,21 @@ for wli=1:wl_times
 			%vres{di, mdli, 2, wli} = vop;
             wlop = simres(1).wlop;
 			wlres{tit, di, mdli, 3, wli} = wlop;
-            tres{tit, di, mdli, 3, wli} = hpc.stats_analysis(ctrl_bf, chip1,simres(1),1);
+            if wli == 2
+				frtrc_hold = hpc.frtrc{1};
+				fop_hold = simres(1).fop;
+				simres(1).fop = simres(1).fop(:,coreid12);
+				simres(1).wlop = wlop(coreid12);
+				hpc.frtrc{1} = hpc.frtrc{1}(:,coreid12);
+				hpc.taas_fix(awl, 1);
+			end
+			tres{tit, di, mdli, 3, wli} = hpc.stats_analysis(ctrl, chip1,simres(1),1);
+			if wli == 2
+				hpc.frtrc{1} = frtrc_hold;
+				simres(1).fop = fop_hold;
+				simres(1).wlop = wlres{tit,di, mdli, 3, wli};
+				hpc.taas_fix(awl,1);
+			end
 			
 			if show
 				figarray = flip(findobj('Type','figure'));
@@ -529,15 +585,15 @@ for wli=1:wl_times
             % Improved Black wolf
             
             %Reference Tracking Objective Matrix
-            R_coeff = 1; % 20 %absolute value
-            R_shared = 5;%15; % R_coeff/0.2;
-            R_track = 20;
-            Q_coeff = 0.5; %6 %1e-2%2.5;  
+            R_coeff = 15; % 20 %absolute value
+            R_shared = 10;%15; % R_coeff/0.2;
+            R_track = 22.5;
+            Q_coeff = 17.5; %6 %1e-2%2.5;
             
             % Create matrixes
-            ctrl.R = R_coeff*eye(chip1.Nc);
-            ctrl.Rt = R_track*eye(chip1.Nc);
-            ctrl.Rs = zeros(chip1.Nc);
+            ctrl_bf.R = R_coeff*eye(chip1.Nc);
+            ctrl_bf.Rt = R_track*eye(chip1.Nc);
+            ctrl_bf.Rs = zeros(chip1.Nc);
             for v=1:chip1.vd
 	            %Here I could create an accumulation thing that need to be
 	            %optimized (e.g. reduced) that contains the deltaF among quadrant 
@@ -545,14 +601,14 @@ for wli=1:wl_times
                 if nc == 0
                     nc = 1;
                 end
-	            ctrl.Rs = ctrl.Rs + chip1.VDom(:,v)*chip1.VDom(:,v)' / nc * R_shared;
+	            ctrl_bf.Rs = ctrl_bf.Rs + chip1.VDom(:,v)*chip1.VDom(:,v)' / nc * R_shared;
             end
             %TODO: Assuming that the diagonal is full
-            ctrl.Rs(~eye(size(ctrl.Rs))) = ctrl.Rs(~eye(size(ctrl.Rs))) * (-1);
+            ctrl_bf.Rs(~eye(size(ctrl_bf.Rs))) = ctrl_bf.Rs(~eye(size(ctrl_bf.Rs))) * (-1);
             %cores_per_dom = sum(chip1.VDom);
-            %ctrl.Rs(logical(eye(size(ctrl.Rs)))) = ctrl.Rs(~~eye(size(ctrl.Rs))) .* chip1.VDom*cores_per_dom'; %here I need ~~ to converto to logical values
-            ctrl.Rs(logical(eye(size(ctrl.Rs)))) = 0;
-            ctrl.Rs(logical(eye(size(ctrl.Rs)))) = -sum(ctrl.Rs,1);
+            %ctrl_bf.Rs(logical(eye(size(ctrl_bf.Rs)))) = ctrl_bf.Rs(~~eye(size(ctrl_bf.Rs))) .* chip1.VDom*cores_per_dom'; %here I need ~~ to converto to logical values
+            ctrl_bf.Rs(logical(eye(size(ctrl_bf.Rs)))) = 0;
+            ctrl_bf.Rs(logical(eye(size(ctrl_bf.Rs)))) = -sum(ctrl_bf.Rs,1);
             
             ctrl_bf.Q = (Q_coeff)*eye(chip1.Ns);
 
@@ -564,7 +620,21 @@ for wli=1:wl_times
 			%vres{di, mdli, 2, wli} = vop;
             wlop = simres(1).wlop;
 			wlres{tit, di, mdli, 4, wli} = wlop;
-            tres{tit, di, mdli, 4, wli} = hpc.stats_analysis(ctrl_bf, chip1,simres(1),1);
+            if wli == 2
+				frtrc_hold = hpc.frtrc{1};
+				fop_hold = simres(1).fop;
+				simres(1).fop = simres(1).fop(:,coreid12);
+				simres(1).wlop = wlop(coreid12);
+				hpc.frtrc{1} = hpc.frtrc{1}(:,coreid12);
+				hpc.taas_fix(awl, 1);
+			end
+			tres{tit, di, mdli, 4, wli} = hpc.stats_analysis(ctrl, chip1,simres(1),1);
+			if wli == 2
+				hpc.frtrc{1} = frtrc_hold;
+				simres(1).fop = fop_hold;
+				simres(1).wlop = wlres{tit,di, mdli, 4, wli};
+				hpc.taas_fix(awl,1);
+			end
 			
 			if show
 				figarray = flip(findobj('Type','figure'));

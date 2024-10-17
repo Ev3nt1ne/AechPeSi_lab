@@ -36,6 +36,8 @@ classdef mpc_hpc < handle %< controller
         Tmpc_off = 0;
         ctrl_info = [];
 
+        hyst_duration;
+
 	end
 
 	properties(Dependent)
@@ -52,6 +54,8 @@ classdef mpc_hpc < handle %< controller
         Tobs;
 
 		solver_stats;
+
+        hyst_idx;
 	end
 	
 	methods
