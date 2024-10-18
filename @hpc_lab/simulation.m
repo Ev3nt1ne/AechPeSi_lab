@@ -228,6 +228,7 @@ function asimcl = ... %[xop, uop, fop, vop, wlop] = ...
 			        asimcl(cid).pvt{chip{cid}.PVT_T} = T;
                     f_ref = obj.frtrc{cid}(min(asimcl(cid).target_index, size(obj.frtrc{cid},1)),:)';
 			        chippwb = obj.chip_pw_budget{cid}(min(asimcl(cid).target_index, length(obj.chip_pw_budget{cid})));
+                    %TODO: can I have a better way of defining the toto_pw_budget
                     totpwb = obj.toto_pw_budget(min(asimcl(cid).target_index, length(obj.toto_pw_budget)));
                     pwbdg = [totpwb, chippwb];
 			        [asimcl(cid).F, asimcl(cid).V, comm{cid}, ctrl{cid}] = ...
@@ -284,6 +285,15 @@ function asimcl = ... %[xop, uop, fop, vop, wlop] = ...
 		    ctrl{cid} = ctrl{cid}.plot_fnc(t1, t2, asimcl(cid).xop, asimcl(cid).uop, asimcl(cid).fop, asimcl(cid).vop, asimcl(cid).wlop);
         end
     end
+    %TODO fix this:
+    figure();
+    ta = obj.Ts_target*[1:Nsim(1)/target_mul(1)]';
+    plot(ta, obj.toto_pw_budget(2:end, :), 'b'); hold on;
+    for cid=1:N_chip
+        t2 = chip{cid}.Ts*sys_mul(cid)*[1:Nsim(cid)]';
+        plot(t2, ctrl{cid}.gta_pl_x(2:end,cid), 'm');
+    end
+    pause(0.5);
 
 end
 

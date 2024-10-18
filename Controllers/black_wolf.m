@@ -221,6 +221,8 @@ classdef black_wolf < mpc_hpc & CP
 
             obj.hyst_duration = 4;
 
+            obj.pw_old = 1*obj.lNc;
+
             % Observer
             % create the dicrete system
             %sys = ss(obj.Ad_ctrl, obj.Bd_ctrl, obj.C, zeros(size(obj.C,1), ...
@@ -235,8 +237,12 @@ classdef black_wolf < mpc_hpc & CP
             %[kalmf,L,P] = kalman(sys,Q,R,N);
             [obj.LK, P, Z] = dlqe(obj.Ad_ctrl, obj.Gw, obj.C, obj.Qcov, obj.Rcov);
 
-            comms{1} = 0;
-            comms{2} = 0;
+            par = zeros(3,1);
+            par(1) = 0.2;
+            par(2) = obj.pw_old;
+            par(3) = hc.toto_pw_budget(1);
+
+            [obj, comms] = obj.init_grad_track_comm(hc, ctrl_id, par);
 		end
 		function [F,V, comm, obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl, ctrl_id, ctrl_comm)
 
@@ -254,7 +260,24 @@ classdef black_wolf < mpc_hpc & CP
             chippwbdg = pwbdg(2);
             totpwbdg = pwbdg(1);
 
-			% Process Workload
+            %%%%%%%
+            % Distributed Algorithm:
+            par = zeros(3,1);
+            par(1) = sum(i_wl*(1:obj.lipl)')/obj.lNc;
+            %TODO improve this
+            par(2) = (obj.pw_old+chippwbdg)/2;
+            par(3) = totpwbdg;
+            [dist_pw, dist_grad, obj] = obj.grad_track_alg(ctrl_comm, ctrl_id,par);
+
+            comm{1} = dist_pw;
+            obj.gta_pl_x(obj.ex_count+1, :) = dist_pw';
+            comm{2} = dist_grad;
+            obj.gta_pl_grad(obj.ex_count+1, :) = dist_grad';
+
+            chippwbdg = min(chippwbdg, dist_pw(ctrl_id));
+            %%%%%%%
+
+            % Process Workload
 			obj.wl = obj.wl*(1-obj.alpha_wl) + i_wl*obj.alpha_wl;
 			Ceff = obj.wl * (obj.pw_ceff)';
 
@@ -378,12 +401,12 @@ classdef black_wolf < mpc_hpc & CP
 			%toto = [obj.Cc*obj.Tobs - 273.15, obj.Cc*state_MPC- 273.15, obj.Cc*res{2} - 273.15, pp, obj.output_mpc, obj.prevF, F, obj.lVDom*V,  i_wl*(hc.dyn_ceff_k)'];
 			%toto = ["T0", "T1", "T2-mpc", "prevMPC T0-T1", "mpc T1-T2", "prev F T0-T1", "F T1-T2", "V T1-T2", "wl T-1 - T0"; toto]
 
+            obj.pw_old = sum((F.*(obj.lVDom*V).*(obj.lVDom*V)).*Ceff + ...
+				(obj.lVDom*V*obj.pw_stat_lin(1) + obj.pw_stat_lin(3)*process).* ...
+				exp(obj.pw_stat_exp(1)*obj.lVDom*V + (Tc)*obj.pw_stat_exp(2) + obj.pw_stat_exp(3)));
+
 			obj.prevF = F;
 			obj.prevV = V;
-
-            % Distributed Algorithm:
-            comm{1} = 0;
-            comm{2} = 0;
 
 		end
 
@@ -400,6 +423,11 @@ classdef black_wolf < mpc_hpc & CP
 			plot(t2, obj.tmpc(2:end,:) - 273.15 -obj.Tmpc_off, 'm');
 			xlabel("Time [s]");
 			ylabel("Temperature [T]");
+
+            figure();
+			plot(t2, obj.gta_pl_grad(2:end,:), 'b');
+			xlabel("Time [s]");
+			ylabel("Gradient of GTA");
 		end
 	end
 

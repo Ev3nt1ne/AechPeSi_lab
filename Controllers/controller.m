@@ -17,10 +17,12 @@ classdef controller < handle
 
         %Maybe do a class alone for this???
         multi_der_fcn;
+        projx_fcn;
+
         multi_prev_grad;
         multi_prev_x;
         multi_prev_y;
-        multi_learn_rate;
+        multi_learn_rate = 0.1;
 	end
 
 	properties(Dependent)
@@ -59,6 +61,8 @@ classdef controller < handle
         lVmin;
         lVmax;
 
+        gta_pl_x;
+        gta_pl_grad;
     end
 
     properties(SetAccess=immutable, GetAccess=public)
@@ -102,25 +106,28 @@ classdef controller < handle
             obj.lFmax = obj.lFVT(end,3);
             obj.lVmin = obj.lFVT(1,1);
             obj.lVmax = obj.lFVT(end,1);
+
+            obj.gta_pl_x = [];
+            obj.gta_pl_grad = [];
         end
-        function [obj, comm] = init_grad_track_comm(obj, hc, ctrl_id)
+        function [obj, comm] = init_grad_track_comm(obj, hc, ctrl_id, par)
             if isempty(obj.comm_mat)
                 error("[CTRL] Communication matrix empty");
             end
-            obj.adj_mat = obj.create_adj_mat(obj.comm_mat, [2,3]);
+            obj.adj_mat = obj.create_adj_mat(obj.comm_mat, [5,2]);
             ll = length(hc.chip_pw_budget);
             c1 = ones(ll,1);
             for i=1:ll
                 c1(i) = hc.chip_pw_budget{i}(1);
             end
             comm{1} = c1;
-            grad = obj.multi_der_fcn(c1,ctrl_id);
+            grad = obj.multi_der_fcn(c1,ctrl_id,par);
             comm{2} = grad;
             obj.multi_prev_x = c1;
             obj.multi_prev_y = grad;
             obj.multi_prev_grad = grad;
         end
-        function [x, y, obj] = grad_track_alg(obj, ctrl_comm, ctrl_id)
+        function [x, y, obj] = grad_track_alg(obj, ctrl_comm, ctrl_id, par)
             GAMMA = obj.multi_learn_rate;
             % Gather informations from neighboors
             u = 0;
@@ -135,10 +142,11 @@ classdef controller < handle
             end
             x = obj.adj_mat(ctrl_id,ctrl_id)*obj.multi_prev_x + u;            
             x = x - GAMMA*obj.multi_prev_y;
+            %x = obj.projx_fcn(x);
             obj.multi_prev_x = x;
             
             y = obj.adj_mat(ctrl_id,ctrl_id)*obj.multi_prev_y + v;
-            grad = obj.multi_der_fcn(x,ctrl_id);
+            grad = obj.multi_der_fcn(x,ctrl_id,par);
             y = y + (grad - obj.multi_prev_grad);
             obj.multi_prev_y = y;
             obj.multi_prev_grad = grad;

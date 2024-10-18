@@ -269,6 +269,8 @@ ctrl_bf.not_update_lin = 0;
 %TODO cambiare riga 276!!!!
 %aa = 1;
 
+mff = @(v1,id,par) 0;
+
 %%
 for tit=1:test_iter
 
@@ -658,9 +660,3 @@ for wli=1:wl_times
 end % for wl_times
 
 end %test_iter
-
-
-
-function [x] = mff(v1,id)
-    x = 0;
-end

@@ -34,6 +34,7 @@ classdef Fuzzy < CP
 		%}
 		derT = 0;
 		T_old = 0;
+        T_count = 0;
 	end
 	
 	methods
@@ -70,36 +71,56 @@ classdef Fuzzy < CP
 			obj.pbold = 0;
 			obj.pbc = 0;
 			obj.ex_count = 0;
+            obj.T_count = 0;
 			obj.derT = zeros(obj.lNc,1);
 			obj.T_old = obj.T_amb;
 			obj.wl = [ones(obj.lNc,1) zeros(obj.lNc, obj.lipl -1)];
 			obj.VCred = zeros(obj.lNc,1);
 			obj.nOut = obj.lVmin*ones(obj.lvd,1);
 
-            [obj, comms] = obj.init_grad_track_comm(hc, ctrl_id);
+            par = zeros(3,1);
+            par(1) = 0.2;
+            par(2) = obj.pw_old{2};
+            par(3) = hc.toto_pw_budget(1);
+
+            [obj, comms] = obj.init_grad_track_comm(hc, ctrl_id, par);
 		end		
 		function [F,V, comm, obj] = ctrl_fnc(obj, f_ref, pwbdg, pvt, i_pwm, i_wl, ctrl_id, ctrl_comm)
 
-			if obj.ex_count >= 10*obj.Tper
-				obj.ex_count = 2*obj.Tper;
+			if obj.T_count >= 10*obj.Tper
+				obj.T_count = 2*obj.Tper;
 			end
-			obj.ex_count = obj.ex_count + 1;
+			obj.T_count = obj.ex_count + 1;
+            obj.ex_count = obj.ex_count + 1;
             
             chippwbdg = pwbdg(2);
             totpwbdg = pwbdg(1);
 
             %%%%%%%
             % Distributed Algorithm:
-            [dist_pw, dist_grad, obj] = obj.grad_track_alg(ctrl_comm, ctrl_id);
+            par = zeros(3,1);
+            par(1) = sum(i_wl*(1:obj.lipl)')/obj.lNc;
+            %TODO here in fuzzy this can be moved below the Thermal
+            %reduction so I can correctly put the target power without
+            %considering the thermal control
+            par(2) = (obj.pw_old{2}+ obj.pw_adapt+chippwbdg)/2;
+            par(3) = totpwbdg;
+            [dist_pw, dist_grad, obj] = obj.grad_track_alg(ctrl_comm, ctrl_id,par);
 
             comm{1} = dist_pw;
+            obj.gta_pl_x(obj.ex_count+1, :) = dist_pw';
             comm{2} = dist_grad;
+            obj.gta_pl_grad(obj.ex_count+1, :) = dist_grad';
 
-            %chippwbdg = min(chippwbdg, dist_pw(ctrl_id));
+            chippwbdg = min(chippwbdg, dist_pw(ctrl_id));
             %%%%%%%
 
-			if chippwbdg~=obj.pbold
-				obj.pbold = chippwbdg;
+            %TODO: here what I should do is:
+            %   A) Filter chippwbdg
+            %   B) compare: abs(obj.pbold-Filtered_chippwbdg) > K, (e.g. K=5)
+            %   
+			if pwbdg(2)~=obj.pbold
+				obj.pbold = pwbdg(2);
 				obj.pbc = 1;
 				obj.hys_p_count = 0;
 				obj.o_hys_act = 0;
@@ -118,7 +139,7 @@ classdef Fuzzy < CP
 			T = pvt{obj.PVT_T};
 			process = pvt{obj.PVT_P};
 			
-			if (mod(obj.ex_count,obj.Tper)==2) % && (obj.ex_count>obj.Tper+1)
+			if (mod(obj.T_count,obj.Tper)==2) % && (obj.T_count>obj.Tper+1)
 				obj.derT = T - obj.T_old;
 				obj.T_old = T;
 			end
@@ -145,7 +166,7 @@ classdef Fuzzy < CP
 			F = f_ref;
 
 			% Control Temperature:
-			if (mod(obj.ex_count,obj.Tper)==2)
+			if (mod(obj.T_count,obj.Tper)==2)
 				Tband = [45.0 65.0 80.0 85 ];
 				Tband = Tband + 273.15;
 				derBand = [0 0.5 1.0 2.0];
@@ -332,6 +353,10 @@ classdef Fuzzy < CP
 		function [obj] = cleanup_fnc(obj, hc)
 		end
 		function [obj] = plot_fnc(obj, t1, t2, cpxplot, cpuplot, cpfplot, cpvplot, wlop)
+            figure();
+			plot(t2, obj.gta_pl_grad(2:end,:), 'b');
+			xlabel("Time [s]");
+			ylabel("Gradient of GTA");
 		end
 
 		function [pu, pw_storage] = cp_pw_dispatcher_c(obj, Ceff, delta_p, ipu, min_pw_red)
