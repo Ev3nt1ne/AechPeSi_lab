@@ -325,7 +325,12 @@ classdef cp_mpc < mpc_hpc & CP
 			Ceff = obj.wl * (obj.pw_ceff)';
 						
 			% Process Power Budget
-			% (?)
+			if pwbdg(2)~=obj.pbold
+				obj.pbold = pwbdg(2);
+				obj.pbc = 1;
+            else
+                obj.pbc = 0;
+			end
 	
 			% Adapt Measured&Computed Power
 			obj.pw_adapt = obj.cp_pw_adapt(obj.pw_adapt, i_pwm, obj.pw_old{1}, obj.pbc);
