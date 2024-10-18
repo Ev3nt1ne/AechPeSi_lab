@@ -5,6 +5,10 @@ function asimcl = ... %[xop, uop, fop, vop, wlop] = ...
 
     lt1 = length(ctrl);
     lt2 = length(chip);
+
+    if ~iscell(ctrl) || ~iscell(chip)
+        error("[LAB] Simulation ctrl and chip must be cells")
+    end
     
     %{ 
     % With cell inputs)
@@ -91,26 +95,26 @@ function asimcl = ... %[xop, uop, fop, vop, wlop] = ...
     end
 
     for cid=1:N_chip
-	    chip(cid).anteSimCheckTM();
-	    obj.anteSimCheckLab(chip(cid));
+	    chip{cid}.anteSimCheckTM();
+	    obj.anteSimCheckLab(chip{cid});
         %TODO: add checks to the quad_pw_budget: if its dim is == number of
         %       quads
-	    chip(cid).anteSimCheckPM();
+	    chip{cid}.anteSimCheckPM();
 
         % INIT
-        asimcl(cid) = hpc_simulation(chip(cid),chip(cid).Ad_true, chip(cid).Bd_true);
+        asimcl(cid) = hpc_simulation(chip{cid},chip{cid}.Ad_true, chip{cid}.Bd_true);
 	    %obj.init_compute_model(, chip.Nc, chip.vd, chip); %called automatically
 
 	    % To Optimize execution, istead of having several functions called and
 	    %	several ifs statement, we use ctrl.Ts_ctrl as the main time step of
 	    %	the simulation.
-	    Nsim(cid) = ceil(obj.tsim / ctrl(cid).Ts_ctrl);
+	    Nsim(cid) = ceil(obj.tsim / ctrl{cid}.Ts_ctrl);
     
 	    % System:
 	    % initial offset:
 	    %sys_ts_offset = 0;
 	    % frequency
-	    sys_mul(cid) = round(ctrl(cid).Ts_ctrl / chip(cid).Ts);
+	    sys_mul(cid) = round(ctrl{cid}.Ts_ctrl / chip{cid}.Ts);
 	    % output completed
 	    %ctrl_output_mul = round(obj.ctrl_Texec / obj.Ts);
     
@@ -118,7 +122,7 @@ function asimcl = ... %[xop, uop, fop, vop, wlop] = ...
 	    % initial offset:
 	    target_ts_offset = 0;
 	    % frequency
-	    ts_div = obj.Ts_target / ctrl(cid).Ts_ctrl;
+	    ts_div = obj.Ts_target / ctrl{cid}.Ts_ctrl;
 	    target_mul(cid) = floor(ts_div);
 	    ctrl_mul(cid) = floor(1/ts_div) -1;
 	    ctrl_mul(cid) = (ctrl_mul(cid)<0)*0 + (ctrl_mul(cid)>=0)*ctrl_mul(cid);
@@ -139,19 +143,19 @@ function asimcl = ... %[xop, uop, fop, vop, wlop] = ...
     
 	    %TODO
 	    x = obj.t_init{cid};% + (rand(obj.Ns,1) - 0.5*ones(obj.Ns,1));
-        asimcl(cid).uop = zeros(Nsim(cid)+1,chip(cid).Nc);
-	    asimcl(cid).xop = zeros(Nsim(cid)+1,chip(cid).Ns);
-        asimcl(cid).fop = zeros(Nsim(cid)+1,chip(cid).Nc);
-	    asimcl(cid).vop = zeros(Nsim(cid)+1,chip(cid).vd);
+        asimcl(cid).uop = zeros(Nsim(cid)+1,chip{cid}.Nc);
+	    asimcl(cid).xop = zeros(Nsim(cid)+1,chip{cid}.Ns);
+        asimcl(cid).fop = zeros(Nsim(cid)+1,chip{cid}.Nc);
+	    asimcl(cid).vop = zeros(Nsim(cid)+1,chip{cid}.vd);
         asimcl(cid).xop(1,:) = x;
 	    asimcl(cid).uop(1,:) = NaN;
 	    asimcl(cid).fop(1,:) = asimcl(cid).F;
 	    asimcl(cid).vop(1,:) = asimcl(cid).V;
-	    asimcl(cid).pvt{chip.PVT_P} = asimcl(cid).process;
-	    asimcl(cid).pvt{chip.PVT_V} = [];
-	    asimcl(cid).pvt{chip.PVT_T} = ctrl(cid).C*x;
+	    asimcl(cid).pvt{chip{cid}.PVT_P} = asimcl(cid).process;
+	    asimcl(cid).pvt{chip{cid}.PVT_V} = [];
+	    asimcl(cid).pvt{chip{cid}.PVT_T} = ctrl{cid}.C*x;
     
-	    [ctrl(cid), comm{cid}] = ctrl(cid).init_fnc(obj, chip(cid), cid, Nsim(cid));
+	    [ctrl{cid}, comm{cid}] = ctrl{cid}.init_fnc(obj, chip{cid}, cid, Nsim(cid));
     end
 
     % Nsim multiplicity check
@@ -203,37 +207,39 @@ function asimcl = ... %[xop, uop, fop, vop, wlop] = ...
         %   communications desync and delays
         %parfor i=1:N_chip
         for cid=1:N_chip
-            if (mod(s,Nsim_mul)==0)
+            if (mod(s-1,Nsim_mul(cid))==0)
                 % Input step managing
                 asimcl(cid).update_counters(target_mul(cid), nip_mul(cid), ctrl_mul(cid));
 
                 %Compute model:
-		        index = 1+(s-1)*sys_mul(cid);
+		        index = 1+((s-1)/Nsim_mul(cid))*sys_mul(cid);
 		        [asimcl(cid).uop(index+1:index+sys_mul(cid),:), asimcl(cid).xop(index+1:index+sys_mul(cid),:), asimcl(cid).wl, asimcl(cid).pwm, asimcl(cid)] = ...
-                    asimcl(cid).compute_model(sys_mul(cid), asimcl(cid).xop(index,:)', asimcl(cid).V, asimcl(cid).F, asimcl(cid).process, obj.temp_amb, obj.wltrc{cid}, chip(cid));	
+                    asimcl(cid).compute_model(sys_mul(cid), asimcl(cid).xop(index,:)', asimcl(cid).V, asimcl(cid).F, asimcl(cid).process, obj.temp_amb, obj.wltrc{cid}, chip{cid});	
         
 		        % Sim output managing
-		        T = ctrl(cid).C*asimcl(cid).xop(index,:)';
+		        T = ctrl{cid}.C*asimcl(cid).xop(index,:)';
 		        % Noise:
-		        dim = min(length(T), chip(cid).Nc);
-		        T = T + [(chip(cid).sensor_noise)*( (rand(dim,1) - 0.5)*2 * chip(cid).sensor_noise_amplitude(chip(cid).PVT_T) ); zeros(length(T)-dim,1)];	
+		        dim = min(length(T), chip{cid}.Nc);
+		        T = T + [(chip{cid}.sensor_noise)*( (rand(dim,1) - 0.5)*2 * chip{cid}.sensor_noise_amplitude(chip{cid}.PVT_T) ); zeros(length(T)-dim,1)];	
         
 		        %if (mod(s-1 + ctrl_ts_offset, ctrl_mul) == 0)
-			        asimcl(cid).pvt{chip(cid).PVT_P} = asimcl(cid).process;
-			        asimcl(cid).pvt{chip(cid).PVT_V} = [];
-			        asimcl(cid).pvt{chip(cid).PVT_T} = T;
+			        asimcl(cid).pvt{chip{cid}.PVT_P} = asimcl(cid).process;
+			        asimcl(cid).pvt{chip{cid}.PVT_V} = [];
+			        asimcl(cid).pvt{chip{cid}.PVT_T} = T;
                     f_ref = obj.frtrc{cid}(min(asimcl(cid).target_index, size(obj.frtrc{cid},1)),:)';
 			        chippwb = obj.chip_pw_budget{cid}(min(asimcl(cid).target_index, length(obj.chip_pw_budget{cid})));
                     totpwb = obj.toto_pw_budget(min(asimcl(cid).target_index, length(obj.toto_pw_budget)));
                     pwbdg = [totpwb, chippwb];
-			        [asimcl(cid).F, asimcl(cid).V, comm{cid}, ctrl(cid)] = ...
-                        ctrl(cid).ctrl_fnc(f_ref, pwbdg, asimcl(cid).pvt, asimcl(cid).ctrl_pwm, asimcl(cid).ctrl_wl, cid, ctrl_comm(cid,:));
+			        [asimcl(cid).F, asimcl(cid).V, comm{cid}, ctrl{cid}] = ...
+                        ctrl{cid}.ctrl_fnc(f_ref, pwbdg, asimcl(cid).pvt, asimcl(cid).ctrl_pwm, asimcl(cid).ctrl_wl, cid, ctrl_comm(cid,:));
 		            % Consumed the information
                     %ctrl_comm(i,:) = {};
                 %end
 
-		        asimcl(cid).fop(s+1,:) = asimcl(cid).F;
-		        asimcl(cid).vop(s+1,:) = asimcl(cid).V;
+                %TODO check if correct:
+                adix = s+1+Nsim_mul(cid)-1;
+		        asimcl(cid).fop(s+1:adix,:) = repelem(asimcl(cid).F', Nsim_mul(cid), 1);
+		        asimcl(cid).vop(s+1:adix,:) = repelem(asimcl(cid).V', Nsim_mul(cid), 1);
             end
         end
     end
@@ -256,26 +262,26 @@ function asimcl = ... %[xop, uop, fop, vop, wlop] = ...
     end
     for cid=1:N_chip
 	    asimcl(cid).wlop = asimcl(cid).wl_index ./ cmp{cid} * 100;
-	    ctrl(cid) = ctrl(cid).cleanup_fnc(asimcl(cid));
+	    ctrl{cid} = ctrl{cid}.cleanup_fnc(asimcl(cid));
 
 	    if show
 		    % Pause because it is bugged on Linux
 		    pause(0.5);
-		    obj.xutplot(chip(cid),asimcl(cid).xop,asimcl(cid).uop);
+		    obj.xutplot(chip{cid},asimcl(cid).xop,asimcl(cid).uop);
 		    pause(0.5);
-		    obj.powerconstrplot(chip(cid),cid,asimcl(cid).uop);
+		    obj.powerconstrplot(chip{cid},cid,asimcl(cid).uop);
 		    pause(0.5);
-		    obj.tempconstrplot(chip(cid),asimcl(cid).xop);
+		    obj.tempconstrplot(chip{cid},asimcl(cid).xop);
 		    pause(0.5);
-		    obj.perfplot(chip(cid),asimcl(cid).fop,asimcl(cid).wlop, cid);	
+		    obj.perfplot(chip{cid},asimcl(cid).fop,asimcl(cid).wlop, cid);	
 		    pause(0.5);
-		    obj.fvplot(chip(cid),asimcl(cid).fop,asimcl(cid).vop);
+		    obj.fvplot(chip{cid},asimcl(cid).fop,asimcl(cid).vop);
             pause(0.5);
     
-		    t1 = chip(cid).Ts*[1:Nsim(cid)*sys_mul(cid)]';
-		    t2 = chip(cid).Ts*sys_mul(cid)*[1:Nsim(cid)]';
+		    t1 = chip{cid}.Ts*[1:Nsim(cid)*sys_mul(cid)]';
+		    t2 = chip{cid}.Ts*sys_mul(cid)*[1:Nsim(cid)]';
     
-		    ctrl(cid) = ctrl(cid).plot_fnc(t1, t2, asimcl(cid).xop, asimcl(cid).uop, asimcl(cid).fop, asimcl(cid).vop, asimcl(cid).wlop);
+		    ctrl{cid} = ctrl{cid}.plot_fnc(t1, t2, asimcl(cid).xop, asimcl(cid).uop, asimcl(cid).fop, asimcl(cid).vop, asimcl(cid).wlop);
         end
     end
 

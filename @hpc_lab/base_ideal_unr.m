@@ -8,7 +8,7 @@ ctrl.C = chip.Cc;
 ctrl.Ts_ctrl = 500e-6;
 
 
-simres = obj.simulation(ctrl, chip,1,0);
+simres = obj.simulation({ctrl}, {chip},1,0);
 
 wlres = ctrl.widx;
 wlop = simres.wlop;

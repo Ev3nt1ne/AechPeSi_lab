@@ -278,7 +278,7 @@ classdef black_wolf < mpc_hpc & CP
 				V = obj.find_dom_sharedV(obj.lFVT, FD, obj.voltage_rule);
             else
                 %TODO: 15
-				fd = diag(f_ref)*ones(length(f_ref), 15);
+				fd = diag(f_ref)*ones(length(f_ref), size(obj.lFVT,1));
 				V = obj.F2VM(obj.lFVT, fd);
                 %V = obj.lFVT(sum(fd' > obj.lFVT(:,3)+1e-6)+1,1); %+1e-6 to fix matlab issue
 			end

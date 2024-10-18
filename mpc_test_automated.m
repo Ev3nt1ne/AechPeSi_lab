@@ -252,7 +252,7 @@ ctrl_bf.Fdiscretization_step = chip1.F_discretization_step;
 ctrl_bf.lwl_mem = chip1.wl_mem_weigth;
 ctrl_bf.Tmpc_off = -370;
 
-ctrl_bf.Nhzn = 2;
+ctrl_bf.Nhzn = 4;
 ctrl_bf.Q2 = 0;
 
 ctrl_bf.Gw = eye(chip1.Ns);
@@ -405,7 +405,7 @@ for wli=1:wl_times
             ctrl.Tsensor_amplitude = chip1.sensor_noise*chip1.sensor_noise_amplitude(chip1.PVT_T);
             ctrl.Fdiscretization_step = chip1.F_discretization_step;
 			
-			simres = hpc.simulation(ctrl, chip1,CM,show);
+			simres = hpc.simulation({ctrl}, {chip1},CM,show);
 			%xres{di, mdli, 1, wli} = xop;
 			%ures{di, mdli, 1, wli} = uop; 
 			%fres{di, mdli, 1, wli} = fop;
@@ -457,7 +457,7 @@ for wli=1:wl_times
             ctrl.Fdiscretization_step = chip1.F_discretization_step;
             ctrl.save_solver_stats = 0;
 
-            ctrl.Nhzn = 4;
+            ctrl.Nhzn = 5;
 
             %Robust Margins for T and P
             ctrl.Cty = zeros(ctrl.Nhzn, chip1.Nc);
@@ -474,7 +474,7 @@ for wli=1:wl_times
             ctrl.Q = Q_coeff*eye(chip1.Ns);
 
 
-			simres = hpc.simulation(ctrl, chip1,CM,show);
+			simres = hpc.simulation({ctrl}, {chip1},CM,show);
 			%xres{di, mdli, 2, wli} = xop;
 			%ures{di, mdli, 2, wli} = uop; 
 			%fres{di, mdli, 2, wli} = fop;
@@ -542,7 +542,7 @@ for wli=1:wl_times
 
             ctrl_bf.Q = (Q_coeff)*eye(chip1.Ns);
 
-			simres = hpc.simulation(ctrl_bf, chip1,CM,show);
+			simres = hpc.simulation({ctrl_bf}, {chip1},CM,show);
             ctrl_bf.not_update_lin = 1;
 			%xres{di, mdli, 2, wli} = xop;
 			%ures{di, mdli, 2, wli} = uop; 
@@ -612,7 +612,7 @@ for wli=1:wl_times
             
             ctrl_bf.Q = (Q_coeff)*eye(chip1.Ns);
 
-			simres = hpc.simulation(ctrl_bf, chip1,CM,show);
+			simres = hpc.simulation({ctrl_bf}, {chip1},CM,show);
             ctrl_bf.not_update_lin = 1;
 			%xres{di, mdli, 2, wli} = xop;
 			%ures{di, mdli, 2, wli} = uop; 

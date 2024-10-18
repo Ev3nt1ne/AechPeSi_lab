@@ -197,7 +197,7 @@ classdef controller < handle
             FMax = FVT(sum(V > ones(dimV,1)*FVT(:,1)'+1e-6, 2) + 1, 3); %+1e-6 to fix matlab issue
         end
         function [VMax] = F2VM(FVT, F)
-            dimV = length(F);
+            dimV = size(F,1);
             VMax = FVT(sum(F > ones(dimV,1)*FVT(:,3)'+1e-6, 2) + 1, 1); %+1e-6 to fix matlab issue
         end
         function [voltage_choice] = find_dom_sharedV(FVT, Ft, vrule)
