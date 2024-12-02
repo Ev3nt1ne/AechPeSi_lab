@@ -44,15 +44,6 @@ classdef CP < controller
 
 		f_ma;
 		pid_integ;
-
-		nOut;
-		o_inc_st = 0;
-		o_dec_st = 0;
-		o_inc_step_count = 0; %v_inc_steps;
-		o_dec_step_count = 0; %v_dec_steps;
-		o_hys_act = 0;
-		o_hys_step_count = 0; %v_hys_steps;
-		hys_p_count = 0;
 	end
 	
 	methods

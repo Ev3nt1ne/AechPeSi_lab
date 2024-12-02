@@ -35,14 +35,17 @@ alg_pos = 4;
 wl_pos = 5;
 
 % Main Aggregator metric: *test*/domain/model/*alg*/wl
-mam = dom_pos;
+mam = wl_pos;
 
 %secondary Aggregator metric or Comparison metric (i.e. the one in the bars)
 scm = alg_pos;
 
+%alg_user_name = {'FCA', 'EBA', 'VBA'};
+alg_user_name = {'FCA', 'TP-MPC', 'LB-MPC', 'LE-MPC'};
+
 % show values:
 show_tip_values = 1;
-show_violin = 0;
+show_violin = 1;
 font_size_tips = 10;
 font_size_tit = 18;
 font_size_axes = 12;
@@ -170,7 +173,7 @@ switch mam
         xmaml = {'Water', 'Air', 'Rack'};
         title_name = "Thermal Model";
     case alg_pos
-        xsaml = {'FCA', 'EBA', 'VBA'};
+        xsaml = alg_user_name;
     case wl_pos
         xmaml = {'MAX-WL', 'MULTI-WL', 'CLOUD-WL'};
         title_name = "Workload Type";
@@ -187,7 +190,7 @@ switch scm
         xsaml = {'Water', 'Air', 'Rack'};
         title_name = "Thermal Model";
     case alg_pos
-        xsaml = {'FCA', 'EBA', 'VBA'};
+        xsaml = alg_user_name;
     case wl_pos
         xsaml = {'MAX-WL', 'MULTI-WL', 'CLOUD-WL'};
         title_name = "Workload Type";
@@ -675,7 +678,7 @@ f2 = figure();
 t2 = tiledlayout(3,12);
 
 %TODO
-xsaml = {'FCA', 'EBA', 'VBA'};
+xsaml = alg_user_name;
 
 Tit = [];
 
@@ -858,19 +861,23 @@ end %show_violin
 %extractCell(tres, aidx, "temp", "exMn", "Max")
 
 %%
-
+disp(strcat("Temp: Max Exceeded (Max): ", num2str(max(T_M_d))));
 disp(strcat("Temp: Max Exceeded (mean): ", num2str(mean(T_M_d))));
 disp(strcat("    SD: ", num2str(std(T_M_d))));
 disp(strcat("Temp: Avearage exceeded value (mean): ", num2str(mean(T_AvEv_d))));
 disp(strcat("    SD: ", num2str(std(T_AvEv_d))));
 disp(strcat("Temp: Avearage exceeded Time Percentage (mean): ", num2str(mean(T_AvEt_d*100))));
 disp(strcat("    SD: ", num2str(std(T_AvEt_d*100))));
+disp(strcat("Temp: Avearage test temp (mean): ", num2str(mean(T_Av_d))));
+disp(strcat("    SD: ", num2str(std(T_Av_d))));
+%
 disp(strcat("Power: Avearage exceeded value Percentage (mean): ", num2str(mean(P_AvEp_d*100))));
 disp(strcat("    SD: ", num2str(std(P_AvEp_d*100))));
 disp(strcat("Power: Max exceeded value Percentage (mean): ", num2str(mean(P_MEp_d*100))));
 disp(strcat("    SD: ", num2str(std(P_MEp_d*100))));
 disp(strcat("Power: Max exceeded time Percentage (mean): ", num2str(mean(P_AvEt_d*100))));
 disp(strcat("    SD: ", num2str(std(P_AvEt_d*100))));
+%
 disp(strcat("Perf: Normalized Norm of frequency difference (mean): ", num2str(mean(W_AvFD_d))));
 disp(strcat("    SD: ", num2str(std(W_AvFD_d))));
 disp(strcat("Perf: Max Workload Progression (mean): ", num2str(mean(W_MWL_d))));

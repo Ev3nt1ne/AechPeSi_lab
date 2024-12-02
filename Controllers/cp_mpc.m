@@ -96,7 +96,7 @@ classdef cp_mpc < mpc_hpc & CP
 						constraints = [constraints, u{k} <= obj.umax - obj.Ctu(k,:)'];
 					end
 
-				    objective = objective + (((u{k}-ly_uref)-obj.umin)/(obj.umax-obj.umin))'*obj.Rt*(((u{k}-ly_uref)-obj.umin)/(obj.umax-obj.umin)) + ...
+				    objective = objective + (((u{k}-ly_uref))/(obj.umax-obj.umin))'*obj.Rt*(((u{k}-ly_uref))/(obj.umax-obj.umin)) + ...
                         ((u{k}-obj.umin)/(obj.umax-obj.umin))'*obj.Rs*((u{k}-obj.umin)/(obj.umax-obj.umin)) + ...
                         ((x{k+1}-obj.T_amb)/(obj.T_target(1)-obj.T_amb))'*obj.Q*((x{k+1}-obj.T_amb)/(obj.T_target(1)-obj.T_amb)); %x{k+1}'*obj.Q*x{k+1};
                 end
@@ -291,12 +291,24 @@ classdef cp_mpc < mpc_hpc & CP
 			obj.pbold = 0;
 			obj.pbc = 0;
 
+            %hyst
+            obj.o_inc_st = 0;
+			obj.o_dec_st = 0;
+			obj.pw_ad_step_count = 0;
+			obj.o_inc_step_count = 0; %o_inc_steps;
+			obj.o_dec_step_count = 0; %o_dec_steps;
+			obj.o_inc_steps = 8;
+			obj.o_hys_act = 0;
+			obj.o_hys_step_count = 0; %o_hys_steps;
+			obj.hys_p_count = 0;
+			obj.nOut = obj.lVmin*ones(obj.lvd,1);
+
             obj.ex_count = 0;
             obj.hyst_idx = -1;
 
 			obj.wl = [ones(obj.lNc,1) zeros(obj.lNc, obj.lipl -1)];
 
-			obj.T_target = ones(obj.lNc, 1)*obj.core_Tcrit;
+			%obj.T_target = ones(obj.lNc, 1)*obj.core_Tcrit;
 
 			obj.f_ma = zeros(obj.lNc,1);
 
@@ -320,6 +332,23 @@ classdef cp_mpc < mpc_hpc & CP
             chippwbdg = pwbdg(2);
             totpwbdg = pwbdg(1);
 
+            if chippwbdg~=obj.pbold
+				obj.pbold = chippwbdg;
+				obj.pbc = 1;
+				obj.hys_p_count = 0;
+				obj.o_hys_act = 0;
+				obj.o_inc_st = 0;
+				obj.o_dec_st = 0;
+				obj.o_inc_step_count = 0; %o_inc_steps;
+				obj.o_dec_step_count = 0; %o_dec_steps;
+				obj.o_hys_step_count = 0;
+				obj.pw_ad_step_count = obj.pw_ad_steps;
+			else
+				obj.pbc = 0;
+				obj.pw_ad_step_count = obj.pw_ad_step_count - 1;
+				obj.pw_ad_step_count = (obj.pw_ad_step_count<0)*0 + (obj.pw_ad_step_count>=0)*obj.pw_ad_step_count;
+			end
+
 			% Process Workload
 			obj.wl = obj.wl*(1-obj.alpha_wl) + i_wl*obj.alpha_wl;
 			Ceff = obj.wl * (obj.pw_ceff)';
@@ -333,7 +362,10 @@ classdef cp_mpc < mpc_hpc & CP
 			end
 	
 			% Adapt Measured&Computed Power
-			obj.pw_adapt = obj.cp_pw_adapt(obj.pw_adapt, i_pwm, obj.pw_old{1}, obj.pbc);
+			aup = obj.pw_ad_aup + obj.pw_ad_step_count * (obj.pw_ad_achange - obj.pw_ad_aup) / obj.pw_ad_steps;
+			adown = obj.pw_ad_adown + obj.pw_ad_step_count * (obj.pw_ad_achange - obj.pw_ad_adown) / obj.pw_ad_steps;
+			
+			obj.pw_adapt = obj.cp_pw_adapt(obj.pw_adapt, i_pwm, obj.pw_old{1}, (obj.pbc | (obj.pw_ad_step_count>(obj.pw_ad_steps-5))), aup, adown);
 			obj.pw_old{1} = obj.pw_old{2};
 
             if obj.pbc==1
@@ -363,7 +395,7 @@ classdef cp_mpc < mpc_hpc & CP
 			obj.xlplot(obj.ex_count+1,:) = 0;
 			%mpc_pw_target = repmat(chippwbdg, obj.Nhzn,1+obj.lvd);
 			%res = obj.call_mpc(obj.Tobs, obj.T_amb*1000, pu, mpc_pw_target);
-			res = obj.call_mpc(obj.Tobs, obj.T_amb*1000, pu, chippwbdg);
+			res = obj.call_mpc(obj.Tobs, obj.T_amb*1000, pu, (chippwbdg-obj.pw_adapt));
 			tt = isnan(res{1});
 			% too complex to make it vectorial
 			%dp = res{1}(~tt);
@@ -393,7 +425,13 @@ classdef cp_mpc < mpc_hpc & CP
             end
 			F_og = (obj.output_mpc - (obj.pw_stat_lin(1).*(obj.lVDom*V) + process*obj.pw_stat_lin(3)).*pex) ./ (obj.lVDom*(V.*V)) ./ Ceff;
 
-			% Process Freq
+
+            %% HYSTERESIS V-FILTER ACTIVATION
+            v_hys_red = (i_pwm - chippwbdg) < -(chippwbdg*(0.125+obj.hys_p_count/10));
+			V = obj.voltage_hysteresis(V, v_hys_red); %
+
+
+			%% Process Freq
 			%	Check vs maxF, Temp hysteresis, etc.					
 			fmaxi = f_ref+0.001;
 			F = F_og + (F_og>fmaxi).*(fmaxi - F_og);

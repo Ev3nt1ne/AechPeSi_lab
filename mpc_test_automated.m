@@ -142,7 +142,7 @@ th_models = 3;
 ndom = 4;
 robust = 0;
 show = 0;
-savetofile = 1;
+savetofile = 0;
 hpc.compare_vs_baseline = 1;
 chip1.sensor_noise = 0;
 
@@ -390,6 +390,8 @@ for wli=1:wl_times
 
 			%%
 
+            %close all;
+
 			%hpc.dummy_pw = 1;
             CM = [1];
 
@@ -435,6 +437,7 @@ for wli=1:wl_times
 					figarray(fn).Name = strcat(figarray(fn).Name, ' Alg: Fuzzy - ', itname);
 				end
 				figid = length(figarray)+1;
+                pause(0.5);
 			end
 			if savetofile
 				hpc.saveall(simres(1), chip1, 1, ...
@@ -453,7 +456,7 @@ for wli=1:wl_times
             ctrl.comm_mat = 1;
             ctrl.multi_der_fcn = @mff;
             ctrl.multi_learn_rate = 0.1;
-            ctrl.T_target = ones(ctrl.lNc, 1)*chip1.core_limit_temp;
+            ctrl.T_target = ones(ctrl.lNc, 1)*(chip1.core_limit_temp);
             ctrl.Fdiscretization_step = chip1.F_discretization_step;
             ctrl.save_solver_stats = 0;
 
@@ -465,7 +468,7 @@ for wli=1:wl_times
             
             %Reference Tracking Objective Matrix
             R_coeff = 20;
-            Q_coeff = 12.5;
+            Q_coeff = 2;
             ctrl.Rt = R_coeff*eye(chip1.Nc);
             
             %Others
@@ -505,6 +508,7 @@ for wli=1:wl_times
 					figarray(fn).Name = strcat(figarray(fn).Name, ' Alg: clMPC - ', itname);
 				end
 				figid = length(figarray)+1;
+                pause(0.5);
 			end
 			
 			if savetofile
@@ -518,7 +522,7 @@ for wli=1:wl_times
             R_coeff = 0; %absolute value
             R_shared = 0;%15; % R_coeff/0.2;
             R_track = 20;
-            Q_coeff = 22.5; %6 %1e-2%2.5; 
+            Q_coeff = 18; %15;
             
             % Create matrixes
             ctrl_bf.R = R_coeff*eye(chip1.Nc);
@@ -574,6 +578,7 @@ for wli=1:wl_times
 					figarray(fn).Name = strcat(figarray(fn).Name, ' Alg: BW - ', itname);
 				end
 				figid = length(figarray)+1;
+                pause(0.5);
             end
 			
 			if savetofile
@@ -585,10 +590,10 @@ for wli=1:wl_times
             % Improved Black wolf
             
             %Reference Tracking Objective Matrix
-            R_coeff = 15; % 20 %absolute value
-            R_shared = 10;%15; % R_coeff/0.2;
-            R_track = 22.5;
-            Q_coeff = 17.5; %6 %1e-2%2.5;
+            R_coeff = 7.5; %4;  %absolute value
+            R_shared = 8; % R_coeff/0.2;
+            R_track = 20; %22.5;
+            Q_coeff = 10; %6
             
             % Create matrixes
             ctrl_bf.R = R_coeff*eye(chip1.Nc);
@@ -644,6 +649,7 @@ for wli=1:wl_times
 					figarray(fn).Name = strcat(figarray(fn).Name, ' Alg: ImBW - ', itname);
 				end
 				figid = length(figarray)+1;
+                pause(0.5);
 			end
 			
 			if savetofile

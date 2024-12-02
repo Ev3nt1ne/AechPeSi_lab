@@ -21,6 +21,12 @@ classdef controller < handle
         multi_prev_x;
         multi_prev_y;
         multi_learn_rate;
+
+        %hyst
+        pw_ad_aup = 0.015; %0.05; %0.025;f
+		pw_ad_adown = 0.02; %0.075; %0.025; %0.1;
+		pw_ad_achange = 0.5; %0.5;
+		pw_ad_steps = 20;
 	end
 
 	properties(Dependent)
@@ -58,6 +64,17 @@ classdef controller < handle
         lFmax;
         lVmin;
         lVmax;
+
+        %hyst
+        pw_ad_step_count = 0;
+        nOut;
+		o_inc_st = 0;
+		o_dec_st = 0;
+		o_inc_step_count = 0; %v_inc_steps;
+		o_dec_step_count = 0; %v_dec_steps;
+		o_hys_act = 0;
+		o_hys_step_count = 0; %v_hys_steps;
+		hys_p_count = 0;
 
     end
 
@@ -142,6 +159,58 @@ classdef controller < handle
             y = y + (grad - obj.multi_prev_grad);
             obj.multi_prev_y = y;
             obj.multi_prev_grad = grad;
+        end
+        function oV = voltage_hysteresis(obj, iV, v_hys_red) %v_hys_red = (i_pwm - chippwbdg) < -(chippwbdg*(0.125+obj.hys_p_count/10));
+            V_inc = (iV > (obj.nOut+1e-3));
+			V_dec = (iV < (obj.nOut-1e-3));
+			
+			obj.o_inc_st = obj.o_inc_st | V_inc;
+			obj.o_inc_step_count = (obj.o_inc_steps.*V_inc) + ((~V_inc).*(obj.o_inc_step_count - obj.o_inc_st));
+			
+			obj.o_inc_st = (obj.o_inc_step_count>0); % | o_dec_st;
+			
+			obj.o_dec_st = obj.o_inc_st & ( obj.o_dec_st | V_dec);
+			%if o_dec_st
+			%	s=s;
+			%end
+			%o_dec_step_count = (o_dec_steps.*V_dec) + ((~V_dec).*(o_dec_step_count - o_dec_st));
+			obj.o_dec_step_count = ((obj.o_dec_step_count>0).*(obj.o_dec_step_count-1)) + (obj.o_dec_step_count<=0).*(obj.o_dec_st.*obj.o_dec_steps);
+			
+			obj.o_dec_st = (obj.o_dec_step_count>0);
+			
+			o_hys_act_hold = obj.o_hys_act;
+			
+			obj.o_hys_act = obj.o_hys_act | (obj.o_dec_st & V_inc);
+			
+			%Initialize
+			obj.o_hys_step_count = ((obj.o_hys_step_count>0).*obj.o_hys_step_count) + (obj.o_hys_step_count<=0).*(obj.o_hys_act.*obj.o_hys_steps);
+			%Reduce
+			%pull = (Ceff.*F.*(obj.VDom*V) + obj.leak_vdd/1000).*(obj.VDom*V) + d_p*obj.leak_process/1000;
+			%v_hys_red = (i_pwm - chippwbdg) < -(chippwbdg*(0.125+obj.hys_p_count/10));
+			%(sum(pull) - chippwbdg + pw_adapt) < -6 ;
+			%(delta_p < (chippwbdg - 6)); %TODO: 6 depends on the #of cores, #of domains, and the ratio between the two.
+			%TODO: also depends on the power budget itself, and the PMAX, PMIN
+			obj.o_hys_step_count = (obj.o_hys_act & obj.o_hys_step_count) .* ...
+				(obj.o_hys_step_count - v_hys_red);
+			
+			obj.o_hys_act = (obj.o_hys_step_count>0);
+			
+			obj.hys_p_count = obj.hys_p_count + (o_hys_act_hold ~= obj.o_hys_act) .* obj.o_hys_act;
+			
+			%{
+			ppap(s,[1:obj.vd]) = o_inc_st;
+			ppap(s,[obj.vd+1:obj.vd*2]) = o_inc_step_count;
+			ppap(s,[obj.vd*2+1:obj.vd*3]) = o_dec_st;
+			ppap(s,[obj.vd*3+1:obj.vd*4]) = o_dec_step_count;
+			ppap(s,[obj.vd*4+1:obj.vd*5]) = o_hys_act;
+			ppap(s,[obj.vd*5+1:obj.vd*6]) = o_hys_step_count;
+			ppap(s,[obj.vd*6+1:obj.vd*7]) = V_inc;
+			ppap(s,[obj.vd*7+1:obj.vd*8]) = V_dec;
+			%}		
+	
+			oV = iV.*((~obj.o_hys_act)|(iV<=obj.nOut)) + obj.nOut.*(obj.o_hys_act & (iV>obj.nOut));
+			
+			obj.nOut = oV;
         end
 	end
 

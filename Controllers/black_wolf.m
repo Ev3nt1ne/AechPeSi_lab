@@ -111,7 +111,7 @@ classdef black_wolf < mpc_hpc & CP
 			objective = 0;
 
 			for k = 1:obj.Nhzn %TODO T_target(1) not good!!!!!
-				objective = objective + (((u{k}-ly_uref)-obj.Pm_min)/(obj.Pm_max-obj.Pm_min))'*obj.Rt*(((u{k}-ly_uref)-obj.Pm_min)/(obj.Pm_max-obj.Pm_min)) + ...
+				objective = objective + (((u{k}-ly_uref))/(obj.Pm_max-obj.Pm_min))'*obj.Rt*(((u{k}-ly_uref))/(obj.Pm_max-obj.Pm_min)) + ...
                         ((u{k}-obj.Pm_min)/(obj.Pm_max-obj.Pm_min))'*obj.Rs*((u{k}-obj.Pm_min)/(obj.Pm_max-obj.Pm_min)) + ...
                         ((x{k+1}-obj.T_amb-Toff)/(obj.T_target(1)-obj.T_amb))'*obj.Q*((x{k+1}-obj.T_amb-Toff)/(obj.T_target(1)-obj.T_amb)) + ...
                         ((u{k}-obj.Pm_min)/(obj.Pm_max-obj.Pm_min).*wSm)'*obj.R*((u{k}-obj.Pm_min)/(obj.Pm_max-obj.Pm_min).*wSm) + ...
@@ -205,6 +205,9 @@ classdef black_wolf < mpc_hpc & CP
 
 			obj.tmpc = zeros(Nsim+1, obj.lNs);
             obj.Pw_diff = zeros(Nsim+1, 1);
+            obj.pw_adapt = 0;
+            obj.pw_old{1} = 1*obj.lNc;
+			obj.pw_old{2} = 1*obj.lNc;
 
 			obj.ex_count = 0;
             obj.hyst_idx = -1;
@@ -220,6 +223,20 @@ classdef black_wolf < mpc_hpc & CP
 			obj.output_mpc = 1*ones(obj.lNc,1);
 
             obj.hyst_duration = 4;
+
+            %hyst
+            obj.o_inc_st = 0;
+			obj.o_dec_st = 0;
+			obj.pw_ad_step_count = 0;
+			obj.o_inc_step_count = 0; %o_inc_steps;
+			obj.o_dec_step_count = 0; %o_dec_steps;
+			obj.o_inc_steps = 8;
+			obj.o_hys_act = 0;
+			obj.o_hys_step_count = 0; %o_hys_steps;
+			obj.hys_p_count = 0;
+			obj.pbold = 0;
+			obj.pbc = 0;
+			obj.nOut = obj.lVmin*ones(obj.lvd,1);
 
             % Observer
             % create the dicrete system
@@ -254,9 +271,33 @@ classdef black_wolf < mpc_hpc & CP
             chippwbdg = pwbdg(2);
             totpwbdg = pwbdg(1);
 
+            if chippwbdg~=obj.pbold
+				obj.pbold = chippwbdg;
+				obj.pbc = 1;
+				obj.hys_p_count = 0;
+				obj.o_hys_act = 0;
+				obj.o_inc_st = 0;
+				obj.o_dec_st = 0;
+				obj.o_inc_step_count = 0; %o_inc_steps;
+				obj.o_dec_step_count = 0; %o_dec_steps;
+				obj.o_hys_step_count = 0;
+				obj.pw_ad_step_count = obj.pw_ad_steps;
+			else
+				obj.pbc = 0;
+				obj.pw_ad_step_count = obj.pw_ad_step_count - 1;
+				obj.pw_ad_step_count = (obj.pw_ad_step_count<0)*0 + (obj.pw_ad_step_count>=0)*obj.pw_ad_step_count;
+			end
+
 			% Process Workload
 			obj.wl = obj.wl*(1-obj.alpha_wl) + i_wl*obj.alpha_wl;
 			Ceff = obj.wl * (obj.pw_ceff)';
+
+            % Adapt Measured&Computed Power
+			aup = obj.pw_ad_aup + obj.pw_ad_step_count * (obj.pw_ad_achange - obj.pw_ad_aup) / obj.pw_ad_steps;
+			adown = obj.pw_ad_adown + obj.pw_ad_step_count * (obj.pw_ad_achange - obj.pw_ad_adown) / obj.pw_ad_steps;
+			
+			obj.pw_adapt = obj.cp_pw_adapt(obj.pw_adapt, i_pwm, obj.pw_old{1}, (obj.pbc | (obj.pw_ad_step_count>(obj.pw_ad_steps-5))), aup, adown);
+			obj.pw_old{1} = obj.pw_old{2};
 
 			%TODO here obj.Cc
 			%[~, Tidx] = min(abs(obj.T0v - obj.Cc*T),[],2);
@@ -325,8 +366,8 @@ classdef black_wolf < mpc_hpc & CP
 
 			% MPC
 			obj.xlplot(obj.ex_count+1,:) = 0;
-			mpc_pw_target = repmat(chippwbdg, obj.Nhzn,1+obj.lvd);
-            wSm = obj.wl*(1-obj.lwl_mem)';
+			mpc_pw_target = repmat((chippwbdg-obj.pw_adapt), obj.Nhzn,1+obj.lvd);
+            wSm = obj.wl*(obj.lwl_mem)'; %obj.wl*(1-obj.lwl_mem)';
 			res = obj.call_mpc(state_MPC+obj.Tmpc_off, Ceff, (obj.T_amb)*1000, h0v, wSm, input_mpc, mpc_pw_target);
 			tt = isnan(res{1});
 			% too complex to make it vectorial
@@ -372,11 +413,29 @@ classdef black_wolf < mpc_hpc & CP
 
 				% TODO: Reverse Voltage choice, here again I use max.
 				V(vi,1) = obj.F2VM(obj.lFVT, max(Fc)); %+1e-6 to fix matlab issue
-			end
+            end
+
+            %% HYSTERESIS V-FILTER ACTIVATION
+            v_hys_red = (i_pwm - chippwbdg) < -(chippwbdg*(0.125+obj.hys_p_count/10));
+			V = obj.voltage_hysteresis(V, v_hys_red); %
+
+			%pwap(s) = pw_adapt;
+
+			% Save OG freq
+			%F_og = F;
+	
+			% Process Freq
+			%	Check vs maxF, Temp hysteresis, etc.
+			fmaxi = obj.V2FM(obj.lFVT, obj.lVDom * V);
+			F = F + (F>fmaxi).*(fmaxi - F);
+			F = F + (F<obj.lFmin).*(obj.lFmin*ones(obj.lNc,1) - F);
 
 			%disp(obj.ex_count)
 			%toto = [obj.Cc*obj.Tobs - 273.15, obj.Cc*state_MPC- 273.15, obj.Cc*res{2} - 273.15, pp, obj.output_mpc, obj.prevF, F, obj.lVDom*V,  i_wl*(hc.dyn_ceff_k)'];
 			%toto = ["T0", "T1", "T2-mpc", "prevMPC T0-T1", "mpc T1-T2", "prev F T0-T1", "F T1-T2", "V T1-T2", "wl T-1 - T0"; toto]
+            pex = exp(obj.pw_stat_exp(1)*obj.lVDom*V + (obj.Cc*obj.Tobs)*obj.pw_stat_exp(2) + obj.pw_stat_exp(3));
+            pu = Ceff.*F.*(obj.lVDom*(V.*V)) + (obj.pw_stat_lin(1).*(obj.lVDom*V) + process*obj.pw_stat_lin(3)).*pex;
+            obj.pw_old{2} = sum(pu);
 
 			obj.prevF = F;
 			obj.prevV = V;
