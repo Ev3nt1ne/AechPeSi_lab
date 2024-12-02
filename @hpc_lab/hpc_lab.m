@@ -3,6 +3,9 @@ classdef hpc_lab < thermal_model & power_model & perf_model & handle
 	%   Detailed explanation goes here
 	
 	properties
+
+		expvar;
+		
 		%tm;
 		tasim = 2; % Free Simulation Time in [s]
 		tsim = 1;					% Simulation Time in [s]

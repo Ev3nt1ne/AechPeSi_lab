@@ -250,13 +250,15 @@ classdef cp_mpc < mpc_hpc & CP
             % sparsify
             if obj.cutoffA ~= 0
                 nnzS = nnz(obj.Ad_ctrl);
-                obj.Ad_ctrl(obj.Ad_ctrl < obj.cutoffA) = 0;
+				idxlg = (obj.Ad_ctrl < obj.cutoffA) & (hpc_class.Ac_nom == 0);
+                obj.Ad_ctrl(idxlg) = 0;
                 nnzE = nnz(obj.Ad_ctrl);
                 disp(sprintf('sparsifying A by x%f.  nnz(A) goes from %d to %d.',nnzS/nnzE, nnzS, nnzE));
             end
             if obj.cutoffB ~= 0
                 nnzS = nnz(obj.Bd_ctrl);
-                obj.Bd_ctrl(obj.Bd_ctrl < obj.cutoffB) = 0;
+				idxlg = (obj.Bd_ctrl < obj.cutoffB) & (hpc_class.Bc_nom == 0);
+                obj.Bd_ctrl(idxlg) = 0;
                 nnzE = nnz(obj.Bd_ctrl);
                 disp(sprintf('sparsifying B by x%f.  nnz(B) goes from %d to %d.',nnzS/nnzE, nnzS, nnzE));
             end
@@ -407,6 +409,8 @@ classdef cp_mpc < mpc_hpc & CP
 			plot(t2, obj.tmpc(2:end,:) - 273.15, 'm'); hold on;
 			xlabel("Time [s]");
 			ylabel("Temperature [T]");
+
+			hc.expvar = obj.tmpc;
 		end
 	end
 
